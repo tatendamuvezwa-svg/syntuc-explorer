@@ -1,0 +1,314 @@
+{
+  "entities": {
+    "ReservationRequest": {
+      "title": "Reservation Request",
+      "description": "Guest reservation request submitted for Victoria Falls packages, tours, or accommodation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "requestType": { "type": "string" },
+        "guestId": { "type": "string" },
+        "guestSessionId": { "type": "string" },
+        "tripPlanId": { "type": "string" },
+        "status": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "adultsCount": { "type": "integer" },
+        "childrenCount": { "type": "integer" },
+        "authoritativeTotal": { "type": "number" },
+        "currency": { "type": "string" },
+        "specialRequests": { "type": "string" },
+        "isBridgeIncentiveApplied": { "type": "boolean" },
+        "assignedStaffId": { "type": "string" },
+        "visitorId": { "type": "string" },
+        "firstTouchSource": { "type": "string" },
+        "firstTouchMedium": { "type": "string" },
+        "firstTouchCampaign": { "type": "string" },
+        "firstTouchContent": { "type": "string" },
+        "firstTouchTerm": { "type": "string" },
+        "firstTouchReferrer": { "type": "string" },
+        "lastTouchSource": { "type": "string" },
+        "lastTouchMedium": { "type": "string" },
+        "lastTouchCampaign": { "type": "string" },
+        "lastTouchContent": { "type": "string" },
+        "lastTouchTerm": { "type": "string" },
+        "lastTouchReferrer": { "type": "string" },
+        "attributionConfidence": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "referenceNumber", "status", "authoritativeTotal", "currency", "createdAt"]
+    },
+    "ReservationItem": {
+      "title": "Reservation Item",
+      "description": "Item snapshot associated with a reservation request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reservationRequestId": { "type": "string" },
+        "productId": { "type": "string" },
+        "snapshotProductName": { "type": "string" },
+        "snapshotOperatorName": { "type": "string" },
+        "snapshotProductType": { "type": "string" },
+        "snapshotUnitPrice": { "type": "number" },
+        "snapshotPriceBasis": { "type": "string" },
+        "snapshotCurrency": { "type": "string" },
+        "guestCount": { "type": "integer" },
+        "nightsCount": { "type": "integer" },
+        "calculatedSubtotal": { "type": "number" },
+        "scheduledDate": { "type": "string" },
+        "scheduledTime": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reservationRequestId", "productId", "snapshotProductName", "calculatedSubtotal"]
+    },
+    "AnalyticsVisitor": {
+      "title": "Analytics Visitor",
+      "description": "Persistent anonymous or identified visitor tracking record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "visitorId": { "type": "string" },
+        "firstSeenAt": { "type": "string", "format": "date-time" },
+        "lastSeenAt": { "type": "string", "format": "date-time" },
+        "firstSource": { "type": "string" },
+        "firstMedium": { "type": "string" },
+        "firstCampaign": { "type": "string" },
+        "firstContent": { "type": "string" },
+        "firstTerm": { "type": "string" },
+        "firstReferrerUrl": { "type": "string" },
+        "firstReferrerDomain": { "type": "string" },
+        "firstLandingPage": { "type": "string" },
+        "attributionConfidence": { "type": "string" },
+        "totalSessions": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "visitorId", "firstSource"]
+    },
+    "AnalyticsSession": {
+      "title": "Analytics Session",
+      "description": "Visitor session recording device, landing page, and attribution parameters.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "visitorId": { "type": "string" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "lastActivityAt": { "type": "string", "format": "date-time" },
+        "landingPage": { "type": "string" },
+        "exitPage": { "type": "string" },
+        "source": { "type": "string" },
+        "medium": { "type": "string" },
+        "campaign": { "type": "string" },
+        "content": { "type": "string" },
+        "term": { "type": "string" },
+        "referrerUrl": { "type": "string" },
+        "referrerDomain": { "type": "string" },
+        "attributionConfidence": { "type": "string" },
+        "isBounce": { "type": "boolean" },
+        "deviceCategory": { "type": "string" },
+        "browser": { "type": "string" },
+        "os": { "type": "string" },
+        "country": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "sessionId", "visitorId", "source"]
+    },
+    "AnalyticsEvent": {
+      "title": "Analytics Event",
+      "description": "Granular visitor funnel event record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "eventId": { "type": "string" },
+        "visitorId": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "eventType": { "type": "string" },
+        "route": { "type": "string" },
+        "productId": { "type": "string" },
+        "packageId": { "type": "string" },
+        "reservationId": { "type": "string" },
+        "reservationReference": { "type": "string" },
+        "metadata": { "type": "object" },
+        "occurredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "eventId", "visitorId", "sessionId", "eventType"]
+    },
+    "MediaAsset": {
+      "title": "Media Asset",
+      "description": "Persisted media thumbnail, image, or video asset.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerType": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "url": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "caption": { "type": "string" },
+        "altText": { "type": "string" },
+        "displayOrder": { "type": "integer" },
+        "isPrimary": { "type": "boolean" },
+        "sourceName": { "type": "string" },
+        "verificationState": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerType", "ownerId", "url", "isPrimary"]
+    },
+    "MediaChunk": {
+      "title": "Media Chunk",
+      "description": "Chunked segment of durable media file or data URI to satisfy Firestore document size constraints.",
+      "type": "object",
+      "properties": {
+        "mediaAssetId": { "type": "string" },
+        "chunkIndex": { "type": "integer" },
+        "totalChunks": { "type": "integer" },
+        "data": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["mediaAssetId", "chunkIndex", "totalChunks", "data"]
+    },
+    "Product": {
+      "title": "Catalog Product",
+      "description": "Authoritative catalog product (accommodation or activity) with pricing, video URL, and media references.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "operatorId": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "productType": { "type": "string" },
+        "categorySlug": { "type": "string" },
+        "shortDescription": { "type": "string" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "duration": { "type": "string" },
+        "basePrice": { "type": "string" },
+        "currency": { "type": "string" },
+        "priceBasis": { "type": "string" },
+        "inclusions": { "type": "array", "items": { "type": "string" } },
+        "exclusions": { "type": "array", "items": { "type": "string" } },
+        "suitability": { "type": "array", "items": { "type": "string" } },
+        "isPublished": { "type": "boolean" },
+        "isFeatured": { "type": "boolean" },
+        "availabilityNote": { "type": "string" },
+        "primaryMediaId": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "evidenceStatus": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "slug", "productType", "basePrice", "currency"]
+    },
+    "DeletedRecord": {
+      "title": "Deleted Record Tombstone",
+      "description": "Tombstone record tracking deliberate deletion of production entities to prevent seed resurrection.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "collectionName": { "type": "string" },
+        "recordId": { "type": "string" },
+        "deletedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "collectionName", "recordId", "deletedAt"]
+    },
+    "Guest": {
+      "title": "Guest",
+      "description": "Guest customer profile with contact information.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "country": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "fullName", "email"]
+    },
+    "GuestAccessToken": {
+      "title": "Guest Access Token",
+      "description": "Secure access token enabling traveler to view their reservation dashboard without staff credentials.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reservationRequestId": { "type": "string" },
+        "guestId": { "type": "string" },
+        "tokenHash": { "type": "string" },
+        "isRevoked": { "type": "boolean" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reservationRequestId", "guestId"]
+    },
+    "GuestMessage": {
+      "title": "Guest Message",
+      "description": "Communication message exchange between guest and coordinator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reservationRequestId": { "type": "string" },
+        "guestSessionId": { "type": "string" },
+        "senderType": { "type": "string" },
+        "senderName": { "type": "string" },
+        "messageText": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reservationRequestId", "messageText", "senderType"]
+    }
+  },
+  "firestore": {
+    "/reservation_requests/{reservationId}": {
+      "schema": "ReservationRequest",
+      "description": "Guest reservation requests"
+    },
+    "/reservation_items/{itemId}": {
+      "schema": "ReservationItem",
+      "description": "Individual items included in a reservation"
+    },
+    "/analytics_visitors/{visitorId}": {
+      "schema": "AnalyticsVisitor",
+      "description": "Unique visitor tracking profiles"
+    },
+    "/analytics_sessions/{sessionId}": {
+      "schema": "AnalyticsSession",
+      "description": "Visitor session records"
+    },
+    "/analytics_events/{eventId}": {
+      "schema": "AnalyticsEvent",
+      "description": "Analytics tracking events"
+    },
+    "/media_assets/{mediaId}": {
+      "schema": "MediaAsset",
+      "description": "Durable catalog media assets"
+    },
+    "/media_chunks/{chunkId}": {
+      "schema": "MediaChunk",
+      "description": "Chunked payload documents for large media assets"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Durable catalog products with custom video URLs and pricing"
+    },
+    "/deleted_records/{tombstoneId}": {
+      "schema": "DeletedRecord",
+      "description": "Tombstones preventing resurrection of deleted production assets"
+    },
+    "/guests/{guestId}": {
+      "schema": "Guest",
+      "description": "Guest customer profiles"
+    },
+    "/guest_access_tokens/{tokenId}": {
+      "schema": "GuestAccessToken",
+      "description": "Guest access tokens for self-service reservation dashboards"
+    },
+    "/guest_messages/{messageId}": {
+      "schema": "GuestMessage",
+      "description": "Communication messages between guests and desk coordinators"
+    }
+  }
+}

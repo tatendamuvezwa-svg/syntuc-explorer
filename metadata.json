@@ -1,0 +1,6 @@
+{
+  "name": "Syntuc Explorer",
+  "description": "Your intelligent guide to Victoria Falls, Zimbabwe. Explore verified accommodation, activities, curated packages, and plan school trips with server-authoritative reservation requests. Built by SAINTECH.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
