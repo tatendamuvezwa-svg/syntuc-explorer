@@ -166,8 +166,8 @@ router.get('/reservations/:id', requireCoordinatorAuth, async (req: Authenticate
   }
 });
 
-// PATCH /api/coordinator/reservations/:id/status - Update reservation status (Idempotent)
-router.patch('/reservations/:id/status', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+// PATCH & POST /api/coordinator/reservations/:id/status - Update reservation status (Idempotent)
+const handleStatusUpdate = async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { status, internalNote } = req.body;
@@ -289,7 +289,9 @@ router.patch('/reservations/:id/status', requireCoordinatorAuth, async (req: Aut
     console.error('Error updating status:', error);
     res.status(500).json({ error: 'FAILED_TO_UPDATE_STATUS' });
   }
-});
+};
+router.patch('/reservations/:id/status', requireCoordinatorAuth, handleStatusUpdate);
+router.post('/reservations/:id/status', requireCoordinatorAuth, handleStatusUpdate);
 
 // GET /api/coordinator/reservations/:id/messages
 router.get('/reservations/:id/messages', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {

@@ -564,20 +564,16 @@ export async function reconcileAuthoritativeMediaAndPrimaries(tombstones: Set<st
       );
 
       let chosenPrimaryId = p.primaryMediaId;
+      const activeChosen = chosenPrimaryId ? activeMedia.find(m => m.id === chosenPrimaryId) : null;
 
-      if (customUploads.length > 0) {
-        // Product has genuine custom coordinator uploads!
-        // Ensure primary points to a custom upload, never a generic seed image
-        const activeChosen = customUploads.find(m => m.id === chosenPrimaryId);
-        if (!activeChosen) {
+      if (!activeChosen) {
+        // Only if currently assigned primary is missing, null, or deleted, select appropriate fallback
+        if (customUploads.length > 0) {
           const preferredCustom = customUploads.find(m => m.isPrimary) || customUploads[0];
           chosenPrimaryId = preferredCustom.id;
-        }
-      } else {
-        const activeChosen = activeMedia.find(m => m.id === chosenPrimaryId);
-        if (!activeChosen) {
+        } else {
           const fallback = activeMedia.find(m => m.isPrimary) || activeMedia[0];
-          chosenPrimaryId = fallback.id;
+          chosenPrimaryId = fallback ? fallback.id : null;
         }
       }
 
@@ -1007,6 +1003,29 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
             .onConflictDoNothing();
         }
 
+        // Ensure trip plan exists if referenced to satisfy foreign key constraint
+        if (data.tripPlanId) {
+          await db
+            .insert(schema.tripPlans)
+            .values({
+              id: data.tripPlanId,
+              guestSessionId: guestSessionId,
+              title: 'Saved Itinerary',
+              startDate: data.startDate || null,
+              endDate: data.endDate || null,
+              adultsCount: data.adultsCount || 2,
+              childrenCount: data.childrenCount || 0,
+            })
+            .onConflictDoNothing();
+        }
+
+        // Validate assigned staff user exists before inserting to satisfy foreign key constraint
+        let validStaffId = data.assignedStaffId || null;
+        if (validStaffId) {
+          const userExists = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, validStaffId));
+          if (userExists.length === 0) validStaffId = null;
+        }
+
         await db
           .insert(schema.reservationRequests)
           .values({
@@ -1026,7 +1045,7 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
             specialRequests: data.specialRequests || null,
             isBridgeIncentiveApplied: Boolean(data.isBridgeIncentiveApplied),
             schoolMetadata: data.schoolMetadata || null,
-            assignedStaffId: data.assignedStaffId || null,
+            assignedStaffId: validStaffId,
             visitorId: data.visitorId || null,
             firstTouchSource: data.firstTouchSource || null,
             firstTouchMedium: data.firstTouchMedium || null,
@@ -1048,7 +1067,7 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
             target: schema.reservationRequests.id,
             set: {
               status: data.status || 'NEW',
-              assignedStaffId: data.assignedStaffId || null,
+              assignedStaffId: validStaffId,
               authoritativeTotal: data.authoritativeTotal ? String(data.authoritativeTotal) : '0.00',
               specialRequests: data.specialRequests || null,
               isBridgeIncentiveApplied: Boolean(data.isBridgeIncentiveApplied),
@@ -1062,11 +1081,39 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
       }
     }
 
-    // 9. Hydrate Reservation Items (Products are already restored in step 5, so FKs succeed)
+    // 9. Hydrate Reservation Items (Ensure referenced product exists so FK succeeds)
     const itemsSnap = await getDocs(collection(fdb, 'reservation_items'));
     for (const docSnap of itemsSnap.docs) {
       const item = docSnap.data() as any;
       try {
+        if (!item.id || !item.reservationRequestId) continue;
+
+        if (item.productId) {
+          const prodExists = await db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.id, item.productId));
+          if (prodExists.length === 0) {
+            await db
+              .insert(schema.products)
+              .values({
+                id: item.productId,
+                name: item.snapshotProductName || 'Victoria Falls Experience',
+                slug: item.productId.replace(/_/g, '-'),
+                productType: (item.snapshotProductType || 'activity').toLowerCase(),
+                categorySlug: 'adventure',
+                shortDescription: item.snapshotProductName || 'Victoria Falls Experience',
+                description: item.snapshotProductName || 'Victoria Falls Experience',
+                location: 'Victoria Falls, Zimbabwe',
+                basePrice: String(item.snapshotUnitPrice || '0.00'),
+                currency: item.snapshotCurrency || 'USD',
+                priceBasis: item.snapshotPriceBasis || 'per_person',
+                inclusions: [],
+                exclusions: [],
+                suitability: [],
+                isPublished: true,
+                evidenceStatus: 'ESTABLISHED',
+              })
+              .onConflictDoNothing();
+          }
+        }
         await db
           .insert(schema.reservationItems)
           .values({
@@ -1164,6 +1211,56 @@ export async function ensureCanonicalCloudSeed(tombstones: Set<string> = new Set
         updatedAt: '2026-10-06T07:51:24.671Z',
         cloudPersistedAt: new Date().toISOString(),
       });
+    }
+
+    // Always ensure canonical reservation exists in local DB before line item insert
+    const resInDb = await db.select({ id: schema.reservationRequests.id }).from(schema.reservationRequests).where(eq(schema.reservationRequests.id, canonId));
+    if (resInDb.length === 0) {
+      await db.insert(schema.guests).values({
+        id: 'gst_sophia_almansoor',
+        fullName: 'Sophia Al-Mansoor',
+        email: 'sophia.almansoor@example.com',
+        country: 'United Kingdom',
+        createdAt: new Date('2026-10-06T07:51:24.671Z'),
+      }).onConflictDoNothing();
+
+      await db.insert(schema.guestSessions).values({
+        id: 'ses_sophia_vf',
+        guestId: 'gst_sophia_almansoor',
+        sessionSecret: 'secret_sophia',
+        createdAt: new Date('2026-10-06T07:51:24.671Z'),
+        lastActiveAt: new Date(),
+      }).onConflictDoNothing();
+
+      await db.insert(schema.reservationRequests).values({
+        id: canonId,
+        referenceNumber: 'SYN-VF-50327',
+        requestType: 'STANDARD',
+        guestId: 'gst_sophia_almansoor',
+        guestSessionId: 'ses_sophia_vf',
+        tripPlanId: null,
+        status: 'CONFIRMED',
+        startDate: '2026-11-12',
+        endDate: '2026-11-15',
+        adultsCount: 2,
+        childrenCount: 0,
+        authoritativeTotal: '346.00',
+        currency: 'USD',
+        specialRequests: 'Anniversary celebration. Window seats on helicopter flight requested.',
+        isBridgeIncentiveApplied: false,
+        visitorId: 'vis_ad2_user',
+        firstTouchSource: 'tiktok',
+        firstTouchMedium: 'paid_social',
+        firstTouchCampaign: 'helicopter_launch',
+        firstTouchContent: 'helicopter_ad_02',
+        lastTouchSource: 'tiktok',
+        lastTouchMedium: 'paid_social',
+        lastTouchCampaign: 'helicopter_launch',
+        lastTouchContent: 'helicopter_ad_02',
+        attributionConfidence: 'UTM_EXACT',
+        createdAt: new Date('2026-10-06T07:51:24.671Z'),
+        updatedAt: new Date('2026-10-06T07:51:24.671Z'),
+      }).onConflictDoNothing();
     }
 
     // Always ensure line item for SYN-VF-50327 exists in Firestore and local DB

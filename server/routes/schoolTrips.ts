@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { eq, and, desc } from 'drizzle-orm';
 import { calculateSchoolTripQuote, SchoolTripQuoteInput } from '../services/schoolTrips.ts';
+import { persistReservationToFirestore } from '../services/firestoreSync.ts';
 import { db } from '../db/index.ts';
 import * as schema from '../db/schema.ts';
 
@@ -253,6 +254,19 @@ router.post('/submit', async (req: Request, res: Response) => {
       tokenHash,
       expiresAt,
     });
+
+    // Persist School Delegation reservation and line items to Cloud Firestore
+    try {
+      const resRecord = (await db.select().from(schema.reservationRequests).where(eq(schema.reservationRequests.id, reservationId)))[0];
+      const resItems = await db.select().from(schema.reservationItems).where(eq(schema.reservationItems.reservationRequestId, reservationId));
+      const guestRecord = (await db.select().from(schema.guests).where(eq(schema.guests.id, guestId)))[0];
+      const tokenRecord = (await db.select().from(schema.guestAccessTokens).where(eq(schema.guestAccessTokens.id, guestToken)))[0];
+      if (resRecord && guestRecord) {
+        await persistReservationToFirestore(resRecord, resItems, guestRecord, tokenRecord);
+      }
+    } catch (fsErr) {
+      console.warn('[SchoolTrips] Cloud Firestore sync notice:', fsErr);
+    }
 
     res.status(201).json({
       success: true,

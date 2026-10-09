@@ -27,8 +27,8 @@ export async function runForensicVerification() {
   await initializeDatabase();
   const initTombstones = await getDeletedTombstones();
   await seedMasterReferenceData();
-  await seedBootstrapCatalog(initTombstones);
   const bootHydration = await hydrateFromFirestore(initTombstones);
+  await seedBootstrapCatalog(initTombstones);
   await seedFallbackMediaAssets(initTombstones);
   await ensureCanonicalCloudSeed(initTombstones);
   await syncUnpersistedLocalMedia(initTombstones, bootHydration.hydratedMediaIds);
@@ -125,6 +125,14 @@ export async function runForensicVerification() {
   };
   await db.insert(schema.guests).values(testGuest);
 
+  await db.insert(schema.guestSessions).values({
+    id: 'ses_david_livingstone',
+    guestId: testGuestId,
+    sessionSecret: 'secret_david_livingstone',
+    createdAt: new Date(),
+    lastActiveAt: new Date(),
+  }).onConflictDoNothing();
+
   const testRes = {
     id: testResId,
     referenceNumber: testRef,
@@ -195,8 +203,8 @@ export async function runForensicVerification() {
   await initializeDatabase();
   const restartTombstones = await getDeletedTombstones();
   await seedMasterReferenceData();
-  await seedBootstrapCatalog(restartTombstones);
   const restartHydration = await hydrateFromFirestore(restartTombstones);
+  await seedBootstrapCatalog(restartTombstones);
   await seedFallbackMediaAssets(restartTombstones);
   await ensureCanonicalCloudSeed(restartTombstones);
   await syncUnpersistedLocalMedia(restartTombstones, restartHydration.hydratedMediaIds);

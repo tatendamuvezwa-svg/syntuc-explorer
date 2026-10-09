@@ -13,6 +13,7 @@ import {
   recordTombstoneInFirestore,
   updateMediaPrimaryStatusInFirestore,
   persistProductToFirestore,
+  persistPackageToFirestore,
 } from '../services/firestoreSync.ts';
 
 const router = Router();
@@ -223,18 +224,40 @@ router.post('/:id/set-primary', requireCoordinatorAuth, async (req: Authenticate
       .set({ isPrimary: true })
       .where(eq(schema.mediaAssets.id, id));
 
-    // 3. Update product primaryMediaId
+    // Ensure target media is durably persisted to Cloud Firestore
+    try {
+      await persistMediaAssetToFirestore({ ...target, isPrimary: true });
+    } catch (fsErr) {
+      console.warn('[Media] Firestore persist target media notice:', fsErr);
+    }
+
+    // 3. Update product primaryMediaId or package primaryImageUrl
     if (target.ownerType === 'product') {
       await db
         .update(schema.products)
-        .set({ primaryMediaId: id })
+        .set({ primaryMediaId: id, updatedAt: new Date() })
         .where(eq(schema.products.id, target.ownerId));
 
       try {
         await updateMediaPrimaryStatusInFirestore(target.ownerType, target.ownerId, id);
         const updatedProd = (await db.select().from(schema.products).where(eq(schema.products.id, target.ownerId)))[0];
         if (updatedProd) await persistProductToFirestore(updatedProd);
-      } catch (_) {}
+      } catch (fsErr) {
+        console.warn('[Media] Firestore persist product notice:', fsErr);
+      }
+    } else if (target.ownerType === 'package') {
+      await db
+        .update(schema.packages)
+        .set({ primaryImageUrl: target.url, updatedAt: new Date() })
+        .where(eq(schema.packages.id, target.ownerId));
+
+      try {
+        await updateMediaPrimaryStatusInFirestore(target.ownerType, target.ownerId, id);
+        const updatedPkg = (await db.select().from(schema.packages).where(eq(schema.packages.id, target.ownerId)))[0];
+        if (updatedPkg) await persistPackageToFirestore(updatedPkg);
+      } catch (fsErr) {
+        console.warn('[Media] Firestore persist package notice:', fsErr);
+      }
     }
 
     res.json({

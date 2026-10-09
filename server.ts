@@ -105,16 +105,16 @@ async function startServer() {
     console.log('[Syntuc Server] Initializing master reference data (operators, properties, users)...');
     await seedMasterReferenceData();
 
-    // 3. Seed baseline bootstrap catalog templates (products, rooms, packages) with strict non-overwrite
-    // This ensures all catalog product IDs exist in PGlite so reservation item FKs succeed
-    console.log('[Syntuc Server] Seeding bootstrap catalog fallback templates (non-overwriting)...');
-    await seedBootstrapCatalog(tombstones);
-
-    // 4. HYDRATE AUTHORITATIVE OPERATIONS FROM CLOUD FIRESTORE
+    // 3. HYDRATE AUTHORITATIVE OPERATIONS FROM CLOUD FIRESTORE FIRST
     // FIRESTORE PRODUCTION STATE TAKES 100% PRECEDENCE OVER SEED/BOOTSTRAP DATA
     console.log('[Syntuc Server] Hydrating authoritative operational records from Cloud Firestore...');
     const { productsRestored, mediaRestored, reservationsRestored, hydratedMediaIds } = await hydrateFromFirestore(tombstones);
     console.log(`[Syntuc Server] Firestore hydration complete: ${productsRestored} products, ${mediaRestored} media assets, ${reservationsRestored} reservations.`);
+
+    // 4. Seed baseline bootstrap catalog templates (products, rooms, packages) with strict non-overwrite
+    // ONLY for products that do NOT exist in the database (never overwriting hydrated Firestore records)
+    console.log('[Syntuc Server] Seeding bootstrap catalog fallback templates (non-overwriting)...');
+    await seedBootstrapCatalog(tombstones);
 
     // 5. Seed fallback media assets ONLY for products with zero media assets and no deletion tombstones
     console.log('[Syntuc Server] Seeding fallback media assets for products with zero images...');
@@ -128,7 +128,7 @@ async function startServer() {
     console.log('[Syntuc Server] Reconciling custom local media assets with Cloud Firestore...');
     await syncUnpersistedLocalMedia(tombstones, hydratedMediaIds);
 
-    // 8. Final media & primary image reconciliation: Custom media always takes 100% precedence over seed
+    // 8. Reconcile primary media and catalog associations: respect administrator selections
     console.log('[Syntuc Server] Reconciling primary media and catalog associations...');
     await reconcileAuthoritativeMediaAndPrimaries(tombstones);
 

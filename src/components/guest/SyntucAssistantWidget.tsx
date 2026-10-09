@@ -227,7 +227,7 @@ export const SyntucAssistantWidget: React.FC = () => {
       },
       {
         pattern: /Zambezi Gorge & Falls Extended Flight/gi,
-        action: { type: 'OPEN_PRODUCT', productId: 'prod_heli_gorge', productName: 'Zambezi Gorge & Falls Extended Flight', label: 'View Extended Gorge Flight' },
+        action: { type: 'OPEN_PRODUCT', productId: 'prod_zambezi_extended_flight', productName: 'Zambezi Gorge & Falls Extended Flight', label: 'View Extended Gorge Flight' },
       },
       {
         pattern: /Zambezi Explorer Luxury Sunset Cruise/gi,
@@ -239,27 +239,27 @@ export const SyntucAssistantWidget: React.FC = () => {
       },
       {
         pattern: /Victoria Falls Rainbow Hotel/gi,
-        action: { type: 'OPEN_PRODUCT', productId: 'prod_rainbow_hotel', productName: 'Victoria Falls Rainbow Hotel', label: 'View Rainbow Hotel' },
+        action: { type: 'OPEN_PRODUCT', productId: 'prod_rainbow', productName: 'Victoria Falls Rainbow Hotel', label: 'View Rainbow Hotel' },
       },
       {
         pattern: /Shearwater Explorers Village/gi,
-        action: { type: 'OPEN_PRODUCT', productId: 'prod_shearwater_village', productName: 'Shearwater Explorers Village', label: 'View Explorers Village' },
+        action: { type: 'OPEN_PRODUCT', productId: 'prod_explorers', productName: 'Shearwater Explorers Village', label: 'View Explorers Village' },
       },
       {
         pattern: /Old Drift Lodge/gi,
-        action: { type: 'OPEN_PRODUCT', productId: 'prod_old_drift_lodge', productName: 'Old Drift Lodge', label: 'View Old Drift Lodge' },
+        action: { type: 'OPEN_PRODUCT', productId: 'prod_olddrift', productName: 'Old Drift Lodge', label: 'View Old Drift Lodge' },
       },
       {
         pattern: /The Elephant Camp/gi,
-        action: { type: 'OPEN_PRODUCT', productId: 'prod_elephant_camp', productName: 'The Elephant Camp', label: 'View The Elephant Camp' },
+        action: { type: 'OPEN_PRODUCT', productId: 'prod_elephantcamp', productName: 'The Elephant Camp', label: 'View The Elephant Camp' },
       },
       {
         pattern: /Chobe National Park (?:Full-Day )?Safari/gi,
         action: { type: 'OPEN_PRODUCT', productId: 'prod_chobe_safari', productName: 'Chobe National Park Full-Day Safari', label: 'View Chobe Safari' },
       },
       {
-        pattern: /1905 Historic Bridge Tour/gi,
-        action: { type: 'OPEN_PRODUCT', productId: 'prod_bridge_tour', productName: '1905 Historic Bridge Tour', label: 'View Bridge Tour' },
+        pattern: /(?:1905 Historic Bridge Tour|Victoria Falls Historic Bridge Adventures)/gi,
+        action: { type: 'OPEN_PRODUCT', productId: 'prod_bridge_adventures', productName: 'Victoria Falls Historic Bridge Adventures', label: 'View Bridge Adventures' },
       },
       {
         pattern: /Rainforest (?:Guided )?Walking Tour/gi,

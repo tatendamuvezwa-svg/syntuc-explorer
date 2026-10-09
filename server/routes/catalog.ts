@@ -21,17 +21,11 @@ router.get('/products', async (req: Request, res: Response) => {
 
     const productsWithDetails = products.map(p => {
       const op = p.operatorId ? operatorMap.get(p.operatorId) : null;
-      // Get primary media asset or first product image (custom coordinator uploads strictly take precedence)
+      // Get primary media asset: use product.primaryMediaId if set, otherwise fallback to isPrimary or first media
       const productMedia = mediaList.filter(m => m.ownerId === p.id);
-      const customUploads = productMedia.filter(
-        m => m.sourceName === 'Coordinator Upload' || m.url.startsWith('data:') || m.url.startsWith('__CHUNKED__:')
-      );
       let primaryMedia = p.primaryMediaId ? productMedia.find(m => m.id === p.primaryMediaId) : null;
-      if (customUploads.length > 0 && (!primaryMedia || (primaryMedia.sourceName !== 'Coordinator Upload' && !primaryMedia.url.startsWith('data:')))) {
-        primaryMedia = customUploads.find(m => m.isPrimary) || customUploads[0];
-      }
       if (!primaryMedia) {
-        primaryMedia = productMedia.find(m => m.isPrimary) || productMedia[0];
+        primaryMedia = productMedia.find(m => m.isPrimary) || productMedia[0] || null;
       }
 
       return {
@@ -89,15 +83,9 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       .where(eq(schema.mediaAssets.ownerId, product.id))
       .orderBy(asc(schema.mediaAssets.displayOrder));
 
-    const customUploads = media.filter(
-      m => m.sourceName === 'Coordinator Upload' || m.url.startsWith('data:') || m.url.startsWith('__CHUNKED__:')
-    );
     let primaryMedia = product.primaryMediaId ? media.find(m => m.id === product.primaryMediaId) : null;
-    if (customUploads.length > 0 && (!primaryMedia || (primaryMedia.sourceName !== 'Coordinator Upload' && !primaryMedia.url.startsWith('data:')))) {
-      primaryMedia = customUploads.find(m => m.isPrimary) || customUploads[0];
-    }
     if (!primaryMedia) {
-      primaryMedia = media.find(m => m.isPrimary) || media[0];
+      primaryMedia = media.find(m => m.isPrimary) || media[0] || null;
     }
 
     res.json({

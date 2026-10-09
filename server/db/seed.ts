@@ -797,11 +797,8 @@ export async function seedBootstrapCatalog(tombstones: Set<string> = new Set()) 
       // Authoritative product already loaded from Firestore! NEVER OVERWRITE!
       continue;
     }
-    // Only bootstrap if product does not exist
+    // Only bootstrap if product does not exist in relational engine
     await db.insert(schema.products).values(p).onConflictDoNothing();
-    try {
-      await persistProductToFirestore(p as any);
-    } catch (_) {}
   }
 
   // 6. Rooms for Accommodation (depends on products)
