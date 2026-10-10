@@ -1,4 +1,5 @@
-import { db } from '../db/index.ts';
+import { db, initializeDatabase } from '../db/index.ts';
+import { seedDatabase } from '../db/seed.ts';
 import * as schema from '../db/schema.ts';
 import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -20,6 +21,9 @@ export async function runR2SecuritySuite(): Promise<{
   failedCount: number;
   results: TestResult[];
 }> {
+  await initializeDatabase();
+  await seedDatabase();
+
   const results: TestResult[] = [];
 
   // Helper to create test session & trip
@@ -375,4 +379,20 @@ export async function runR2SecuritySuite(): Promise<{
     failedCount,
     results,
   };
+}
+
+if (process.argv[1]?.includes('r2-security')) {
+  runR2SecuritySuite()
+    .then(r => {
+      console.log(`=== R2 SECURITY & ACCESS CONTROL TEST SUITE ===`);
+      console.log(`Passed: ${r.passedCount} / ${r.total}`);
+      for (const res of r.results) {
+        console.log(`  [${res.passed ? 'PASS' : 'FAIL'}] ${res.testId}: ${res.name} -> ${res.details}`);
+      }
+      process.exit(r.allPassed ? 0 : 1);
+    })
+    .catch(e => {
+      console.error('R2 security suite error:', e);
+      process.exit(1);
+    });
 }
