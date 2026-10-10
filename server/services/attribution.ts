@@ -1,7 +1,11 @@
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq, desc, and } from 'drizzle-orm';
 import crypto from 'crypto';
+import {
+  getDocById,
+  setDocById,
+  updateDocById,
+  getCollectionDocs,
+  where,
+} from '../lib/firestore.ts';
 
 export interface RawAttributionInput {
   visitorId: string;
@@ -30,9 +34,6 @@ export interface ClassifiedAttribution {
   confidence: 'UTM_EXACT' | 'REFERRER_ONLY' | 'DIRECT' | 'UNKNOWN';
 }
 
-/**
- * Classifies traffic source, campaign, and ad content based on UTMs and Referrer
- */
 export function classifyTraffic(input: {
   utmSource?: string | null;
   utmMedium?: string | null;
@@ -56,7 +57,6 @@ export function classifyTraffic(input: {
       const parsed = new URL(refUrl);
       refDomain = parsed.hostname.toLowerCase().replace(/^www\./, '');
     } catch (_) {
-      // Non-standard URL format, keep as is or parse prefix
       refDomain = refUrl.toLowerCase().split('/')[0].replace(/^www\./, '');
     }
   }
@@ -101,18 +101,6 @@ export function classifyTraffic(input: {
         confidence: 'REFERRER_ONLY',
       };
     }
-    if (refDomain.includes('instagram.com')) {
-      return {
-        source: 'instagram',
-        medium: 'referral',
-        campaign: null,
-        content: null,
-        term: null,
-        referrerUrl: refUrl,
-        referrerDomain: refDomain,
-        confidence: 'REFERRER_ONLY',
-      };
-    }
     if (refDomain.includes('google.')) {
       return {
         source: 'google',
@@ -125,7 +113,19 @@ export function classifyTraffic(input: {
         confidence: 'REFERRER_ONLY',
       };
     }
-    if (refDomain.includes('whatsapp.com') || refDomain.includes('wa.me')) {
+    if (refDomain.includes('instagram.com')) {
+      return {
+        source: 'instagram',
+        medium: 'social_referral',
+        campaign: null,
+        content: null,
+        term: null,
+        referrerUrl: refUrl,
+        referrerDomain: refDomain,
+        confidence: 'REFERRER_ONLY',
+      };
+    }
+    if (refDomain.includes('whatsapp') || refDomain.includes('wa.me')) {
       return {
         source: 'whatsapp',
         medium: 'referral',
@@ -138,7 +138,6 @@ export function classifyTraffic(input: {
       };
     }
 
-    // Generic referral
     return {
       source: refDomain,
       medium: 'referral',
@@ -164,99 +163,76 @@ export function classifyTraffic(input: {
   };
 }
 
-/**
- * Initializes or updates an analytics session and visitor record
- * Strictly maintains First-Touch vs Last-Touch attribution!
- */
 export async function initializeSession(input: RawAttributionInput) {
   try {
     const { visitorId, sessionId, landingPage, deviceCategory, browser, os, country } = input;
     const classified = classifyTraffic(input);
+    const nowIso = new Date().toISOString();
 
-    const now = new Date();
-
-    // Check if visitor exists
-    const existingVisitors = await db
-      .select()
-      .from(schema.analyticsVisitors)
-      .where(eq(schema.analyticsVisitors.visitorId, visitorId));
-
+    // Check if visitor exists in Firestore
+    const existingVisitor = await getDocById<any>('analytics_visitors', visitorId);
     let isReturning = false;
-    let visitorRecord: typeof schema.analyticsVisitors.$inferSelect;
+    let visitorRecord: any;
 
-    if (existingVisitors.length === 0) {
+    if (!existingVisitor) {
       // First-Touch: Create new visitor record with initial attribution
-      const [newVisitor] = await db
-        .insert(schema.analyticsVisitors)
-        .values({
-          id: 'vis_' + crypto.randomBytes(12).toString('hex'),
-          visitorId,
-          firstSeenAt: now,
-          lastSeenAt: now,
-          firstSource: classified.source,
-          firstMedium: classified.medium,
-          firstCampaign: classified.campaign,
-          firstContent: classified.content,
-          firstTerm: classified.term,
-          firstReferrerUrl: classified.referrerUrl,
-          firstReferrerDomain: classified.referrerDomain,
-          firstLandingPage: landingPage || '/',
-          attributionConfidence: classified.confidence,
-          totalSessions: 1,
-        })
-        .returning();
+      const newVisitor = {
+        id: visitorId,
+        visitorId,
+        firstSeenAt: nowIso,
+        lastSeenAt: nowIso,
+        firstSource: classified.source,
+        firstMedium: classified.medium,
+        firstCampaign: classified.campaign,
+        firstContent: classified.content,
+        firstTerm: classified.term,
+        firstReferrerUrl: classified.referrerUrl,
+        firstReferrerDomain: classified.referrerDomain,
+        firstLandingPage: landingPage || '/',
+        attributionConfidence: classified.confidence,
+        totalSessions: 1,
+      };
+      await setDocById('analytics_visitors', visitorId, newVisitor);
       visitorRecord = newVisitor;
     } else {
-      // Returning visitor: PRESERVE first touch attribution! Only update lastSeenAt & totalSessions
       isReturning = true;
-      const existing = existingVisitors[0];
-      const [updatedVisitor] = await db
-        .update(schema.analyticsVisitors)
-        .set({
-          lastSeenAt: now,
-          totalSessions: (existing.totalSessions || 1) + 1,
-          updatedAt: now,
-        })
-        .where(eq(schema.analyticsVisitors.visitorId, visitorId))
-        .returning();
-      visitorRecord = updatedVisitor || existing;
+      const updatedVisitor = {
+        lastSeenAt: nowIso,
+        totalSessions: (existingVisitor.totalSessions || 1) + 1,
+        updatedAt: nowIso,
+      };
+      await updateDocById('analytics_visitors', visitorId, updatedVisitor);
+      visitorRecord = { ...existingVisitor, ...updatedVisitor };
     }
 
-    // Check or upsert session
-    const existingSessions = await db
-      .select()
-      .from(schema.analyticsSessions)
-      .where(eq(schema.analyticsSessions.sessionId, sessionId));
+    // Check or upsert session in Firestore
+    const existingSession = await getDocById<any>('analytics_sessions', sessionId);
+    let sessionRecord: any;
 
-    let sessionRecord: typeof schema.analyticsSessions.$inferSelect;
-
-    if (existingSessions.length === 0) {
-      const [newSession] = await db
-        .insert(schema.analyticsSessions)
-        .values({
-          id: 'ses_' + crypto.randomBytes(12).toString('hex'),
-          sessionId,
-          visitorId,
-          startedAt: now,
-          lastActivityAt: now,
-          landingPage: landingPage || '/',
-          source: classified.source,
-          medium: classified.medium,
-          campaign: classified.campaign,
-          content: classified.content,
-          term: classified.term,
-          referrerUrl: classified.referrerUrl,
-          referrerDomain: classified.referrerDomain,
-          attributionConfidence: classified.confidence,
-          deviceCategory: (deviceCategory as any) || 'desktop',
-          browser: browser || null,
-          os: os || null,
-          country: country || null,
-        })
-        .returning();
+    if (!existingSession) {
+      const newSession = {
+        id: sessionId,
+        sessionId,
+        visitorId,
+        startedAt: nowIso,
+        lastActivityAt: nowIso,
+        landingPage: landingPage || '/',
+        source: classified.source,
+        medium: classified.medium,
+        campaign: classified.campaign,
+        content: classified.content,
+        term: classified.term,
+        referrerUrl: classified.referrerUrl,
+        referrerDomain: classified.referrerDomain,
+        attributionConfidence: classified.confidence,
+        deviceCategory: deviceCategory || 'desktop',
+        browser: browser || null,
+        os: os || null,
+        country: country || null,
+      };
+      await setDocById('analytics_sessions', sessionId, newSession);
       sessionRecord = newSession;
 
-      // Automatically log initial acquisition events
       await recordEventSafely({
         visitorId,
         sessionId,
@@ -281,16 +257,11 @@ export async function initializeSession(input: RawAttributionInput) {
         },
       });
     } else {
-      const existing = existingSessions[0];
-      const [updatedSession] = await db
-        .update(schema.analyticsSessions)
-        .set({
-          lastActivityAt: now,
-          updatedAt: now,
-        })
-        .where(eq(schema.analyticsSessions.sessionId, sessionId))
-        .returning();
-      sessionRecord = updatedSession || existing;
+      await updateDocById('analytics_sessions', sessionId, {
+        lastActivityAt: nowIso,
+        updatedAt: nowIso,
+      });
+      sessionRecord = { ...existingSession, lastActivityAt: nowIso };
     }
 
     return {
@@ -316,7 +287,7 @@ export async function initializeSession(input: RawAttributionInput) {
       },
     };
   } catch (err) {
-    console.error('[Analytics] Failed to initialize session:', err);
+    console.error('[Analytics] Failed to initialize session in Firestore:', err);
     return {
       success: false,
       error: 'INITIALIZATION_FAILED',
@@ -324,9 +295,6 @@ export async function initializeSession(input: RawAttributionInput) {
   }
 }
 
-/**
- * Safely records a structured analytics event without throwing or blocking
- */
 export async function recordEventSafely(params: {
   visitorId: string;
   sessionId: string;
@@ -339,14 +307,26 @@ export async function recordEventSafely(params: {
   metadata?: Record<string, any> | null;
 }) {
   try {
-    const { visitorId, sessionId, eventType, route, productId, packageId, reservationId, reservationReference, metadata } = params;
+    const {
+      visitorId,
+      sessionId,
+      eventType,
+      route,
+      productId,
+      packageId,
+      reservationId,
+      reservationReference,
+      metadata,
+    } = params;
 
     if (!visitorId || !sessionId || !eventType) {
       return null;
     }
 
     const eventId = 'evt_' + crypto.randomBytes(12).toString('hex');
-    await db.insert(schema.analyticsEvents).values({
+    const nowIso = new Date().toISOString();
+
+    await setDocById('analytics_events', eventId, {
       id: eventId,
       eventId,
       visitorId,
@@ -358,27 +338,23 @@ export async function recordEventSafely(params: {
       reservationId: reservationId || null,
       reservationReference: reservationReference || null,
       metadata: metadata || {},
-      occurredAt: new Date(),
+      occurredAt: nowIso,
     });
 
-    // Also update session last_activity_at
     try {
-      await db
-        .update(schema.analyticsSessions)
-        .set({ lastActivityAt: new Date(), updatedAt: new Date() })
-        .where(eq(schema.analyticsSessions.sessionId, sessionId));
+      await updateDocById('analytics_sessions', sessionId, {
+        lastActivityAt: nowIso,
+        updatedAt: nowIso,
+      });
     } catch (_) {}
 
     return eventId;
   } catch (err) {
-    console.error('[Analytics] Safe event recording error:', err);
+    console.error('[Analytics] Safe event recording error in Firestore:', err);
     return null;
   }
 }
 
-/**
- * Retrieves authoritative First-Touch and Last-Touch attribution snapshots for reservation attachment
- */
 export async function getAttributionForReservation(visitorId?: string | null, sessionId?: string | null) {
   let firstTouch = {
     source: 'direct',
@@ -402,13 +378,8 @@ export async function getAttributionForReservation(visitorId?: string | null, se
 
   try {
     if (visitorId) {
-      const visitors = await db
-        .select()
-        .from(schema.analyticsVisitors)
-        .where(eq(schema.analyticsVisitors.visitorId, visitorId));
-
-      if (visitors.length > 0) {
-        const v = visitors[0];
+      const v = await getDocById<any>('analytics_visitors', visitorId);
+      if (v) {
         firstTouch = {
           source: v.firstSource || 'direct',
           medium: v.firstMedium || 'none',
@@ -422,13 +393,8 @@ export async function getAttributionForReservation(visitorId?: string | null, se
     }
 
     if (sessionId) {
-      const sessions = await db
-        .select()
-        .from(schema.analyticsSessions)
-        .where(eq(schema.analyticsSessions.sessionId, sessionId));
-
-      if (sessions.length > 0) {
-        const s = sessions[0];
+      const s = await getDocById<any>('analytics_sessions', sessionId);
+      if (s) {
         lastTouch = {
           source: s.source || 'direct',
           medium: s.medium || 'none',
@@ -441,7 +407,7 @@ export async function getAttributionForReservation(visitorId?: string | null, se
       }
     }
   } catch (err) {
-    console.error('[Analytics] Error looking up attribution for reservation:', err);
+    console.error('[Analytics] Error looking up attribution in Firestore:', err);
   }
 
   return {

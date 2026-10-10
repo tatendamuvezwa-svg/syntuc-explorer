@@ -1,7 +1,4 @@
 import { Router, Response } from 'express';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
 import {
   createSessionCredentials,
@@ -9,6 +6,14 @@ import {
   requireGuestSession,
   GuestSessionRequest,
 } from '../middleware/auth.ts';
+import {
+  getDocById,
+  setDocById,
+  updateDocById,
+  deleteDocById,
+  getCollectionDocs,
+  where,
+} from '../lib/firestore.ts';
 
 const router = Router();
 
@@ -17,24 +22,20 @@ router.post('/init', async (req, res: Response) => {
   try {
     const existingSessionId = req.body.sessionId;
     const existingSecret = req.body.sessionSecret;
+    const nowIso = new Date().toISOString();
 
     if (existingSessionId && existingSecret) {
-      const records = await db
-        .select()
-        .from(schema.guestSessions)
-        .where(eq(schema.guestSessions.id, existingSessionId));
+      const session = await getDocById<any>('guest_sessions', existingSessionId);
 
-      if (records.length > 0 && records[0].sessionSecret === existingSecret) {
-        // Update last active
-        await db
-          .update(schema.guestSessions)
-          .set({ lastActiveAt: new Date() })
-          .where(eq(schema.guestSessions.id, existingSessionId));
+      if (session && session.sessionSecret === existingSecret) {
+        await updateDocById('guest_sessions', existingSessionId, {
+          lastActiveAt: nowIso,
+        });
 
         res.json({
-          sessionId: records[0].id,
-          sessionSecret: records[0].sessionSecret,
-          signature: signSessionId(records[0].id, records[0].sessionSecret),
+          sessionId: session.id,
+          sessionSecret: session.sessionSecret,
+          signature: signSessionId(session.id, session.sessionSecret),
         });
         return;
       }
@@ -42,21 +43,25 @@ router.post('/init', async (req, res: Response) => {
 
     // Create new session
     const { sessionId, sessionSecret } = createSessionCredentials();
-    await db.insert(schema.guestSessions).values({
+    await setDocById('guest_sessions', sessionId, {
       id: sessionId,
       sessionSecret,
       ipHash: crypto.createHash('sha256').update(req.ip || '127.0.0.1').digest('hex'),
       userAgent: req.headers['user-agent'] || 'browser',
+      createdAt: nowIso,
+      lastActiveAt: nowIso,
     });
 
     // Create initial trip plan for this session
     const tripPlanId = 'trip_' + crypto.randomBytes(12).toString('hex');
-    await db.insert(schema.tripPlans).values({
+    await setDocById('trip_plans', tripPlanId, {
       id: tripPlanId,
       guestSessionId: sessionId,
       title: 'My Victoria Falls Journey',
       adultsCount: 2,
       childrenCount: 0,
+      createdAt: nowIso,
+      updatedAt: nowIso,
     });
 
     res.json({
@@ -66,7 +71,7 @@ router.post('/init', async (req, res: Response) => {
       tripPlanId,
     });
   } catch (error) {
-    console.error('Session init error:', error);
+    console.error('Session init error in Firestore:', error);
     res.status(500).json({ error: 'SESSION_INITIALIZATION_FAILED' });
   }
 });
@@ -75,30 +80,28 @@ router.post('/init', async (req, res: Response) => {
 router.get('/trip', requireGuestSession, async (req: GuestSessionRequest, res: Response) => {
   try {
     const sessionId = req.guestSession!.id;
+    const nowIso = new Date().toISOString();
 
-    // Fetch trip plan strictly belonging to this session
-    const tripPlans = await db
-      .select()
-      .from(schema.tripPlans)
-      .where(eq(schema.tripPlans.guestSessionId, sessionId));
+    const tripPlans = await getCollectionDocs<any>(
+      'trip_plans',
+      where('guestSessionId', '==', sessionId)
+    );
 
     if (tripPlans.length === 0) {
-      // Auto-create if somehow missing
       const newTripId = 'trip_' + crypto.randomBytes(12).toString('hex');
-      await db.insert(schema.tripPlans).values({
+      const newPlan = {
         id: newTripId,
         guestSessionId: sessionId,
         title: 'My Victoria Falls Journey',
         adultsCount: 2,
         childrenCount: 0,
-      });
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      await setDocById('trip_plans', newTripId, newPlan);
 
       res.json({
-        id: newTripId,
-        guestSessionId: sessionId,
-        title: 'My Victoria Falls Journey',
-        adultsCount: 2,
-        childrenCount: 0,
+        ...newPlan,
         items: [],
       });
       return;
@@ -106,20 +109,20 @@ router.get('/trip', requireGuestSession, async (req: GuestSessionRequest, res: R
 
     const tripPlan = tripPlans[0];
 
-    // Fetch items belonging to this trip plan
-    const items = await db
-      .select()
-      .from(schema.tripItems)
-      .where(eq(schema.tripItems.tripPlanId, tripPlan.id));
+    // Fetch items belonging strictly to this trip plan
+    const items = await getCollectionDocs<any>(
+      'trip_items',
+      where('tripPlanId', '==', tripPlan.id)
+    );
 
-    // Join with product and room details for client display
-    const products = await db.select().from(schema.products);
-    const productMap = new Map(products.map(p => [p.id, p]));
+    // Enrich with product and room details
+    const products = await getCollectionDocs<any>('products');
+    const productMap = new Map(products.map((p) => [p.id, p]));
 
-    const rooms = await db.select().from(schema.rooms);
-    const roomMap = new Map(rooms.map(r => [r.id, r]));
+    const rooms = await getCollectionDocs<any>('rooms');
+    const roomMap = new Map(rooms.map((r) => [r.id, r]));
 
-    const enrichedItems = items.map(item => {
+    const enrichedItems = items.map((item) => {
       const prod = productMap.get(item.productId);
       const room = item.roomId ? roomMap.get(item.roomId) : null;
       return {
@@ -134,7 +137,7 @@ router.get('/trip', requireGuestSession, async (req: GuestSessionRequest, res: R
       items: enrichedItems,
     });
   } catch (error) {
-    console.error('Error fetching trip plan:', error);
+    console.error('Error fetching trip plan from Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_TRIP_PLAN' });
   }
 });
@@ -144,11 +147,12 @@ router.put('/trip', requireGuestSession, async (req: GuestSessionRequest, res: R
   try {
     const sessionId = req.guestSession!.id;
     const { title, startDate, endDate, adultsCount, childrenCount, interests, intensity } = req.body;
+    const nowIso = new Date().toISOString();
 
-    const tripPlans = await db
-      .select()
-      .from(schema.tripPlans)
-      .where(eq(schema.tripPlans.guestSessionId, sessionId));
+    const tripPlans = await getCollectionDocs<any>(
+      'trip_plans',
+      where('guestSessionId', '==', sessionId)
+    );
 
     if (tripPlans.length === 0) {
       res.status(404).json({ error: 'TRIP_PLAN_NOT_FOUND' });
@@ -157,23 +161,20 @@ router.put('/trip', requireGuestSession, async (req: GuestSessionRequest, res: R
 
     const tripId = tripPlans[0].id;
 
-    await db
-      .update(schema.tripPlans)
-      .set({
-        title: title || tripPlans[0].title,
-        startDate: startDate !== undefined ? startDate : tripPlans[0].startDate,
-        endDate: endDate !== undefined ? endDate : tripPlans[0].endDate,
-        adultsCount: adultsCount !== undefined ? Math.max(1, Number(adultsCount)) : tripPlans[0].adultsCount,
-        childrenCount: childrenCount !== undefined ? Math.max(0, Number(childrenCount)) : tripPlans[0].childrenCount,
-        interests: interests || tripPlans[0].interests,
-        intensity: intensity || tripPlans[0].intensity,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.tripPlans.id, tripId));
+    await updateDocById('trip_plans', tripId, {
+      title: title || tripPlans[0].title,
+      startDate: startDate !== undefined ? startDate : tripPlans[0].startDate || null,
+      endDate: endDate !== undefined ? endDate : tripPlans[0].endDate || null,
+      adultsCount: adultsCount !== undefined ? Math.max(1, Number(adultsCount)) : tripPlans[0].adultsCount,
+      childrenCount: childrenCount !== undefined ? Math.max(0, Number(childrenCount)) : tripPlans[0].childrenCount,
+      interests: interests || tripPlans[0].interests || [],
+      intensity: intensity || tripPlans[0].intensity || 'MODERATE',
+      updatedAt: nowIso,
+    });
 
     res.json({ success: true, message: 'Trip updated successfully' });
   } catch (error) {
-    console.error('Error updating trip plan:', error);
+    console.error('Error updating trip plan in Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_UPDATE_TRIP' });
   }
 });
@@ -193,28 +194,28 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
       guestCount,
       notes,
     } = req.body;
+    const nowIso = new Date().toISOString();
 
     if (!productId) {
       res.status(400).json({ error: 'PRODUCT_ID_REQUIRED' });
       return;
     }
 
-    // Verify product exists in catalog
-    const productRecords = await db
-      .select()
-      .from(schema.products)
-      .where(eq(schema.products.id, productId));
-
-    if (productRecords.length === 0) {
-      res.status(404).json({ error: 'PRODUCT_NOT_FOUND', message: 'The requested product does not exist in catalog' });
+    // Verify product exists in Firestore
+    const product = await getDocById<any>('products', productId);
+    if (!product) {
+      res.status(404).json({
+        error: 'PRODUCT_NOT_FOUND',
+        message: 'The requested product does not exist in catalog',
+      });
       return;
     }
 
-    // If tripPlanId passed, verify it belongs strictly to this session
-    const tripPlans = await db
-      .select()
-      .from(schema.tripPlans)
-      .where(eq(schema.tripPlans.guestSessionId, sessionId));
+    // Fetch trip plan strictly belonging to this session
+    const tripPlans = await getCollectionDocs<any>(
+      'trip_plans',
+      where('guestSessionId', '==', sessionId)
+    );
 
     if (tripPlans.length === 0) {
       res.status(404).json({ error: 'TRIP_PLAN_NOT_FOUND' });
@@ -232,7 +233,7 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
     }
 
     const itemId = 'item_' + crypto.randomBytes(12).toString('hex');
-    await db.insert(schema.tripItems).values({
+    await setDocById('trip_items', itemId, {
       id: itemId,
       tripPlanId: ownedTrip.id,
       productId,
@@ -243,15 +244,16 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
       scheduledTime: scheduledTime || null,
       guestCount: guestCount ? Math.max(1, Number(guestCount)) : ownedTrip.adultsCount,
       notes: notes || null,
+      createdAt: nowIso,
     });
 
     res.json({
       success: true,
       itemId,
-      message: `${productRecords[0].name} added to My Trip`,
+      message: `${product.name} added to My Trip`,
     });
   } catch (error) {
-    console.error('Error adding trip item:', error);
+    console.error('Error adding trip item in Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_ADD_TRIP_ITEM' });
   }
 });
@@ -262,32 +264,16 @@ router.delete('/trip/items/:id', requireGuestSession, async (req: GuestSessionRe
     const sessionId = req.guestSession!.id;
     const itemId = req.params.id;
 
-    // Fetch the trip item
-    const itemRecords = await db
-      .select()
-      .from(schema.tripItems)
-      .where(eq(schema.tripItems.id, itemId));
-
-    if (itemRecords.length === 0) {
+    // Fetch the trip item from Firestore
+    const item = await getDocById<any>('trip_items', itemId);
+    if (!item) {
       res.status(404).json({ error: 'ITEM_NOT_FOUND' });
       return;
     }
 
-    const item = itemRecords[0];
-
     // Verify trip plan belongs to current guest session
-    const tripPlanRecords = await db
-      .select()
-      .from(schema.tripPlans)
-      .where(
-        and(
-          eq(schema.tripPlans.id, item.tripPlanId),
-          eq(schema.tripPlans.guestSessionId, sessionId)
-        )
-      );
-
-    if (tripPlanRecords.length === 0) {
-      // Security check: item does not belong to this guest's session!
+    const tripPlan = await getDocById<any>('trip_plans', item.tripPlanId);
+    if (!tripPlan || tripPlan.guestSessionId !== sessionId) {
       res.status(403).json({
         error: 'ACCESS_DENIED',
         message: 'You cannot delete another guest’s trip item.',
@@ -295,12 +281,11 @@ router.delete('/trip/items/:id', requireGuestSession, async (req: GuestSessionRe
       return;
     }
 
-    // Safe to delete
-    await db.delete(schema.tripItems).where(eq(schema.tripItems.id, itemId));
+    await deleteDocById('trip_items', itemId);
 
     res.json({ success: true, message: 'Item removed from My Trip' });
   } catch (error) {
-    console.error('Error deleting trip item:', error);
+    console.error('Error deleting trip item in Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_DELETE_TRIP_ITEM' });
   }
 });

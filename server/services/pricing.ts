@@ -1,6 +1,4 @@
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq, inArray } from 'drizzle-orm';
+import { getDocById, getCollectionDocs } from '../lib/firestore.ts';
 
 export interface RawReservationItemInput {
   productId: string;
@@ -11,7 +9,6 @@ export interface RawReservationItemInput {
   scheduledDate?: string;
   scheduledTime?: string;
   notes?: string;
-  // Any client-submitted unitPrice or totalPrice will be explicitly ignored
   unitPrice?: any;
   totalPrice?: any;
 }
@@ -44,29 +41,25 @@ export interface AuthoritativePricingResult {
   bridgeIncentiveQualified: boolean;
 }
 
-// Qualifying priority activity names/keywords for Bridge Tour incentive
 const QUALIFYING_ACTIVITY_PATTERNS = [
-  'quad', // Quad Biking
-  'helicopter', // Helicopter Flight (12m or 25m)
+  'quad',
+  'helicopter',
   'flight of angels',
-  'elephant', // Elephant Interaction
-  'sunset cruise', // Sunset Cruise (Zambezi Explorer or school sunset cruise)
+  'elephant',
+  'sunset cruise',
 ];
 
 function isQualifyingPriorityActivity(name: string, slug: string): boolean {
-  const lowerName = (name + ' ' + slug).toLowerCase();
-  
-  // Explicit non-qualifying rules:
-  // 1. Bridge Tour itself does NOT count!
+  const lowerName = (name + ' ' + (slug || '')).toLowerCase();
+
   if (lowerName.includes('bridge')) {
     return false;
   }
-  // 2. Standard Boat Cruise does NOT count! (Only Sunset Cruise qualifies)
   if (lowerName.includes('boat cruise') && !lowerName.includes('sunset')) {
     return false;
   }
 
-  return QUALIFYING_ACTIVITY_PATTERNS.some(pat => lowerName.includes(pat));
+  return QUALIFYING_ACTIVITY_PATTERNS.some((pat) => lowerName.includes(pat));
 }
 
 export async function calculateAuthoritativePricing(
@@ -86,32 +79,30 @@ export async function calculateAuthoritativePricing(
     };
   }
 
-  // Fetch all products involved
-  const productIds = itemsInput.map(i => i.productId);
-  const fetchedProducts = await db
-    .select()
-    .from(schema.products)
-    .where(inArray(schema.products.id, productIds));
+  // Fetch all products involved directly from Firestore
+  const productMap = new Map<string, any>();
+  for (const item of itemsInput) {
+    if (!productMap.has(item.productId)) {
+      const prod = await getDocById<any>('products', item.productId);
+      if (prod) {
+        productMap.set(item.productId, prod);
+      }
+    }
+  }
 
-  const productMap = new Map(fetchedProducts.map(p => [p.id, p]));
+  // Fetch operators from Firestore for snapshot names
+  const operators = await getCollectionDocs<any>('operators');
+  const operatorMap = new Map<string, string>(operators.map((o) => [o.id, o.name]));
 
-  // Fetch operators for snapshot names
-  const fetchedOperators = await db.select().from(schema.operators);
-  const operatorMap = new Map(fetchedOperators.map(o => [o.id, o.name]));
-
-  // Fetch rooms if applicable
-  const roomIds = itemsInput.map(i => i.roomId).filter(Boolean) as string[];
-  const fetchedRooms = roomIds.length > 0
-    ? await db.select().from(schema.rooms).where(inArray(schema.rooms.id, roomIds))
-    : [];
-  const roomMap = new Map(fetchedRooms.map(r => [r.id, r]));
-
-  // Fetch variants if applicable
-  const variantIds = itemsInput.map(i => i.variantId).filter(Boolean) as string[];
-  const fetchedVariants = variantIds.length > 0
-    ? await db.select().from(schema.productVariants).where(inArray(schema.productVariants.id, variantIds))
-    : [];
-  const variantMap = new Map(fetchedVariants.map(v => [v.id, v]));
+  // Fetch rooms if applicable from Firestore
+  const roomIds = itemsInput.map((i) => i.roomId).filter(Boolean) as string[];
+  const roomMap = new Map<string, any>();
+  for (const rId of roomIds) {
+    if (!roomMap.has(rId)) {
+      const rm = await getDocById<any>('rooms', rId);
+      if (rm) roomMap.set(rId, rm);
+    }
+  }
 
   let totalAccommodationNights = 0;
   let qualifyingActivitiesCount = 0;
@@ -128,45 +119,41 @@ export async function calculateAuthoritativePricing(
       throw new Error(`Product not found in catalog: ${raw.productId}`);
     }
 
-    const operatorName = product.operatorId ? operatorMap.get(product.operatorId) || 'Syntuc Partner' : 'Syntuc Partner';
-    const guestCount = Math.max(1, raw.guestCount || (globalAdults + globalChildren) || 1);
+    const operatorName = product.operatorId
+      ? operatorMap.get(product.operatorId) || 'Syntuc Partner'
+      : 'Syntuc Partner';
+    const guestCount = Math.max(1, raw.guestCount || globalAdults + globalChildren || 1);
     const nights = Math.max(1, raw.nightsCount || 1);
 
-    let unitPrice = Number(product.basePrice);
-    let priceBasis = product.priceBasis;
+    let unitPrice = Number(product.basePrice || 0);
+    let priceBasis = product.priceBasis || 'per_person';
     let subtotal = 0;
 
     if (product.productType === 'accommodation') {
       totalAccommodationNights += nights;
-      
-      // If specific room selected, use authoritative room rate
+
       if (raw.roomId && roomMap.has(raw.roomId)) {
         const room = roomMap.get(raw.roomId)!;
-        unitPrice = Number(room.pricePerNight);
+        unitPrice = Number(room.baseRate || room.pricePerNight || unitPrice);
         priceBasis = 'per_room_night';
       }
 
       if (priceBasis === 'per_room_night') {
         subtotal = unitPrice * nights;
       } else {
-        // per_person accommodation
         subtotal = unitPrice * guestCount * nights;
       }
     } else if (product.productType === 'package') {
-      // Curated Holiday Package
       subtotal = unitPrice * guestCount;
-      if (product.duration && (product.duration.includes('3 Night') || product.duration.includes('2 Night'))) {
+      if (
+        product.duration &&
+        (product.duration.includes('3 Night') || product.duration.includes('2 Night'))
+      ) {
         totalAccommodationNights += 2;
         qualifyingActivitiesCount += 2;
       }
     } else {
-      // Activity / Experience
-      if (raw.variantId && variantMap.has(raw.variantId)) {
-        const variant = variantMap.get(raw.variantId)!;
-        unitPrice += Number(variant.priceDelta);
-      }
-
-      const lowerName = (product.name + ' ' + product.slug).toLowerCase();
+      const lowerName = (product.name + ' ' + (product.slug || '')).toLowerCase();
       if (lowerName.includes('bridge')) {
         hasBridgeTourInCart = true;
         bridgeTourItemIndex = idx;
@@ -177,7 +164,6 @@ export async function calculateAuthoritativePricing(
       if (priceBasis === 'per_group') {
         subtotal = unitPrice;
       } else {
-        // per_person
         subtotal = unitPrice * guestCount;
       }
     }
@@ -201,26 +187,24 @@ export async function calculateAuthoritativePricing(
     });
   }
 
-  // Bridge Tour Incentive Logic:
-  // Condition 1: At least 2 nights of accommodation.
-  // AND
-  // Condition 2: At least 2 qualifying PAID priority activities.
-  const bridgeIncentiveQualified = totalAccommodationNights >= 2 && qualifyingActivitiesCount >= 2;
+  const bridgeIncentiveQualified =
+    totalAccommodationNights >= 2 && qualifyingActivitiesCount >= 2;
   let isBridgeIncentiveApplied = false;
 
   if (bridgeIncentiveQualified && hasBridgeTourInCart && bridgeTourItemIndex >= 0) {
-    // Zero out the Bridge Tour subtotal (USD 0 complimentary)
     resolvedItems[bridgeTourItemIndex].calculatedSubtotal = 0;
-    resolvedItems[bridgeTourItemIndex].notes = 
-      (resolvedItems[bridgeTourItemIndex].notes ? resolvedItems[bridgeTourItemIndex].notes + ' | ' : '') +
+    resolvedItems[bridgeTourItemIndex].notes =
+      (resolvedItems[bridgeTourItemIndex].notes
+        ? resolvedItems[bridgeTourItemIndex].notes + ' | '
+        : '') +
       'COMPLIMENTARY Victoria Falls Historic 1905 Bridge Tour Incentive Applied ($0)';
     isBridgeIncentiveApplied = true;
   }
 
-  // Calculate sum of authoritative subtotals
-  const authoritativeTotal = Math.round(
-    resolvedItems.reduce((acc, item) => acc + item.calculatedSubtotal, 0) * 100
-  ) / 100;
+  const authoritativeTotal =
+    Math.round(
+      resolvedItems.reduce((acc, item) => acc + item.calculatedSubtotal, 0) * 100
+    ) / 100;
 
   return {
     items: resolvedItems,

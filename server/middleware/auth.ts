@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq } from 'drizzle-orm';
+import { getDocById, getCollectionDocs, where } from '../lib/firestore.ts';
 
 export interface AuthenticatedStaffRequest extends Request {
   staffUser?: {
@@ -33,7 +31,7 @@ export function signSessionId(sessionId: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(sessionId).digest('hex');
 }
 
-// Verify guest session from headers
+// Verify guest session from Firestore
 export async function requireGuestSession(
   req: GuestSessionRequest,
   res: Response,
@@ -48,17 +46,12 @@ export async function requireGuestSession(
   }
 
   try {
-    const sessionRecords = await db
-      .select()
-      .from(schema.guestSessions)
-      .where(eq(schema.guestSessions.id, sessionId));
+    const session = await getDocById<any>('guest_sessions', sessionId);
 
-    if (sessionRecords.length === 0) {
+    if (!session) {
       res.status(401).json({ error: 'INVALID_SESSION', message: 'Guest session not found or expired' });
       return;
     }
-
-    const session = sessionRecords[0];
 
     // If signature provided, verify HMAC
     if (signature) {
@@ -72,7 +65,7 @@ export async function requireGuestSession(
     // Attach to request
     req.guestSession = {
       id: session.id,
-      guestId: session.guestId,
+      guestId: session.guestId || null,
       sessionSecret: session.sessionSecret,
     };
 
@@ -83,7 +76,7 @@ export async function requireGuestSession(
   }
 }
 
-// Staff / Coordinator Authentication
+// Staff / Coordinator Authentication backed by Firestore users
 export async function requireCoordinatorAuth(
   req: AuthenticatedStaffRequest,
   res: Response,
@@ -93,7 +86,7 @@ export async function requireCoordinatorAuth(
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({
       error: 'AUTHENTICATION_REQUIRED',
-      message: 'Bearer token authorization required for Reservations Desk access'
+      message: 'Bearer token authorization required for Reservations Desk access',
     });
     return;
   }
@@ -104,28 +97,24 @@ export async function requireCoordinatorAuth(
   if (['mock-token', 'bypass', 'admin-bypass', 'dev-token', 'test'].includes(token.toLowerCase())) {
     res.status(403).json({
       error: 'MOCK_TOKEN_REJECTED',
-      message: 'Mock or bypass authentication tokens are strictly prohibited.'
+      message: 'Mock or bypass authentication tokens are strictly prohibited.',
     });
     return;
   }
 
   try {
-    // Authenticate token against registered staff users
-    // Token can be staffId or apiKey associated with active staff
-    const staffRecords = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.isActive, true));
+    // Authenticate token against registered staff users in Firestore
+    const staffRecords = await getCollectionDocs<any>('users', where('isActive', '==', true));
 
     // Match by registered staff token format (staff_{id}) or staff ID
     const staff = staffRecords.find(
-      u => token === `staff_${u.id}` || u.id === token
+      (u) => token === `staff_${u.id}` || u.id === token
     );
 
     if (!staff) {
       res.status(401).json({
         error: 'INVALID_COORDINATOR_CREDENTIALS',
-        message: 'Invalid staff credentials or session expired'
+        message: 'Invalid staff credentials or session expired',
       });
       return;
     }
@@ -133,7 +122,7 @@ export async function requireCoordinatorAuth(
     if (staff.role !== 'admin' && staff.role !== 'reservations_coordinator') {
       res.status(403).json({
         error: 'INSUFFICIENT_ROLE_PERMISSIONS',
-        message: 'User does not possess reservations coordinator authorization'
+        message: 'User does not possess reservations coordinator authorization',
       });
       return;
     }

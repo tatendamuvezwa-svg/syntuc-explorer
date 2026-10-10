@@ -1,21 +1,26 @@
 import { Router, Response } from 'express';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { requireGuestSession, GuestSessionRequest } from '../middleware/auth.ts';
 import { calculateAuthoritativePricing, RawReservationItemInput } from '../services/pricing.ts';
 import { getAttributionForReservation, recordEventSafely } from '../services/attribution.ts';
-import { persistReservationToFirestore } from '../services/firestoreSync.ts';
+import {
+  getFirestoreDb,
+  doc,
+  writeBatch,
+  getDocById,
+  setDocById,
+  updateDocById,
+  getCollectionDocs,
+  where,
+} from '../lib/firestore.ts';
 
 const router = Router();
 
-// POST /api/reservations and POST /api/reservations/submit - Submit reservation request
 const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) => {
   try {
     const currentSessionId = req.guestSession!.id;
     const {
-      guestSessionId, // Provided in body
+      guestSessionId,
       tripPlanId,
       fullName,
       email,
@@ -26,8 +31,8 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       adultsCount,
       childrenCount,
       specialRequests,
-      items, // RawReservationItemInput[]
-      status: clientStatus, // Client attempted status
+      items,
+      status: clientStatus,
     } = req.body;
 
     // Security Check: Session Mismatch Protection
@@ -47,17 +52,8 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     // Security Check: Trip Plan Ownership Protection
     let activeTripPlanId = tripPlanId;
     if (tripPlanId) {
-      const ownedTrip = await db
-        .select()
-        .from(schema.tripPlans)
-        .where(
-          and(
-            eq(schema.tripPlans.id, tripPlanId),
-            eq(schema.tripPlans.guestSessionId, currentSessionId)
-          )
-        );
-
-      if (ownedTrip.length === 0) {
+      const ownedTrip = await getDocById<any>('trip_plans', tripPlanId);
+      if (!ownedTrip || ownedTrip.guestSessionId !== currentSessionId) {
         res.status(403).json({
           error: 'TRIP_PLAN_OWNERSHIP_VIOLATION',
           message: 'The specified trip plan does not belong to your guest session.',
@@ -65,11 +61,10 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
         return;
       }
     } else {
-      // Auto-resolve trip plan for current session
-      const sessionTrips = await db
-        .select()
-        .from(schema.tripPlans)
-        .where(eq(schema.tripPlans.guestSessionId, currentSessionId));
+      const sessionTrips = await getCollectionDocs<any>(
+        'trip_plans',
+        where('guestSessionId', '==', currentSessionId)
+      );
       if (sessionTrips.length > 0) {
         activeTripPlanId = sessionTrips[0].id;
       }
@@ -78,19 +73,16 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     const adults = Math.max(1, Number(adultsCount) || 2);
     const children = Math.max(0, Number(childrenCount) || 0);
 
-    // Collect reservation items: either from payload or from owned trip plan
     let rawItems: RawReservationItemInput[] = [];
 
     if (items && Array.isArray(items) && items.length > 0) {
       rawItems = items;
     } else if (activeTripPlanId) {
-      // Load items from the verified trip plan
-      const tripItems = await db
-        .select()
-        .from(schema.tripItems)
-        .where(eq(schema.tripItems.tripPlanId, activeTripPlanId));
-
-      rawItems = tripItems.map(ti => ({
+      const tripItems = await getCollectionDocs<any>(
+        'trip_items',
+        where('tripPlanId', '==', activeTripPlanId)
+      );
+      rawItems = tripItems.map((ti) => ({
         productId: ti.productId,
         roomId: ti.roomId || undefined,
         variantId: ti.variantId || undefined,
@@ -110,7 +102,6 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     }
 
     // Server-Authoritative Pricing Calculation
-    // Client-submitted unitPrice, totalPrice, or discounts are explicitly ignored!
     let pricingResult;
     try {
       pricingResult = await calculateAuthoritativePricing(rawItems, adults, children);
@@ -122,35 +113,31 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       return;
     }
 
-    // Status Protection: Never allow client to force CONFIRMED or privileged status
-    // All guest requests MUST begin in 'NEW' status
+    // Status Protection: All guest requests MUST begin in 'NEW' status
     const initialStatus = 'NEW';
     if (clientStatus && clientStatus !== 'NEW') {
       console.warn(`[Security] Client attempted to force status "${clientStatus}". Enforcing "NEW".`);
     }
 
-    // Idempotency / Duplicate Submission Protection (double-click / network retry)
-    const recentSubmissions = await db
-      .select()
-      .from(schema.reservationRequests)
-      .where(
-        and(
-          eq(schema.reservationRequests.guestSessionId, currentSessionId),
-          eq(schema.reservationRequests.authoritativeTotal, pricingResult.authoritativeTotal.toString())
-        )
-      )
-      .orderBy(desc(schema.reservationRequests.createdAt))
-      .limit(1);
+    // Idempotency / Duplicate Submission Protection
+    const existingReservations = await getCollectionDocs<any>(
+      'reservation_requests',
+      where('guestSessionId', '==', currentSessionId)
+    );
 
-    if (recentSubmissions.length > 0) {
-      const recent = recentSubmissions[0];
+    const matchingRecent = existingReservations
+      .filter((r) => Number(r.authoritativeTotal) === pricingResult.authoritativeTotal)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    if (matchingRecent.length > 0) {
+      const recent = matchingRecent[0];
       const timeDiff = Date.now() - new Date(recent.createdAt).getTime();
       if (timeDiff < 15000) {
-        const existingTokens = await db
-          .select()
-          .from(schema.guestAccessTokens)
-          .where(eq(schema.guestAccessTokens.reservationRequestId, recent.id));
-        const guestToken = existingTokens[0]?.id || '';
+        const tokens = await getCollectionDocs<any>(
+          'guest_access_tokens',
+          where('reservationRequestId', '==', recent.id)
+        );
+        const guestToken = tokens[0]?.id || '';
         res.json({
           success: true,
           referenceNumber: recent.referenceNumber,
@@ -167,30 +154,28 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       }
     }
 
-    // 1. Create or link Guest
+    const nowIso = new Date().toISOString();
     const guestId = 'gst_' + crypto.randomBytes(12).toString('hex');
-    await db.insert(schema.guests).values({
+    const guestRecord = {
       id: guestId,
       fullName: fullName.trim(),
       email: email.trim().toLowerCase(),
       phone: phone?.trim() || null,
       country: country?.trim() || null,
       specialRequests: specialRequests || null,
-    });
+      createdAt: nowIso,
+    };
 
-    // Update guest session with guestId
-    await db
-      .update(schema.guestSessions)
-      .set({ guestId })
-      .where(eq(schema.guestSessions.id, currentSessionId));
-
-    // 2. Generate Reference Number (e.g., SYN-VF-78291)
     const refNum = `SYN-VF-${Math.floor(10000 + Math.random() * 90000)}`;
     const reservationId = 'res_' + crypto.randomBytes(12).toString('hex');
 
-    // Retrieve authoritative First-Touch and Last-Touch attribution snapshots
+    // Retrieve authoritative attribution
     const clientVisitorId = req.body.visitorId || (req.headers['x-visitor-id'] as string) || null;
-    const clientAnalyticsSessionId = req.body.analyticsSessionId || (req.headers['x-analytics-session-id'] as string) || currentSessionId;
+    const clientAnalyticsSessionId =
+      req.body.analyticsSessionId ||
+      (req.headers['x-analytics-session-id'] as string) ||
+      currentSessionId;
+
     let attribution = {
       visitorId: clientVisitorId,
       firstTouchSource: 'direct',
@@ -211,11 +196,10 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     try {
       attribution = await getAttributionForReservation(clientVisitorId, clientAnalyticsSessionId);
     } catch (attrErr) {
-      console.warn('[Analytics] Attribution retrieval warning (continuing reservation safely):', attrErr);
+      console.warn('[Analytics] Attribution retrieval warning:', attrErr);
     }
 
-    // 3. Insert Reservation Request
-    await db.insert(schema.reservationRequests).values({
+    const reservationRecord = {
       id: reservationId,
       referenceNumber: refNum,
       guestId,
@@ -230,7 +214,6 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       currency: pricingResult.currency,
       specialRequests: specialRequests || null,
       isBridgeIncentiveApplied: pricingResult.isBridgeIncentiveApplied,
-      // Marketing Attribution Snapshots
       visitorId: attribution.visitorId,
       firstTouchSource: attribution.firstTouchSource,
       firstTouchMedium: attribution.firstTouchMedium,
@@ -245,7 +228,105 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       lastTouchTerm: attribution.lastTouchTerm,
       lastTouchReferrer: attribution.lastTouchReferrer,
       attributionConfidence: attribution.attributionConfidence,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      cloudPersistedAt: nowIso,
+    };
+
+    const reservationItemRecords = pricingResult.items.map((snap) => {
+      const resItemId = 'ri_' + crypto.randomBytes(12).toString('hex');
+      return {
+        id: resItemId,
+        reservationRequestId: reservationId,
+        productId: snap.productId,
+        roomId: snap.roomId,
+        variantId: snap.variantId,
+        snapshotProductName: snap.snapshotProductName,
+        snapshotOperatorName: snap.snapshotOperatorName,
+        snapshotProductType: snap.snapshotProductType,
+        snapshotUnitPrice: snap.snapshotUnitPrice.toString(),
+        snapshotPriceBasis: snap.snapshotPriceBasis,
+        snapshotCurrency: snap.snapshotCurrency,
+        guestCount: snap.guestCount,
+        nightsCount: snap.nightsCount,
+        calculatedSubtotal: snap.calculatedSubtotal.toString(),
+        scheduledDate: snap.scheduledDate,
+        scheduledTime: snap.scheduledTime,
+        notes: snap.notes,
+        createdAt: nowIso,
+      };
     });
+
+    const leadId = 'lead_' + crypto.randomBytes(12).toString('hex');
+    const leadRecord = {
+      id: leadId,
+      guestId,
+      status: 'ACTIVE',
+      leadSource: 'syntuc_explorer_direct',
+      firstTouchTimestamp: nowIso,
+      lastTouchTimestamp: nowIso,
+      lastInteractionType: 'reservation_requested',
+      estimatedValue: pricingResult.authoritativeTotal.toString(),
+      notes: `Reservation request ${refNum} submitted. Total: US$${pricingResult.authoritativeTotal}.`,
+      createdAt: nowIso,
+    };
+
+    const interactionId = 'int_' + crypto.randomBytes(12).toString('hex');
+    const interactionRecord = {
+      id: interactionId,
+      leadId,
+      guestId,
+      channel: 'web_desk',
+      interactionType: 'inquiry',
+      summary: `Traveler submitted request ${refNum} with ${pricingResult.items.length} items.`,
+      createdAt: nowIso,
+    };
+
+    const guestAccessToken = 'gstok_' + crypto.randomBytes(24).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(guestAccessToken).digest('hex');
+    const expiresAtIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const tokenRecord = {
+      id: guestAccessToken,
+      reservationRequestId: reservationId,
+      guestId,
+      tokenHash,
+      isRevoked: false,
+      expiresAt: expiresAtIso,
+      createdAt: nowIso,
+    };
+
+    const messageId = 'msg_' + crypto.randomBytes(12).toString('hex');
+    const messageRecord = {
+      id: messageId,
+      reservationRequestId: reservationId,
+      guestSessionId: currentSessionId,
+      senderType: 'coordinator',
+      senderName: 'Syntuc Reservations Desk',
+      messageText: `Welcome to Victoria Falls! We have safely received your reservation request (${refNum}). Our coordinator is reviewing partner availability and will update your dashboard with confirmation details shortly. No payment is required at this stage.`,
+      createdAt: nowIso,
+    };
+
+    // AUTHORITATIVE WRITE: Atomically execute writeBatch to Cloud Firestore
+    const fdb = getFirestoreDb();
+    const batch = writeBatch(fdb);
+
+    batch.set(doc(fdb, 'guests', guestId), guestRecord);
+    batch.set(doc(fdb, 'guest_sessions', currentSessionId), { guestId }, { merge: true });
+    batch.set(doc(fdb, 'reservation_requests', reservationId), reservationRecord);
+
+    for (const ri of reservationItemRecords) {
+      batch.set(doc(fdb, 'reservation_items', ri.id), ri);
+    }
+
+    batch.set(doc(fdb, 'leads', leadId), leadRecord);
+    batch.set(doc(fdb, 'interactions', interactionId), interactionRecord);
+    batch.set(doc(fdb, 'guest_access_tokens', guestAccessToken), tokenRecord);
+    batch.set(doc(fdb, 'guest_messages', messageId), messageRecord);
+
+    // Commit batch to Firestore
+    await batch.commit();
+    console.log(`[Firestore] Reservation ${refNum} (${reservationId}) atomically committed.`);
 
     // Safely log conversion event
     await recordEventSafely({
@@ -265,114 +346,6 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       },
     });
 
-    // 4. Insert Reservation Items Historical Snapshots
-    for (const snap of pricingResult.items) {
-      const resItemId = 'ri_' + crypto.randomBytes(12).toString('hex');
-      await db.insert(schema.reservationItems).values({
-        id: resItemId,
-        reservationRequestId: reservationId,
-        productId: snap.productId,
-        roomId: snap.roomId,
-        variantId: snap.variantId,
-        snapshotProductName: snap.snapshotProductName,
-        snapshotOperatorName: snap.snapshotOperatorName,
-        snapshotProductType: snap.snapshotProductType,
-        snapshotUnitPrice: snap.snapshotUnitPrice.toString(),
-        snapshotPriceBasis: snap.snapshotPriceBasis,
-        snapshotCurrency: snap.snapshotCurrency,
-        guestCount: snap.guestCount,
-        nightsCount: snap.nightsCount,
-        calculatedSubtotal: snap.calculatedSubtotal.toString(),
-        scheduledDate: snap.scheduledDate,
-        scheduledTime: snap.scheduledTime,
-        notes: snap.notes,
-      });
-    }
-
-    // 5. Create or Update Lead with First/Last Touch
-    const leadId = 'lead_' + crypto.randomBytes(12).toString('hex');
-    await db.insert(schema.leads).values({
-      id: leadId,
-      guestId,
-      status: 'ACTIVE',
-      leadSource: 'syntuc_explorer_direct',
-      firstTouchTimestamp: new Date(),
-      lastTouchTimestamp: new Date(),
-      lastInteractionType: 'reservation_requested',
-      estimatedValue: pricingResult.authoritativeTotal.toString(),
-      notes: `Reservation request ${refNum} submitted. Total: US$${pricingResult.authoritativeTotal}.`,
-    });
-
-    // 6. Record Initial Interaction
-    await db.insert(schema.interactions).values({
-      id: 'int_' + crypto.randomBytes(12).toString('hex'),
-      leadId,
-      guestId,
-      channel: 'web_desk',
-      interactionType: 'inquiry',
-      summary: `Traveler submitted request ${refNum} with ${pricingResult.items.length} items.`,
-    });
-
-    // 7. Issue Secure Guest Access Token
-    const guestAccessToken = 'gstok_' + crypto.randomBytes(24).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(guestAccessToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days validity
-
-    await db.insert(schema.guestAccessTokens).values({
-      id: guestAccessToken,
-      reservationRequestId: reservationId,
-      guestId,
-      tokenHash,
-      isRevoked: false,
-      expiresAt,
-    });
-
-    // 8. Add initial automated welcome message from Reservations Desk
-    await db.insert(schema.guestMessages).values({
-      id: 'msg_' + crypto.randomBytes(12).toString('hex'),
-      reservationRequestId: reservationId,
-      guestSessionId: currentSessionId,
-      senderType: 'coordinator',
-      senderName: 'Syntuc Reservations Desk',
-      messageText: `Welcome to Victoria Falls! We have safely received your reservation request (${refNum}). Our coordinator is reviewing partner availability and will update your dashboard with confirmation details shortly. No payment is required at this stage.`,
-    });
-
-    // 9. Persist synchronously to Cloud Firestore for durable container lifecycle survival
-    try {
-      const persistedRes = (await db
-        .select()
-        .from(schema.reservationRequests)
-        .where(eq(schema.reservationRequests.id, reservationId)))[0];
-      const persistedItems = await db
-        .select()
-        .from(schema.reservationItems)
-        .where(eq(schema.reservationItems.reservationRequestId, reservationId));
-      const persistedGuest = (await db
-        .select()
-        .from(schema.guests)
-        .where(eq(schema.guests.id, guestId)))[0];
-      const persistedToken = (await db
-        .select()
-        .from(schema.guestAccessTokens)
-        .where(eq(schema.guestAccessTokens.id, guestAccessToken)))[0];
-      const persistedMsg = (await db
-        .select()
-        .from(schema.guestMessages)
-        .where(eq(schema.guestMessages.reservationRequestId, reservationId)))[0];
-
-      if (persistedRes) {
-        await persistReservationToFirestore(
-          persistedRes,
-          persistedItems,
-          persistedGuest,
-          persistedToken,
-          persistedMsg
-        );
-      }
-    } catch (fsErr) {
-      console.error('[Reservation] Cloud Firestore sync warning:', fsErr);
-    }
-
     res.json({
       success: true,
       referenceNumber: refNum,
@@ -385,9 +358,12 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       dashboardUrl: `/guest/reservation/${guestAccessToken}`,
       message: 'Reservation request successfully submitted to the Syntuc Reservations Desk.',
     });
-  } catch (error) {
-    console.error('Reservation submission error:', error);
-    res.status(500).json({ error: 'FAILED_TO_SUBMIT_RESERVATION' });
+  } catch (error: any) {
+    console.error('Reservation submission error in Firestore:', error);
+    res.status(500).json({
+      error: 'FAILED_TO_SUBMIT_RESERVATION',
+      message: error.message || 'Authoritative database write failed',
+    });
   }
 };
 
@@ -400,73 +376,68 @@ router.get('/guest/:token', async (req, res: Response) => {
     const token = req.params.token;
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-    const tokenRecords = await db
-      .select()
-      .from(schema.guestAccessTokens)
-      .where(
-        and(
-          eq(schema.guestAccessTokens.tokenHash, tokenHash),
-          eq(schema.guestAccessTokens.isRevoked, false)
-        )
+    // Look up token in Firestore: first by doc ID, then by tokenHash
+    let tokenRecord = await getDocById<any>('guest_access_tokens', token);
+    if (!tokenRecord || tokenRecord.isRevoked) {
+      const allTokens = await getCollectionDocs<any>(
+        'guest_access_tokens',
+        where('tokenHash', '==', tokenHash)
       );
+      tokenRecord = allTokens.find((t) => !t.isRevoked) || null;
+    }
 
-    if (tokenRecords.length === 0) {
-      res.status(404).json({ error: 'INVALID_OR_REVOKED_TOKEN', message: 'Reservation access link is invalid or expired.' });
+    if (!tokenRecord) {
+      res.status(404).json({
+        error: 'INVALID_OR_REVOKED_TOKEN',
+        message: 'Reservation access link is invalid or expired.',
+      });
       return;
     }
 
-    const tokenRecord = tokenRecords[0];
-
-    // Check expiration
-    if (new Date(tokenRecord.expiresAt) < new Date()) {
-      res.status(401).json({ error: 'TOKEN_EXPIRED', message: 'This reservation access link has expired.' });
+    if (tokenRecord.expiresAt && new Date(tokenRecord.expiresAt) < new Date()) {
+      res.status(401).json({
+        error: 'TOKEN_EXPIRED',
+        message: 'This reservation access link has expired.',
+      });
       return;
     }
 
-    // Update last accessed
-    await db
-      .update(schema.guestAccessTokens)
-      .set({ lastAccessedAt: new Date() })
-      .where(eq(schema.guestAccessTokens.id, tokenRecord.id));
+    await updateDocById('guest_access_tokens', tokenRecord.id, {
+      lastAccessedAt: new Date().toISOString(),
+    });
 
-    // Fetch reservation request
-    const resRecords = await db
-      .select()
-      .from(schema.reservationRequests)
-      .where(eq(schema.reservationRequests.id, tokenRecord.reservationRequestId));
+    const reservation = await getDocById<any>(
+      'reservation_requests',
+      tokenRecord.reservationRequestId
+    );
 
-    if (resRecords.length === 0) {
+    if (!reservation) {
       res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
       return;
     }
 
-    const reservation = resRecords[0];
+    const guest = reservation.guestId
+      ? await getDocById<any>('guests', reservation.guestId)
+      : null;
 
-    // Fetch guest info
-    const guestRecords = await db
-      .select()
-      .from(schema.guests)
-      .where(eq(schema.guests.id, reservation.guestId));
-    const guest = guestRecords[0] || null;
+    const items = await getCollectionDocs<any>(
+      'reservation_items',
+      where('reservationRequestId', '==', reservation.id)
+    );
 
-    // Fetch historical reservation items
-    const items = await db
-      .select()
-      .from(schema.reservationItems)
-      .where(eq(schema.reservationItems.reservationRequestId, reservation.id));
-
-    // Fetch messages for this reservation
-    const messages = await db
-      .select()
-      .from(schema.guestMessages)
-      .where(eq(schema.guestMessages.reservationRequestId, reservation.id))
-      .orderBy(schema.guestMessages.createdAt);
+    const allMessages = await getCollectionDocs<any>(
+      'guest_messages',
+      where('reservationRequestId', '==', reservation.id)
+    );
+    const messages = allMessages.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
 
     res.json({
       reservation: {
         id: reservation.id,
         referenceNumber: reservation.referenceNumber,
-        status: reservation.status, // Clearly distinguish REQUESTED vs CONFIRMED
+        status: reservation.status,
         isConfirmed: reservation.status === 'CONFIRMED',
         startDate: reservation.startDate,
         endDate: reservation.endDate,
@@ -489,7 +460,7 @@ router.get('/guest/:token', async (req, res: Response) => {
       messages,
     });
   } catch (error) {
-    console.error('Guest dashboard load error:', error);
+    console.error('Guest dashboard load error in Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_DASHBOARD' });
   }
 });
@@ -506,42 +477,39 @@ router.post('/guest/:token/messages', async (req, res: Response) => {
     }
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const tokenRecords = await db
-      .select()
-      .from(schema.guestAccessTokens)
-      .where(
-        and(
-          eq(schema.guestAccessTokens.tokenHash, tokenHash),
-          eq(schema.guestAccessTokens.isRevoked, false)
-        )
-      );
 
-    if (tokenRecords.length === 0) {
+    let tokenRecord = await getDocById<any>('guest_access_tokens', token);
+    if (!tokenRecord || tokenRecord.isRevoked) {
+      const allTokens = await getCollectionDocs<any>(
+        'guest_access_tokens',
+        where('tokenHash', '==', tokenHash)
+      );
+      tokenRecord = allTokens.find((t) => !t.isRevoked) || null;
+    }
+
+    if (!tokenRecord) {
       res.status(404).json({ error: 'INVALID_TOKEN' });
       return;
     }
 
-    const tokenRecord = tokenRecords[0];
-
-    const guestRecords = await db
-      .select()
-      .from(schema.guests)
-      .where(eq(schema.guests.id, tokenRecord.guestId));
-
-    const senderName = guestRecords[0]?.fullName || 'Guest';
+    const guest = await getDocById<any>('guests', tokenRecord.guestId);
+    const senderName = guest?.fullName || 'Guest';
 
     const msgId = 'msg_' + crypto.randomBytes(12).toString('hex');
-    await db.insert(schema.guestMessages).values({
+    const nowIso = new Date().toISOString();
+
+    await setDocById('guest_messages', msgId, {
       id: msgId,
       reservationRequestId: tokenRecord.reservationRequestId,
       senderType: 'guest',
       senderName,
       messageText: messageText.trim(),
+      createdAt: nowIso,
     });
 
     res.json({ success: true, messageId: msgId });
   } catch (error) {
-    console.error('Error posting guest message:', error);
+    console.error('Error posting guest message in Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_SEND_MESSAGE' });
   }
 });
