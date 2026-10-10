@@ -669,6 +669,18 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
             },
           });
       }
+      // Ensure default fallback guest exists
+      await db
+        .insert(schema.guests)
+        .values({
+          id: 'gst_default_restored',
+          fullName: 'Valued Guest',
+          email: 'guest@syntuc.com',
+          phone: null,
+          country: 'Zimbabwe',
+          createdAt: new Date(),
+        })
+        .onConflictDoNothing();
     } catch (gErr) {
       console.warn('[FirestoreSync] Notice hydrating guests:', gErr);
     }
@@ -679,6 +691,13 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
       for (const docSnap of tokenSnap.docs) {
         const tok = docSnap.data() as any;
         if (!tok.id) continue;
+        if (tok.reservationRequestId) {
+          const resExists = await db
+            .select({ id: schema.reservationRequests.id })
+            .from(schema.reservationRequests)
+            .where(eq(schema.reservationRequests.id, tok.reservationRequestId));
+          if (resExists.length === 0) continue;
+        }
         await db
           .insert(schema.guestAccessTokens)
           .values({
@@ -693,29 +712,6 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
       }
     } catch (tokErr) {
       console.warn('[FirestoreSync] Notice hydrating tokens:', tokErr);
-    }
-
-    // 4. Hydrate Guest Messages
-    try {
-      const msgSnap = await getDocs(collection(fdb, 'guest_messages'));
-      for (const docSnap of msgSnap.docs) {
-        const m = docSnap.data() as any;
-        if (!m.id) continue;
-        await db
-          .insert(schema.guestMessages)
-          .values({
-            id: m.id,
-            reservationRequestId: m.reservationRequestId,
-            guestSessionId: m.guestSessionId || 'ses_restored',
-            senderType: m.senderType || 'coordinator',
-            senderName: m.senderName || 'Reservations Desk',
-            messageText: m.messageText || '',
-            createdAt: parseFirestoreDate(m.createdAt),
-          })
-          .onConflictDoNothing();
-      }
-    } catch (msgErr) {
-      console.warn('[FirestoreSync] Notice hydrating messages:', msgErr);
     }
 
     // 5. Hydrate Products (AUTHORITATIVE: overrides seed/default data, must precede reservation items for FK integrity)
@@ -988,20 +984,6 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
           })
           .onConflictDoNothing();
 
-        // Also ensure guest access token is available for self-service dashboard
-        if (data.guestToken) {
-          await db
-            .insert(schema.guestAccessTokens)
-            .values({
-              id: data.guestToken,
-              reservationRequestId: data.id,
-              guestId: guestId,
-              tokenHash: 'hash_' + data.guestToken,
-              isRevoked: false,
-              expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-            })
-            .onConflictDoNothing();
-        }
 
         // Ensure trip plan exists if referenced to satisfy foreign key constraint
         if (data.tripPlanId) {
@@ -1076,6 +1058,21 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
           });
 
         reservationsRestored++;
+
+        // Also ensure guest access token is available for self-service dashboard after reservation is inserted
+        if (data.guestToken) {
+          await db
+            .insert(schema.guestAccessTokens)
+            .values({
+              id: data.guestToken,
+              reservationRequestId: data.id,
+              guestId: guestId,
+              tokenHash: 'hash_' + data.guestToken,
+              isRevoked: false,
+              expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+            })
+            .onConflictDoNothing();
+        }
       } catch (insertErr) {
         console.warn(`[FirestoreSync] Failed restoring reservation ${data.referenceNumber}:`, insertErr);
       }
@@ -1114,6 +1111,17 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
               .onConflictDoNothing();
           }
         }
+
+        // Verify reservation request exists before inserting item to avoid foreign key violation
+        const resExists = await db
+          .select({ id: schema.reservationRequests.id })
+          .from(schema.reservationRequests)
+          .where(eq(schema.reservationRequests.id, item.reservationRequestId));
+        if (resExists.length === 0) {
+          // If the parent reservation request is missing or tombstoned, skip orphan item
+          continue;
+        }
+
         await db
           .insert(schema.reservationItems)
           .values({
@@ -1140,6 +1148,51 @@ export async function hydrateFromFirestore(existingTombstones?: Set<string>): Pr
       } catch (itemErr) {
         console.warn(`[FirestoreSync] Notice restoring reservation item ${item.id}:`, itemErr);
       }
+    }
+
+    // 10. Hydrate Guest Messages (after reservations are restored so FK succeeds)
+    try {
+      const msgSnap = await getDocs(collection(fdb, 'guest_messages'));
+      for (const docSnap of msgSnap.docs) {
+        const m = docSnap.data() as any;
+        if (!m.id) continue;
+        const sessionId = m.guestSessionId || 'ses_restored';
+        // Ensure guest session exists
+        await db
+          .insert(schema.guestSessions)
+          .values({
+            id: sessionId,
+            guestId: 'gst_default_restored',
+            sessionSecret: 'secret_' + sessionId,
+            createdAt: parseFirestoreDate(m.createdAt),
+            lastActiveAt: new Date(),
+          })
+          .onConflictDoNothing();
+
+        // Check if reservation exists if referenced
+        if (m.reservationRequestId) {
+          const resExists = await db
+            .select({ id: schema.reservationRequests.id })
+            .from(schema.reservationRequests)
+            .where(eq(schema.reservationRequests.id, m.reservationRequestId));
+          if (resExists.length === 0) continue;
+        }
+
+        await db
+          .insert(schema.guestMessages)
+          .values({
+            id: m.id,
+            reservationRequestId: m.reservationRequestId || null,
+            guestSessionId: sessionId,
+            senderType: m.senderType || 'coordinator',
+            senderName: m.senderName || 'Reservations Desk',
+            messageText: m.messageText || '',
+            createdAt: parseFirestoreDate(m.createdAt),
+          })
+          .onConflictDoNothing();
+      }
+    } catch (msgErr) {
+      console.warn('[FirestoreSync] Notice hydrating messages:', msgErr);
     }
 
     console.log(
