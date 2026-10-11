@@ -1,9 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq, desc, and, gte, lte, sql } from 'drizzle-orm';
 import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware/auth.ts';
 import { initializeSession, recordEventSafely } from '../services/attribution.ts';
+import { getCollectionDocs } from '../lib/firestore.ts';
 
 const router = Router();
 
@@ -129,32 +127,51 @@ router.get('/dashboard', requireCoordinatorAuth, async (req: AuthenticatedStaffR
       }
     }
 
-    // 1. Fetch visitors
-    const allVisitors = await db.select().from(schema.analyticsVisitors);
+    // 1. Fetch visitors from Firestore
+    const rawVisitors = await getCollectionDocs<any>('analytics_visitors');
+    const allVisitors = rawVisitors.map(v => ({
+      ...v,
+      firstSeenAt: new Date(v.firstSeenAt),
+      lastSeenAt: new Date(v.lastSeenAt),
+    }));
     const filteredVisitors = allVisitors.filter((v) => {
       if (timeFilterStart && v.lastSeenAt < timeFilterStart) return false;
       if (timeFilterEnd && v.firstSeenAt > timeFilterEnd) return false;
       return true;
     });
 
-    // 2. Fetch sessions
-    const allSessions = await db.select().from(schema.analyticsSessions);
+    // 2. Fetch sessions from Firestore
+    const rawSessions = await getCollectionDocs<any>('analytics_sessions');
+    const allSessions = rawSessions.map(s => ({
+      ...s,
+      startedAt: new Date(s.startedAt),
+      lastActivityAt: new Date(s.lastActivityAt),
+    }));
     const filteredSessions = allSessions.filter((s) => {
       if (timeFilterStart && s.startedAt < timeFilterStart) return false;
       if (timeFilterEnd && s.startedAt > timeFilterEnd) return false;
       return true;
     });
 
-    // 3. Fetch events
-    const allEvents = await db.select().from(schema.analyticsEvents);
+    // 3. Fetch events from Firestore
+    const rawEvents = await getCollectionDocs<any>('analytics_events');
+    const allEvents = rawEvents.map(e => ({
+      ...e,
+      occurredAt: new Date(e.occurredAt),
+    }));
     const filteredEvents = allEvents.filter((e) => {
       if (timeFilterStart && e.occurredAt < timeFilterStart) return false;
       if (timeFilterEnd && e.occurredAt > timeFilterEnd) return false;
       return true;
     });
 
-    // 4. Fetch reservations
-    const allReservations = await db.select().from(schema.reservationRequests);
+    // 4. Fetch reservations from Firestore
+    const rawReservations = await getCollectionDocs<any>('reservation_requests');
+    const allReservations = rawReservations.map(r => ({
+      ...r,
+      createdAt: new Date(r.createdAt),
+      updatedAt: new Date(r.updatedAt || r.createdAt),
+    }));
     const filteredReservations = allReservations.filter((r) => {
       if (timeFilterStart && r.createdAt < timeFilterStart) return false;
       if (timeFilterEnd && r.createdAt > timeFilterEnd) return false;

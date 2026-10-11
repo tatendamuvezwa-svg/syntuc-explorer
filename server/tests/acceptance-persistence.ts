@@ -1,5 +1,5 @@
 import http from 'http';
-import { getFirestoreDb } from '../services/firestoreSync.ts';
+import { getFirestoreDb } from '../lib/firestore.ts';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 
 function post(path: string, data: any, headers: Record<string, string> = {}): Promise<{ status: number; body: any }> {

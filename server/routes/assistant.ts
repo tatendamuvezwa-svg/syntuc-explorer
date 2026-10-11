@@ -1,8 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { processAssistantMessage } from '../services/gemini.ts';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq } from 'drizzle-orm';
 
 const router = Router();
 

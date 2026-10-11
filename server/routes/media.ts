@@ -1,20 +1,25 @@
 import { Router, Response } from 'express';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
-import { eq, and, asc } from 'drizzle-orm';
 import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware/auth.ts';
 import {
-  persistMediaAssetToFirestore,
-  deleteMediaAssetFromFirestore,
-  recordTombstoneInFirestore,
-  updateMediaPrimaryStatusInFirestore,
-  persistProductToFirestore,
-  persistPackageToFirestore,
-} from '../services/firestoreSync.ts';
+  getFirestoreDb,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocById,
+  setDocById,
+  updateDocById,
+  deleteDocById,
+  getCollectionDocs,
+  where,
+  getTombstones,
+  recordTombstone,
+} from '../lib/firestore.ts';
 
 const router = Router();
 
@@ -49,12 +54,77 @@ const upload = multer({
   },
 });
 
+const CHUNK_SIZE = 350 * 1024;
+
+async function persistMediaToFirestore(mediaAsset: any) {
+  const fdb = getFirestoreDb();
+  const rawUrl = mediaAsset.url || '';
+  const isLarge = rawUrl.length > CHUNK_SIZE;
+
+  if (isLarge) {
+    const totalChunks = Math.ceil(rawUrl.length / CHUNK_SIZE);
+    const chunkPromises = [];
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkData = rawUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      chunkPromises.push(
+        setDoc(doc(fdb, 'media_chunks', `${mediaAsset.id}_chunk_${i}`), {
+          mediaAssetId: mediaAsset.id,
+          chunkIndex: i,
+          totalChunks,
+          data: chunkData,
+          createdAt: new Date().toISOString(),
+        })
+      );
+    }
+    await Promise.all(chunkPromises);
+
+    const thumb = mediaAsset.thumbnailUrl && mediaAsset.thumbnailUrl.length < CHUNK_SIZE
+      ? mediaAsset.thumbnailUrl
+      : `__CHUNKED__:${mediaAsset.id}`;
+
+    await setDoc(doc(fdb, 'media_assets', mediaAsset.id), {
+      ...mediaAsset,
+      url: `__CHUNKED__:${mediaAsset.id}`,
+      thumbnailUrl: thumb,
+      isChunked: true,
+      totalChunks,
+      rawLength: rawUrl.length,
+      createdAt: mediaAsset.createdAt || new Date().toISOString(),
+      cloudPersistedAt: new Date().toISOString(),
+    });
+  } else {
+    await setDoc(doc(fdb, 'media_assets', mediaAsset.id), {
+      ...mediaAsset,
+      isChunked: false,
+      createdAt: mediaAsset.createdAt || new Date().toISOString(),
+      cloudPersistedAt: new Date().toISOString(),
+    });
+  }
+}
+
+async function removeMediaFromFirestore(mediaId: string) {
+  const fdb = getFirestoreDb();
+  const assetRef = doc(fdb, 'media_assets', mediaId);
+  const snap = await getDoc(assetRef);
+  if (snap.exists()) {
+    const data = snap.data();
+    if (data.isChunked && data.totalChunks) {
+      const deletePromises = [];
+      for (let i = 0; i < data.totalChunks; i++) {
+        deletePromises.push(deleteDoc(doc(fdb, 'media_chunks', `${mediaId}_chunk_${i}`)));
+      }
+      await Promise.all(deletePromises);
+    }
+    await deleteDoc(assetRef);
+  }
+}
+
 // GET /api/media/product - Safe fallback if no productId provided
 router.get('/product', (req, res: Response) => {
   res.json([]);
 });
 
-// GET /api/media/product/:productId - Get all media for a product
+// GET /api/media/product/:productId - Get all media for a product directly from Firestore
 router.get('/product/:productId', async (req, res: Response) => {
   try {
     const { productId } = req.params;
@@ -62,19 +132,20 @@ router.get('/product/:productId', async (req, res: Response) => {
       res.json([]);
       return;
     }
-    const media = await db
-      .select()
-      .from(schema.mediaAssets)
-      .where(eq(schema.mediaAssets.ownerId, productId.trim()))
-      .orderBy(asc(schema.mediaAssets.displayOrder));
+    const tombstones = await getTombstones();
+    const allMedia = await getCollectionDocs<any>('media_assets', where('ownerId', '==', productId.trim()));
+    const activeMedia = allMedia
+      .filter((m) => !tombstones.has(`media_assets_${m.id}`))
+      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
 
-    res.json(media);
+    res.json(activeMedia);
   } catch (error) {
+    console.error('Error fetching product media from Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_MEDIA' });
   }
 });
 
-// POST /api/media/upload - Upload file or register verified external URL
+// POST /api/media/upload - Upload file or register verified external URL directly to Firestore
 router.post(
   '/upload',
   requireCoordinatorAuth,
@@ -103,40 +174,43 @@ router.post(
       if (req.file) {
         try {
           const fileBuffer = fs.readFileSync(req.file.path);
-          // Store durable Data URI directly in database so media survives container recycling
+          // Store durable Data URI directly in Firestore so media survives container recycling
           assetUrl = `data:${req.file.mimetype};base64,${fileBuffer.toString('base64')}`;
-          // Clean up temp upload file
           try {
             fs.unlinkSync(req.file.path);
           } catch (_) {}
         } catch (readErr) {
-          console.warn('[Media] Failed to convert uploaded file to durable Data URI, falling back to path:', readErr);
+          console.warn('[Media] Data URI generation notice, using fallback path:', readErr);
           assetUrl = `/uploads/${req.file.filename}`;
         }
       }
 
       if (!assetUrl) {
-        res.status(400).json({ error: 'FILE_OR_URL_REQUIRED', message: 'Please provide either an uploaded file or external image URL' });
+        res.status(400).json({
+          error: 'FILE_OR_URL_REQUIRED',
+          message: 'Please provide either an uploaded file or external image URL',
+        });
         return;
       }
 
       const mediaId = 'med_' + crypto.randomBytes(12).toString('hex');
       const shouldBePrimary = isPrimary === 'true' || isPrimary === true;
+      const nowIso = new Date().toISOString();
 
-      // If marked as primary, unset any existing primary media for this product first
+      // If marked as primary, unset any existing primary media for this owner first
       if (shouldBePrimary) {
-        await db
-          .update(schema.mediaAssets)
-          .set({ isPrimary: false })
-          .where(
-            and(
-              eq(schema.mediaAssets.ownerType, ownerType),
-              eq(schema.mediaAssets.ownerId, ownerId)
-            )
-          );
+        const existingMedia = await getCollectionDocs<any>(
+          'media_assets',
+          where('ownerId', '==', ownerId)
+        );
+        for (const m of existingMedia) {
+          if (m.isPrimary) {
+            await updateDocById('media_assets', m.id, { isPrimary: false, updatedAt: nowIso });
+          }
+        }
       }
 
-      // Insert media record
+      // Build media record
       const mediaRecord = {
         id: mediaId,
         ownerType,
@@ -150,29 +224,26 @@ router.post(
         altText: altText || null,
         sourceName: sourceName || 'Coordinator Upload',
         verificationState: 'ESTABLISHED',
+        createdAt: nowIso,
+        updatedAt: nowIso,
       };
-      await db.insert(schema.mediaAssets).values(mediaRecord);
 
-      // Persist to Cloud Firestore for durable container lifecycle survival
-      try {
-        await persistMediaAssetToFirestore(mediaRecord as any);
-      } catch (fsErr) {
-        console.warn('[Media] Cloud Firestore persistence notice:', fsErr);
-      }
+      // Persist directly to Cloud Firestore
+      await persistMediaToFirestore(mediaRecord);
 
-      // If primary, also update primaryMediaId on the product
-      if (shouldBePrimary && ownerType === 'product') {
-        await db
-          .update(schema.products)
-          .set({ primaryMediaId: mediaId })
-          .where(eq(schema.products.id, ownerId));
-
-        // Sync primary media flags in Firestore and update product document
-        try {
-          await updateMediaPrimaryStatusInFirestore(ownerType, ownerId, mediaId);
-          const updatedProd = (await db.select().from(schema.products).where(eq(schema.products.id, ownerId)))[0];
-          if (updatedProd) await persistProductToFirestore(updatedProd);
-        } catch (_) {}
+      // If primary, update product or package in Firestore
+      if (shouldBePrimary) {
+        if (ownerType === 'product') {
+          await updateDocById('products', ownerId, {
+            primaryMediaId: mediaId,
+            updatedAt: nowIso,
+          });
+        } else if (ownerType === 'package') {
+          await updateDocById('packages', ownerId, {
+            primaryImageUrl: assetUrl,
+            updatedAt: nowIso,
+          });
+        }
       }
 
       res.json({
@@ -189,75 +260,42 @@ router.post(
   }
 );
 
-// POST /api/media/:id/set-primary - Switch primary image for product
+// POST /api/media/:id/set-primary - Switch primary image directly in Firestore
 router.post('/:id/set-primary', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const target = await getDocById<any>('media_assets', id);
 
-    // Fetch the target media
-    const targetRecords = await db
-      .select()
-      .from(schema.mediaAssets)
-      .where(eq(schema.mediaAssets.id, id));
-
-    if (targetRecords.length === 0) {
+    if (!target) {
       res.status(404).json({ error: 'MEDIA_NOT_FOUND' });
       return;
     }
 
-    const target = targetRecords[0];
+    const nowIso = new Date().toISOString();
 
     // 1. Unset all existing primary media for this owner
-    await db
-      .update(schema.mediaAssets)
-      .set({ isPrimary: false })
-      .where(
-        and(
-          eq(schema.mediaAssets.ownerType, target.ownerType),
-          eq(schema.mediaAssets.ownerId, target.ownerId)
-        )
-      );
-
-    // 2. Set this media as primary
-    await db
-      .update(schema.mediaAssets)
-      .set({ isPrimary: true })
-      .where(eq(schema.mediaAssets.id, id));
-
-    // Ensure target media is durably persisted to Cloud Firestore
-    try {
-      await persistMediaAssetToFirestore({ ...target, isPrimary: true });
-    } catch (fsErr) {
-      console.warn('[Media] Firestore persist target media notice:', fsErr);
+    const existingMedia = await getCollectionDocs<any>(
+      'media_assets',
+      where('ownerId', '==', target.ownerId)
+    );
+    for (const m of existingMedia) {
+      const isTarget = m.id === id;
+      if (m.isPrimary !== isTarget) {
+        await updateDocById('media_assets', m.id, { isPrimary: isTarget, updatedAt: nowIso });
+      }
     }
 
-    // 3. Update product primaryMediaId or package primaryImageUrl
+    // 2. Update product primaryMediaId or package primaryImageUrl in Firestore
     if (target.ownerType === 'product') {
-      await db
-        .update(schema.products)
-        .set({ primaryMediaId: id, updatedAt: new Date() })
-        .where(eq(schema.products.id, target.ownerId));
-
-      try {
-        await updateMediaPrimaryStatusInFirestore(target.ownerType, target.ownerId, id);
-        const updatedProd = (await db.select().from(schema.products).where(eq(schema.products.id, target.ownerId)))[0];
-        if (updatedProd) await persistProductToFirestore(updatedProd);
-      } catch (fsErr) {
-        console.warn('[Media] Firestore persist product notice:', fsErr);
-      }
+      await updateDocById('products', target.ownerId, {
+        primaryMediaId: id,
+        updatedAt: nowIso,
+      });
     } else if (target.ownerType === 'package') {
-      await db
-        .update(schema.packages)
-        .set({ primaryImageUrl: target.url, updatedAt: new Date() })
-        .where(eq(schema.packages.id, target.ownerId));
-
-      try {
-        await updateMediaPrimaryStatusInFirestore(target.ownerType, target.ownerId, id);
-        const updatedPkg = (await db.select().from(schema.packages).where(eq(schema.packages.id, target.ownerId)))[0];
-        if (updatedPkg) await persistPackageToFirestore(updatedPkg);
-      } catch (fsErr) {
-        console.warn('[Media] Firestore persist package notice:', fsErr);
-      }
+      await updateDocById('packages', target.ownerId, {
+        primaryImageUrl: target.url,
+        updatedAt: nowIso,
+      });
     }
 
     res.json({
@@ -270,28 +308,19 @@ router.post('/:id/set-primary', requireCoordinatorAuth, async (req: Authenticate
   }
 });
 
-// PATCH /api/media/:id - Edit caption, alt text, display order
+// PATCH /api/media/:id - Edit caption, alt text, display order in Firestore
 router.patch('/:id', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { caption, altText, displayOrder, sourceName } = req.body;
 
-    await db
-      .update(schema.mediaAssets)
-      .set({
-        caption: caption !== undefined ? caption : undefined,
-        altText: altText !== undefined ? altText : undefined,
-        displayOrder: displayOrder !== undefined ? Number(displayOrder) : undefined,
-        sourceName: sourceName !== undefined ? sourceName : undefined,
-      })
-      .where(eq(schema.mediaAssets.id, id));
+    const updates: any = { updatedAt: new Date().toISOString() };
+    if (caption !== undefined) updates.caption = caption;
+    if (altText !== undefined) updates.altText = altText;
+    if (displayOrder !== undefined) updates.displayOrder = Number(displayOrder);
+    if (sourceName !== undefined) updates.sourceName = sourceName;
 
-    const updatedMedia = (await db.select().from(schema.mediaAssets).where(eq(schema.mediaAssets.id, id)))[0];
-    if (updatedMedia) {
-      try {
-        await persistMediaAssetToFirestore(updatedMedia);
-      } catch (_) {}
-    }
+    await updateDocById('media_assets', id, updates);
 
     res.json({ success: true, message: 'Media metadata updated' });
   } catch (error) {
@@ -299,89 +328,75 @@ router.patch('/:id', requireCoordinatorAuth, async (req: AuthenticatedStaffReque
   }
 });
 
-// DELETE /api/media/:id - Delete media asset
+// DELETE /api/media/:id - Delete media asset from Firestore and record durable tombstone
 router.delete('/:id', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const item = await getDocById<any>('media_assets', id);
 
-    const records = await db
-      .select()
-      .from(schema.mediaAssets)
-      .where(eq(schema.mediaAssets.id, id));
-
-    if (records.length === 0) {
+    if (!item) {
       res.status(404).json({ error: 'MEDIA_NOT_FOUND' });
       return;
     }
 
-    const item = records[0];
-
-    // If local file, delete from disk
+    // If local file exists, remove from disk
     if (item.url && item.url.startsWith('/uploads/')) {
       const filePath = path.join(uploadsDir, path.basename(item.url));
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
-        } catch (e) {
-          console.error('Error removing local file:', e);
-        }
+        } catch (_) {}
       }
     }
 
-    await db.delete(schema.mediaAssets).where(eq(schema.mediaAssets.id, id));
+    // 1. Record durable deletion tombstone in Cloud Firestore
+    await recordTombstone('media_assets', id);
 
-    // Remove from Cloud Firestore and record deletion tombstone
-    try {
-      await recordTombstoneInFirestore('media_assets', id);
-      await deleteMediaAssetFromFirestore(id);
-    } catch (_) {}
+    // 2. Remove document and chunks from Firestore
+    await removeMediaFromFirestore(id);
 
-    // If deleted media was primary or referenced by product, update product
+    // 3. Reconcile primary image reference on owner product/package if needed
     if (item.ownerType === 'product') {
-      const remaining = await db
-        .select()
-        .from(schema.mediaAssets)
-        .where(eq(schema.mediaAssets.ownerId, item.ownerId))
-        .orderBy(asc(schema.mediaAssets.displayOrder));
+      const tombstones = await getTombstones();
+      const remainingMedia = (await getCollectionDocs<any>(
+        'media_assets',
+        where('ownerId', '==', item.ownerId)
+      ))
+        .filter((m) => m.id !== id && !tombstones.has(`media_assets_${m.id}`))
+        .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
 
-      if (remaining.length > 0) {
-        const newPrimary = remaining[0];
-        await db.update(schema.mediaAssets).set({ isPrimary: true }).where(eq(schema.mediaAssets.id, newPrimary.id));
-        await db.update(schema.products).set({ primaryMediaId: newPrimary.id }).where(eq(schema.products.id, item.ownerId));
-        try {
-          await updateMediaPrimaryStatusInFirestore(item.ownerType, item.ownerId, newPrimary.id);
-        } catch (_) {}
+      if (remainingMedia.length > 0) {
+        const newPrimary = remainingMedia[0];
+        await updateDocById('media_assets', newPrimary.id, { isPrimary: true, updatedAt: new Date().toISOString() });
+        await updateDocById('products', item.ownerId, { primaryMediaId: newPrimary.id, updatedAt: new Date().toISOString() });
       } else {
-        await db.update(schema.products).set({ primaryMediaId: null }).where(eq(schema.products.id, item.ownerId));
+        await updateDocById('products', item.ownerId, { primaryMediaId: null, updatedAt: new Date().toISOString() });
       }
-
-      try {
-        const updatedProd = (await db.select().from(schema.products).where(eq(schema.products.id, item.ownerId)))[0];
-        if (updatedProd) await persistProductToFirestore(updatedProd);
-      } catch (_) {}
     }
 
     res.json({ success: true, message: 'Media asset deleted and primary references reconciled' });
   } catch (error) {
+    console.error('Error deleting media:', error);
     res.status(500).json({ error: 'FAILED_TO_DELETE_MEDIA' });
   }
 });
 
-// POST /api/media/reorder - Reorder gallery images
+// POST /api/media/reorder - Reorder gallery images directly in Firestore
 router.post('/reorder', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
-    const { items } = req.body; // array of { id: string, displayOrder: number }
+    const { items } = req.body;
     if (!Array.isArray(items)) {
       res.status(400).json({ error: 'ITEMS_ARRAY_REQUIRED' });
       return;
     }
 
+    const nowIso = new Date().toISOString();
     for (const item of items) {
       if (item.id && typeof item.displayOrder === 'number') {
-        await db
-          .update(schema.mediaAssets)
-          .set({ displayOrder: item.displayOrder })
-          .where(eq(schema.mediaAssets.id, item.id));
+        await updateDocById('media_assets', item.id, {
+          displayOrder: item.displayOrder,
+          updatedAt: nowIso,
+        });
       }
     }
 

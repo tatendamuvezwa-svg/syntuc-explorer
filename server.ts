@@ -3,8 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { initializeDatabase } from './server/db/index.ts';
-import { seedMasterReferenceData, seedBootstrapCatalog, seedFallbackMediaAssets } from './server/db/seed.ts';
 import catalogRoutes from './server/routes/catalog.ts';
 import sessionRoutes from './server/routes/session.ts';
 import reservationRoutes from './server/routes/reservation.ts';
@@ -14,13 +12,7 @@ import schoolTripRoutes from './server/routes/schoolTrips.ts';
 import assistantRoutes from './server/routes/assistant.ts';
 import analyticsRoutes from './server/routes/analytics.ts';
 import { runR2SecuritySuite } from './server/tests/r2-security.ts';
-import {
-  getDeletedTombstones,
-  ensureCanonicalCloudSeed,
-  hydrateFromFirestore,
-  syncUnpersistedLocalMedia,
-  reconcileAuthoritativeMediaAndPrimaries,
-} from './server/services/firestoreSync.ts';
+import { getFirestoreDb } from './server/lib/firestore.ts';
 
 dotenv.config();
 
@@ -64,7 +56,8 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     product: 'Syntuc Explorer',
     brand: 'SAINTECH',
-    version: '2.0.0',
+    database: 'Cloud Firestore (Authoritative Native)',
+    version: '3.0.0',
     timestamp: new Date().toISOString(),
   });
 });
@@ -90,49 +83,15 @@ app.use('/api/school-trips', schoolTripRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-// Database initialization and server startup
+// Server startup with direct authoritative Cloud Firestore
 async function startServer() {
   try {
-    console.log('[Syntuc Server] Initializing PostgreSQL database...');
-    await initializeDatabase();
-
-    // 1. Retrieve active deletion tombstones first
-    const tombstones = await getDeletedTombstones();
-    console.log(`[Syntuc Server] Active deletion tombstones loaded: ${tombstones.size}`);
-
-    // 2. Initialize master reference tables (operators, properties, users, categories)
-    // so all foreign keys exist in the relational engine before any catalog or operational records
-    console.log('[Syntuc Server] Initializing master reference data (operators, properties, users)...');
-    await seedMasterReferenceData();
-
-    // 3. HYDRATE AUTHORITATIVE OPERATIONS FROM CLOUD FIRESTORE FIRST
-    // FIRESTORE PRODUCTION STATE TAKES 100% PRECEDENCE OVER SEED/BOOTSTRAP DATA
-    console.log('[Syntuc Server] Hydrating authoritative operational records from Cloud Firestore...');
-    const { productsRestored, mediaRestored, reservationsRestored, hydratedMediaIds } = await hydrateFromFirestore(tombstones);
-    console.log(`[Syntuc Server] Firestore hydration complete: ${productsRestored} products, ${mediaRestored} media assets, ${reservationsRestored} reservations.`);
-
-    // 4. Seed baseline bootstrap catalog templates (products, rooms, packages) with strict non-overwrite
-    // ONLY for products that do NOT exist in the database (never overwriting hydrated Firestore records)
-    console.log('[Syntuc Server] Seeding bootstrap catalog fallback templates (non-overwriting)...');
-    await seedBootstrapCatalog(tombstones);
-
-    // 5. Seed fallback media assets ONLY for products with zero media assets and no deletion tombstones
-    console.log('[Syntuc Server] Seeding fallback media assets for products with zero images...');
-    await seedFallbackMediaAssets(tombstones);
-
-    // 6. Ensure canonical cloud seed (Sophia Al-Mansoor) if not tombstoned
-    console.log('[Syntuc Server] Ensuring Cloud Firestore persistence sync...');
-    await ensureCanonicalCloudSeed(tombstones);
-
-    // 7. Reconcile custom local media assets with Cloud Firestore
-    console.log('[Syntuc Server] Reconciling custom local media assets with Cloud Firestore...');
-    await syncUnpersistedLocalMedia(tombstones, hydratedMediaIds);
-
-    // 8. Reconcile primary media and catalog associations: respect administrator selections
-    console.log('[Syntuc Server] Reconciling primary media and catalog associations...');
-    await reconcileAuthoritativeMediaAndPrimaries(tombstones);
-
-    console.log('[Syntuc Server] Database and Cloud Persistence ready.');
+    console.log('[Syntuc Server] Initializing Authoritative Cloud Firestore client...');
+    const fdb = getFirestoreDb();
+    if (!fdb) {
+      throw new Error('Could not initialize Cloud Firestore connection.');
+    }
+    console.log('[Syntuc Server] Authoritative Cloud Firestore database active.');
 
     // Setup Vite in development or static dist in production
     if (!isProduction) {

@@ -1,7 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
+import { getCollectionDocs, getTombstones } from '../lib/firestore.ts';
 
 export interface AssistantAction {
   type: 'ADD_TO_TRIP' | 'NAVIGATE' | 'OPEN_PRODUCT' | 'OPEN_BOOKING' | 'OPEN_PACKAGE_INQUIRY';
@@ -94,11 +93,13 @@ export async function processAssistantMessage(
     } catch (_) {}
   }
 
-  // Build live catalog summary from database
+  // Build live catalog summary directly from Firestore
   let catalogSummary = '';
   let packagesSummary = '';
   try {
-    const products = await db.select().from(schema.products);
+    const tombstones = await getTombstones();
+    const allProducts = await getCollectionDocs<any>('products');
+    const products = allProducts.filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
     catalogSummary = products
       .map(
         p =>
@@ -106,7 +107,8 @@ export async function processAssistantMessage(
       )
       .join('\n');
 
-    const pkgs = await db.select().from(schema.packages);
+    const allPkgs = await getCollectionDocs<any>('packages');
+    const pkgs = allPkgs.filter((k) => k.isPublished && !tombstones.has(`packages_${k.id}`));
     packagesSummary = pkgs
       .map(
         k =>
@@ -114,7 +116,7 @@ export async function processAssistantMessage(
       )
       .join('\n');
   } catch (err) {
-    console.error('Error fetching catalog for assistant grounding:', err);
+    console.error('Error fetching catalog from Firestore for assistant grounding:', err);
   }
 
   const lowerMsg = userMessage.toLowerCase().trim();

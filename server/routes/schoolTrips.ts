@@ -1,17 +1,22 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { eq, and, desc } from 'drizzle-orm';
 import { calculateSchoolTripQuote, SchoolTripQuoteInput } from '../services/schoolTrips.ts';
-import { persistReservationToFirestore } from '../services/firestoreSync.ts';
-import { db } from '../db/index.ts';
-import * as schema from '../db/schema.ts';
+import {
+  getFirestoreDb,
+  getDocById,
+  setDocById,
+  getCollectionDocs,
+  where,
+  writeBatch,
+  doc,
+} from '../lib/firestore.ts';
 
 const router = Router();
 
 // GET /api/school-trips/tariffs - List published educational tariffs
 router.get('/tariffs', async (req: Request, res: Response) => {
   try {
-    const tariffs = await db.select().from(schema.schoolTripTariffs);
+    const tariffs = await getCollectionDocs<any>('school_trip_tariffs');
     res.json(tariffs);
   } catch (error) {
     res.status(500).json({ error: 'FAILED_TO_LOAD_TARIFFS' });
@@ -89,17 +94,10 @@ router.post('/submit', async (req: Request, res: Response) => {
     });
 
     // Idempotency / Duplicate Submission Protection (double-click / network retry)
-    const recentSchoolSubmissions = await db
-      .select()
-      .from(schema.reservationRequests)
-      .where(
-        and(
-          eq(schema.reservationRequests.requestType, 'SCHOOL_DELEGATION'),
-          eq(schema.reservationRequests.authoritativeTotal, quoteResult.totalEstimate.toString())
-        )
-      )
-      .orderBy(desc(schema.reservationRequests.createdAt))
-      .limit(5);
+    const recentSchoolSubmissions = await getCollectionDocs<any>(
+      'reservation_requests',
+      where('requestType', '==', 'SCHOOL_DELEGATION')
+    );
 
     for (const r of recentSchoolSubmissions) {
       const meta = r.schoolMetadata as any;
@@ -108,10 +106,10 @@ router.post('/submit', async (req: Request, res: Response) => {
         meta.schoolName?.toLowerCase() === schoolName.trim().toLowerCase() &&
         (Date.now() - new Date(r.createdAt).getTime()) < 15000
       ) {
-        const tokens = await db
-          .select()
-          .from(schema.guestAccessTokens)
-          .where(eq(schema.guestAccessTokens.reservationRequestId, r.id));
+        const tokens = await getCollectionDocs<any>(
+          'guest_access_tokens',
+          where('reservationRequestId', '==', r.id)
+        );
         res.status(200).json({
           success: true,
           referenceNumber: r.referenceNumber,
@@ -124,46 +122,51 @@ router.post('/submit', async (req: Request, res: Response) => {
       }
     }
 
+    const nowIso = new Date().toISOString();
+
     // 1. Create or link Guest
     const guestId = 'gst_sch_' + crypto.randomBytes(10).toString('hex');
-    await db.insert(schema.guests).values({
+    const guestRecord = {
       id: guestId,
       fullName: (contactPerson || `${schoolName} Coordinator`).trim(),
       email: contactEmail.trim().toLowerCase(),
       phone: contactPhone?.trim() || null,
       country: 'Zimbabwe / SADC',
       specialRequests: specialRequests?.trim() || `School delegation: ${schoolName} (${educationLevel})`,
-    });
+      createdAt: nowIso,
+    };
 
     // Ensure session exists or link session
     let sessionId = guestSessionId;
+    let sessionRecordToSave: any = null;
     if (sessionId) {
-      const existingSession = await db
-        .select()
-        .from(schema.guestSessions)
-        .where(eq(schema.guestSessions.id, sessionId));
-      if (existingSession.length === 0) {
-        await db.insert(schema.guestSessions).values({
+      const existingSession = await getDocById<any>('guest_sessions', sessionId);
+      if (!existingSession) {
+        sessionRecordToSave = {
           id: sessionId,
           guestId,
           sessionSecret: crypto.randomBytes(32).toString('hex'),
-        });
+          createdAt: nowIso,
+          lastActiveAt: nowIso,
+        };
       }
     } else {
       sessionId = 'ses_' + crypto.randomBytes(16).toString('hex');
-      await db.insert(schema.guestSessions).values({
+      sessionRecordToSave = {
         id: sessionId,
         guestId,
         sessionSecret: crypto.randomBytes(32).toString('hex'),
-      });
+        createdAt: nowIso,
+        lastActiveAt: nowIso,
+      };
     }
 
     // 2. Generate Authoritative Reference (SYN-VF-XXXXX)
     const refNum = `SYN-VF-${Math.floor(20000 + Math.random() * 70000)}`;
     const reservationId = 'res_sch_' + crypto.randomBytes(10).toString('hex');
 
-    // 3. Insert Reservation Request into central authoritative table
-    await db.insert(schema.reservationRequests).values({
+    // 3. Central authoritative Reservation Request document
+    const reservationRecord = {
       id: reservationId,
       referenceNumber: refNum,
       requestType: 'SCHOOL_DELEGATION',
@@ -195,12 +198,14 @@ router.post('/submit', async (req: Request, res: Response) => {
         contactEmail: contactEmail.trim().toLowerCase(),
         contactPhone: contactPhone || null,
       },
-    });
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
 
-    // 4. Insert Reservation Items from authoritative line items
-    for (const item of quoteResult.lineItems) {
+    // 4. Reservation Items from authoritative line items
+    const reservationItemRecords = quoteResult.lineItems.map((item) => {
       const resItemId = 'ri_sch_' + crypto.randomBytes(10).toString('hex');
-      await db.insert(schema.reservationItems).values({
+      return {
         id: resItemId,
         reservationRequestId: reservationId,
         productId: item.id.startsWith('prod_') ? item.id : 'prod_rainforest_walk',
@@ -214,59 +219,73 @@ router.post('/submit', async (req: Request, res: Response) => {
         nightsCount: item.category === 'accommodation' ? nights : 1,
         calculatedSubtotal: item.subtotal.toString(),
         notes: item.isComplimentaryIncentive ? 'Complimentary 1905 Historic Bridge Tour Incentive ($0)' : item.notes || null,
-      });
-    }
+        createdAt: nowIso,
+      };
+    });
 
     // 5. Create Lead
     const leadId = 'lead_sch_' + crypto.randomBytes(10).toString('hex');
-    await db.insert(schema.leads).values({
+    const leadRecord = {
       id: leadId,
       guestId,
       status: 'ACTIVE',
       leadSource: 'school_trip_planner',
-      firstTouchTimestamp: new Date(),
-      lastTouchTimestamp: new Date(),
+      firstTouchTimestamp: nowIso,
+      lastTouchTimestamp: nowIso,
       lastInteractionType: 'school_quote_submitted',
       estimatedValue: quoteResult.totalEstimate.toString(),
       notes: `School delegation: ${schoolName} (${students} students, ${teachers} teachers, ${nights} nights)`,
-    });
+      createdAt: nowIso,
+    };
 
     // 6. Post initial notification in guest messages
     const msgId = 'msg_sch_' + crypto.randomBytes(10).toString('hex');
-    await db.insert(schema.guestMessages).values({
+    const messageRecord = {
       id: msgId,
       reservationRequestId: reservationId,
       senderType: 'coordinator',
       senderName: 'Victoria Falls Educational Desk',
       messageText: `Your school delegation request for "${schoolName}" has been received under reference #${refNum}. Our desk is reviewing educational tariff holds with verified accommodation and activity partners.`,
-    });
+      createdAt: nowIso,
+    };
 
     // 7. Generate Guest Access Token
     const guestToken = crypto.randomUUID();
     const tokenHash = crypto.createHash('sha256').update(guestToken).digest('hex');
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 90);
-
-    await db.insert(schema.guestAccessTokens).values({
+    const expiresAtDate = new Date();
+    expiresAtDate.setDate(expiresAtDate.getDate() + 90);
+    const tokenRecord = {
       id: guestToken,
       reservationRequestId: reservationId,
       guestId,
       tokenHash,
-      expiresAt,
-    });
+      isRevoked: false,
+      expiresAt: expiresAtDate.toISOString(),
+      createdAt: nowIso,
+    };
 
-    // Persist School Delegation reservation and line items to Cloud Firestore
-    try {
-      const resRecord = (await db.select().from(schema.reservationRequests).where(eq(schema.reservationRequests.id, reservationId)))[0];
-      const resItems = await db.select().from(schema.reservationItems).where(eq(schema.reservationItems.reservationRequestId, reservationId));
-      const guestRecord = (await db.select().from(schema.guests).where(eq(schema.guests.id, guestId)))[0];
-      const tokenRecord = (await db.select().from(schema.guestAccessTokens).where(eq(schema.guestAccessTokens.id, guestToken)))[0];
-      if (resRecord && guestRecord) {
-        await persistReservationToFirestore(resRecord, resItems, guestRecord, tokenRecord);
-      }
-    } catch (fsErr) {
-      console.warn('[SchoolTrips] Cloud Firestore sync notice:', fsErr);
+    // AUTHORITATIVE WRITE: Atomically execute writeBatch to Cloud Firestore
+    const fdb = getFirestoreDb();
+    const batch = writeBatch(fdb);
+
+    batch.set(doc(fdb, 'guests', guestId), guestRecord);
+    if (sessionRecordToSave) {
+      batch.set(doc(fdb, 'guest_sessions', sessionId), sessionRecordToSave);
+    } else {
+      batch.set(doc(fdb, 'guest_sessions', sessionId), { guestId }, { merge: true });
     }
+    batch.set(doc(fdb, 'reservation_requests', reservationId), reservationRecord);
+
+    for (const ri of reservationItemRecords) {
+      batch.set(doc(fdb, 'reservation_items', ri.id), ri);
+    }
+
+    batch.set(doc(fdb, 'leads', leadId), leadRecord);
+    batch.set(doc(fdb, 'guest_messages', msgId), messageRecord);
+    batch.set(doc(fdb, 'guest_access_tokens', guestToken), tokenRecord);
+
+    await batch.commit();
+    console.log(`[Firestore] School delegation reservation #${refNum} (${reservationId}) atomically committed.`);
 
     res.status(201).json({
       success: true,
