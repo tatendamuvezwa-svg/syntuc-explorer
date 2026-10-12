@@ -25,6 +25,8 @@ export interface Product {
   operatorName?: string;
   primaryImageUrl?: string | null;
   primaryImageAlt?: string | null;
+  variants?: ProductVariant[];
+  rooms?: Room[];
 }
 
 export interface Room {
@@ -42,14 +44,32 @@ export interface Room {
   isAvailable: boolean;
 }
 
+export interface CompulsoryFee {
+  name: string;
+  amount: number;
+  currency: string;
+  basis: 'per_person' | 'per_person_per_night' | 'per_room_night';
+}
+
 export interface ProductVariant {
   id: string;
   productId: string;
   name: string;
   description: string | null;
-  priceDelta: string;
-  duration: string | null;
+  price?: number;
+  priceDelta?: string;
+  currency?: string;
+  priceBasis?: 'per_person' | 'per_room_night' | 'per_person_sharing_night' | 'per_single_room_night' | 'per_group';
+  occupancyType?: 'sharing' | 'single' | 'room' | 'ticket';
+  category?: string;
+  season?: 'high' | 'low' | 'green' | 'mid' | 'high_water' | 'low_water';
+  mealPlan?: string;
+  duration?: string | null;
+  compulsoryFees?: CompulsoryFee[];
+  childRate?: number;
   isActive: boolean;
+  evidenceStatus?: string;
+  supplierNote?: string;
 }
 
 export interface MediaAsset {
@@ -115,11 +135,13 @@ export interface TripItem {
   variantId: string | null;
   dayNumber: number;
   scheduledDate: string | null;
+  checkOutDate?: string | null;
   scheduledTime: string | null;
   guestCount: number;
   notes: string | null;
   product?: Product;
   room?: Room | null;
+  variant?: ProductVariant | null;
 }
 
 export interface ReservationRequest {
@@ -166,6 +188,8 @@ export interface ReservationItem {
   productId: string;
   roomId: string | null;
   variantId: string | null;
+  variantName?: string | null;
+  roomName?: string | null;
   snapshotProductName: string;
   snapshotOperatorName: string;
   snapshotProductType: string;
@@ -176,7 +200,15 @@ export interface ReservationItem {
   nightsCount: number;
   calculatedSubtotal: string;
   scheduledDate: string | null;
+  checkOutDate?: string | null;
   scheduledTime: string | null;
+  feeBreakdown?: Array<{
+    name: string;
+    amount: number;
+    currency: string;
+    basis: string;
+    total: number;
+  }>;
   notes: string | null;
 }
 

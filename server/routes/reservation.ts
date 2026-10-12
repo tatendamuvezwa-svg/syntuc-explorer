@@ -76,7 +76,16 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     let rawItems: RawReservationItemInput[] = [];
 
     if (items && Array.isArray(items) && items.length > 0) {
-      rawItems = items;
+      rawItems = items.map((it: any) => ({
+        productId: it.productId,
+        roomId: it.roomId || undefined,
+        variantId: it.variantId || undefined,
+        guestCount: it.guestCount ? Number(it.guestCount) : adults + children,
+        scheduledDate: it.scheduledDate || startDate || undefined,
+        checkOutDate: it.checkOutDate || endDate || undefined,
+        scheduledTime: it.scheduledTime || undefined,
+        notes: it.notes || undefined,
+      }));
     } else if (activeTripPlanId) {
       const tripItems = await getCollectionDocs<any>(
         'trip_items',
@@ -86,8 +95,9 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
         productId: ti.productId,
         roomId: ti.roomId || undefined,
         variantId: ti.variantId || undefined,
-        guestCount: ti.guestCount,
-        scheduledDate: ti.scheduledDate || undefined,
+        guestCount: ti.guestCount ? Number(ti.guestCount) : adults + children,
+        scheduledDate: ti.scheduledDate || startDate || undefined,
+        checkOutDate: ti.checkOutDate || endDate || undefined,
         scheduledTime: ti.scheduledTime || undefined,
         notes: ti.notes || undefined,
       }));
@@ -101,10 +111,10 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
       return;
     }
 
-    // Server-Authoritative Pricing Calculation
+    // Server-Authoritative Pricing Calculation with strict date validation
     let pricingResult;
     try {
-      pricingResult = await calculateAuthoritativePricing(rawItems, adults, children);
+      pricingResult = await calculateAuthoritativePricing(rawItems, adults, children, { requireDates: true });
     } catch (err: any) {
       res.status(400).json({
         error: 'PRICING_CALCULATION_ERROR',
@@ -241,6 +251,8 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
         productId: snap.productId,
         roomId: snap.roomId,
         variantId: snap.variantId,
+        variantName: snap.variantName || null,
+        roomName: snap.roomName || null,
         snapshotProductName: snap.snapshotProductName,
         snapshotOperatorName: snap.snapshotOperatorName,
         snapshotProductType: snap.snapshotProductType,
@@ -251,7 +263,9 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
         nightsCount: snap.nightsCount,
         calculatedSubtotal: snap.calculatedSubtotal.toString(),
         scheduledDate: snap.scheduledDate,
+        checkOutDate: snap.checkOutDate || null,
         scheduledTime: snap.scheduledTime,
+        feeBreakdown: snap.feeBreakdown || [],
         notes: snap.notes,
         createdAt: nowIso,
       };
@@ -369,6 +383,35 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
 
 router.post('/', requireGuestSession, handleReservationSubmit);
 router.post('/submit', requireGuestSession, handleReservationSubmit);
+
+// POST /api/reservations/calculate - Live authoritative calculation endpoint
+router.post('/calculate', async (req, res: Response) => {
+  try {
+    const { items, adultsCount, childrenCount, startDate, endDate } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ error: 'ITEMS_REQUIRED', message: 'No items provided for calculation' });
+      return;
+    }
+    const adults = Math.max(1, Number(adultsCount) || 2);
+    const children = Math.max(0, Number(childrenCount) || 0);
+
+    const rawItems: RawReservationItemInput[] = items.map((it: any) => ({
+      productId: it.productId,
+      roomId: it.roomId || undefined,
+      variantId: it.variantId || undefined,
+      guestCount: it.guestCount ? Number(it.guestCount) : adults + children,
+      scheduledDate: it.scheduledDate || startDate || undefined,
+      checkOutDate: it.checkOutDate || endDate || undefined,
+      scheduledTime: it.scheduledTime || undefined,
+      notes: it.notes || undefined,
+    }));
+
+    const pricingResult = await calculateAuthoritativePricing(rawItems, adults, children, { requireDates: false });
+    res.json({ success: true, pricing: pricingResult });
+  } catch (error: any) {
+    res.status(400).json({ error: 'CALCULATION_ERROR', message: error.message || 'Pricing calculation failed' });
+  }
+});
 
 // GET /api/reservations/guest/:token - Secure Guest Reservation Dashboard
 router.get('/guest/:token', async (req, res: Response) => {

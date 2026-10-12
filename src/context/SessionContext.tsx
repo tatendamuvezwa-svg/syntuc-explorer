@@ -13,6 +13,8 @@ interface SessionContextType {
     productId: string;
     roomId?: string;
     variantId?: string;
+    scheduledDate?: string;
+    checkOutDate?: string;
     guestCount?: number;
     notes?: string;
   }) => Promise<void>;
@@ -85,6 +87,8 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     productId: string;
     roomId?: string;
     variantId?: string;
+    scheduledDate?: string;
+    checkOutDate?: string;
     guestCount?: number;
     notes?: string;
   }) => {

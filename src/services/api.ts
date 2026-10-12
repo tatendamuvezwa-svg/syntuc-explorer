@@ -47,6 +47,12 @@ export const api = {
     return res.json();
   },
 
+  async getProductVariants(id: string): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/catalog/products/${id}/variants`);
+    if (!res.ok) throw new Error('Failed to load product variants');
+    return res.json();
+  },
+
   async getCategories(): Promise<Category[]> {
     const res = await fetch(`${API_BASE}/catalog/categories`);
     if (!res.ok) throw new Error('Failed to load categories');
@@ -103,6 +109,7 @@ export const api = {
     dayNumber?: number;
     guestCount?: number;
     scheduledDate?: string;
+    checkOutDate?: string;
     scheduledTime?: string;
     notes?: string;
   }): Promise<any> {
@@ -127,7 +134,33 @@ export const api = {
     return res.json();
   },
 
-  // --- Reservations ---
+  // --- Reservations & Pricing ---
+  async calculateAuthoritativePricing(data: {
+    items: Array<{
+      productId: string;
+      roomId?: string;
+      variantId?: string;
+      guestCount?: number;
+      scheduledDate?: string;
+      checkOutDate?: string;
+    }>;
+    adultsCount?: number;
+    childrenCount?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any> {
+    const res = await fetch(`${API_BASE}/reservations/calculate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'Failed to calculate authoritative pricing');
+    }
+    return res.json();
+  },
+
   async submitReservationRequest(data: any): Promise<any> {
     const res = await fetch(`${API_BASE}/reservations`, {
       method: 'POST',

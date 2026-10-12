@@ -14,6 +14,7 @@ import {
   getCollectionDocs,
   where,
 } from '../lib/firestore.ts';
+import { resolveAuthoritativeVariant } from '../services/variantCatalog.ts';
 
 const router = Router();
 
@@ -122,15 +123,24 @@ router.get('/trip', requireGuestSession, async (req: GuestSessionRequest, res: R
     const rooms = await getCollectionDocs<any>('rooms');
     const roomMap = new Map(rooms.map((r) => [r.id, r]));
 
-    const enrichedItems = items.map((item) => {
-      const prod = productMap.get(item.productId);
-      const room = item.roomId ? roomMap.get(item.roomId) : null;
-      return {
-        ...item,
-        product: prod,
-        room: room,
-      };
-    });
+    const enrichedItems = await Promise.all(
+      items.map(async (item) => {
+        const prod = productMap.get(item.productId);
+        const room = item.roomId ? roomMap.get(item.roomId) : null;
+        let variant = null;
+        if (item.variantId) {
+          try {
+            variant = await resolveAuthoritativeVariant(item.productId, item.variantId);
+          } catch (_) {}
+        }
+        return {
+          ...item,
+          product: prod,
+          room: room,
+          variant: variant,
+        };
+      })
+    );
 
     res.json({
       ...tripPlan,
@@ -190,6 +200,7 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
       variantId,
       dayNumber,
       scheduledDate,
+      checkOutDate,
       scheduledTime,
       guestCount,
       notes,
@@ -209,6 +220,18 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
         message: 'The requested product does not exist in catalog',
       });
       return;
+    }
+
+    // Validate variant if supplied
+    if (variantId) {
+      const resolvedVar = await resolveAuthoritativeVariant(productId, variantId);
+      if (!resolvedVar) {
+        res.status(400).json({
+          error: 'INVALID_VARIANT',
+          message: `The selected variant is invalid or inactive for ${product.name}`,
+        });
+        return;
+      }
     }
 
     // Fetch trip plan strictly belonging to this session
@@ -241,6 +264,7 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
       variantId: variantId || null,
       dayNumber: dayNumber ? Number(dayNumber) : 1,
       scheduledDate: scheduledDate || null,
+      checkOutDate: checkOutDate || null,
       scheduledTime: scheduledTime || null,
       guestCount: guestCount ? Math.max(1, Number(guestCount)) : ownedTrip.adultsCount,
       notes: notes || null,

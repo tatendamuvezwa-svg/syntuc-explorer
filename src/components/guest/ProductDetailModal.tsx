@@ -15,6 +15,7 @@ import {
   Info,
   Calendar,
   Play,
+  Layers,
 } from 'lucide-react';
 import { Room, MediaAsset } from '../../types/index.ts';
 

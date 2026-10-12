@@ -5,6 +5,7 @@ import {
   where,
   getTombstones,
 } from '../lib/firestore.ts';
+import { getAuthoritativeVariantsForProduct } from '../services/variantCatalog.ts';
 
 const router = Router();
 
@@ -77,8 +78,7 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       (r) => (r.productId === product.id || r.propertyId === product.propertyId) && !tombstones.has(`rooms_${r.id}`)
     );
 
-    const allVariants = await getCollectionDocs<any>('product_variants');
-    const variants = allVariants.filter((v) => v.productId === product.id);
+    const variants = await getAuthoritativeVariantsForProduct(product.id);
 
     const allMedia = await getCollectionDocs<any>('media_assets');
     const media = allMedia
@@ -105,6 +105,18 @@ router.get('/products/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching product detail from Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_PRODUCT_DETAIL' });
+  }
+});
+
+// GET authoritative variants for a product
+router.get('/products/:id/variants', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const variants = await getAuthoritativeVariantsForProduct(id);
+    res.json(variants);
+  } catch (error) {
+    console.error('Error fetching variants from Firestore:', error);
+    res.status(500).json({ error: 'FAILED_TO_LOAD_VARIANTS' });
   }
 });
 
