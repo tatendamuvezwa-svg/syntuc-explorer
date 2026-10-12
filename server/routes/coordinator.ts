@@ -1,6 +1,11 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
-import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware/auth.ts';
+import {
+  requireCoordinatorAuth,
+  AuthenticatedStaffRequest,
+  verifyPassword,
+  createStaffAuthToken,
+} from '../middleware/auth.ts';
 import { recordEventSafely } from '../services/attribution.ts';
 import {
   getFirestoreDb,
@@ -51,13 +56,13 @@ router.post('/login', async (req, res: Response) => {
       return;
     }
 
-    // Verify password against stored hash in Firestore
-    if (user.passwordHash !== password) {
+    // Verify password against stored hash in Firestore using secure verification
+    if (!verifyPassword(password, user.passwordHash)) {
       res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid staff credentials' });
       return;
     }
 
-    const token = `staff_${user.id}`;
+    const token = createStaffAuthToken(user.id);
 
     res.json({
       success: true,

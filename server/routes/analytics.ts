@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware/auth.ts';
 import { initializeSession, recordEventSafely } from '../services/attribution.ts';
-import { getCollectionDocs } from '../lib/firestore.ts';
+import { getCollectionDocs, where } from '../lib/firestore.ts';
 
 const router = Router();
 
@@ -608,44 +608,41 @@ router.get('/journey/:identifier', requireCoordinatorAuth, async (req: Authentic
 
     // Identify target visitorId
     let targetVisitorId = identifier;
-    let targetReservation: typeof schema.reservationRequests.$inferSelect | null = null;
+    let targetReservation: any = null;
 
     // Check if identifier is reservation reference or reservation ID
-    const reservations = await db
-      .select()
-      .from(schema.reservationRequests)
-      .where(
-        sql`${schema.reservationRequests.referenceNumber} = ${identifier} OR ${schema.reservationRequests.id} = ${identifier}`
-      );
+    const allReservations = await getCollectionDocs<any>('reservation_requests');
+    const matchedReservation = allReservations.find(
+      (r) => r.referenceNumber === identifier || r.id === identifier
+    );
 
-    if (reservations.length > 0) {
-      targetReservation = reservations[0];
+    if (matchedReservation) {
+      targetReservation = matchedReservation;
       if (targetReservation.visitorId) {
         targetVisitorId = targetReservation.visitorId;
       }
     }
 
     // Fetch visitor record
-    const visitors = await db
-      .select()
-      .from(schema.analyticsVisitors)
-      .where(eq(schema.analyticsVisitors.visitorId, targetVisitorId));
-
+    const visitors = await getCollectionDocs<any>(
+      'analytics_visitors',
+      where('visitorId', '==', targetVisitorId)
+    );
     const visitorRecord = visitors[0] || null;
 
     // Fetch all sessions for this visitor
-    const sessions = await db
-      .select()
-      .from(schema.analyticsSessions)
-      .where(eq(schema.analyticsSessions.visitorId, targetVisitorId))
-      .orderBy(schema.analyticsSessions.startedAt);
+    const sessions = await getCollectionDocs<any>(
+      'analytics_sessions',
+      where('visitorId', '==', targetVisitorId)
+    );
+    sessions.sort((a, b) => new Date(a.startedAt || 0).getTime() - new Date(b.startedAt || 0).getTime());
 
     // Fetch all events for this visitor
-    const events = await db
-      .select()
-      .from(schema.analyticsEvents)
-      .where(eq(schema.analyticsEvents.visitorId, targetVisitorId))
-      .orderBy(schema.analyticsEvents.occurredAt);
+    const events = await getCollectionDocs<any>(
+      'analytics_events',
+      where('visitorId', '==', targetVisitorId)
+    );
+    events.sort((a, b) => new Date(a.occurredAt || 0).getTime() - new Date(b.occurredAt || 0).getTime());
 
     res.json({
       identifier,

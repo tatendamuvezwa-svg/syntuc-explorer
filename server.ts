@@ -11,7 +11,6 @@ import mediaRoutes from './server/routes/media.ts';
 import schoolTripRoutes from './server/routes/schoolTrips.ts';
 import assistantRoutes from './server/routes/assistant.ts';
 import analyticsRoutes from './server/routes/analytics.ts';
-import { runR2SecuritySuite } from './server/tests/r2-security.ts';
 import { getFirestoreDb } from './server/lib/firestore.ts';
 
 dotenv.config();
@@ -62,15 +61,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Run R2 Security & Regression Tests endpoint
-app.get('/api/tests/r2', async (req, res) => {
-  try {
-    const report = await runR2SecuritySuite();
-    res.json(report);
-  } catch (err: any) {
-    res.status(500).json({ error: 'R2_TESTS_EXECUTION_FAILED', message: err.message });
-  }
-});
 
 // Mount Modular API Routes
 app.use('/api/catalog', catalogRoutes);
@@ -112,17 +102,6 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`[Syntuc Explorer] Server active on http://0.0.0.0:${PORT}`);
     });
-
-    // Run security tests verification in background after port opens
-    runR2SecuritySuite()
-      .then((securityCheck) => {
-        console.log(
-          `[Syntuc Server] R2 Security Suite: ${securityCheck.passedCount}/${securityCheck.total} tests PASSED.`
-        );
-      })
-      .catch((err) => {
-        console.error('[Syntuc Server] R2 Security Suite check error:', err);
-      });
   } catch (error) {
     console.error('[Syntuc Server] Fatal startup error:', error);
     process.exit(1);
