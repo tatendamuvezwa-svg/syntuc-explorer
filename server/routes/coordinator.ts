@@ -264,7 +264,7 @@ const handleStatusUpdate = async (req: AuthenticatedStaffRequest, res: Response)
     // Add automated message to guest thread with duplicate prevention
     let statusMessage = `Status update: Your reservation request status is now marked as ${status}.`;
     if (status === 'CONFIRMED') {
-      statusMessage = `Great news! Your Victoria Falls reservation request has been officially CONFIRMED by our local partner operators. Our desk coordinator will be in touch with final arrival details.`;
+      statusMessage = `Great news! Your Victoria Falls reservation request has been officially CONFIRMED by our local partner operators. Our desk coordinator will be in touch with final arrival d[...]`;
     } else if (status === 'CONTACTED' || status === 'PARTNER_CONTACTED') {
       statusMessage = `Our Reservations Desk has contacted the relevant local operators to hold your dates. We will update you as soon as confirmation arrives.`;
     } else if (status === 'QUOTED') {
@@ -323,6 +323,12 @@ router.delete('/reservations/:id', requireCoordinatorAuth, async (req: Authentic
 
     if (!existing) {
       res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
+      return;
+    }
+
+    // ENFORCE ADMIN-ONLY: Only staff users with role === 'admin' may delete reservations.
+    if (req.staffUser?.role !== 'admin') {
+      res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Administrator authorization required to delete reservations' });
       return;
     }
 
