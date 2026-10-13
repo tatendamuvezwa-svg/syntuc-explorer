@@ -319,8 +319,17 @@ router.get('/reservations/:id/messages', requireCoordinatorAuth, async (req: Aut
 router.delete('/reservations/:id', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const existing = await getDocById<any>('reservation_requests', id);
 
+    // Authorize before reading or mutating reservation data.
+    if (req.staffUser?.role !== 'admin') {
+      res.status(403).json({
+        error: 'ADMIN_REQUIRED',
+        message: 'Administrator authorization required to delete reservations',
+      });
+      return;
+    }
+
+    const existing = await getDocById<any>('reservation_requests', id);
     if (!existing) {
       res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
       return;
