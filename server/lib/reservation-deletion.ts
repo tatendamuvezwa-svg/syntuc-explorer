@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import {
   getDocById,
   deleteDocById,
@@ -23,14 +22,17 @@ export type FirestoreDeps = {
   where?: typeof where;
 };
 
+type DeletionError = Error & { status: number; code: string };
+
+function deletionError(status: number, code: string, message = code): DeletionError {
+  return Object.assign(new Error(message), { status, code });
+}
+
 /**
  * Delete a reservation and its associated records.
- *
- * This function enforces admin-only authorization before any reads or mutations.
- * It performs a single authoritative lookup for the reservation and then deletes
- * only reservation-scoped records. It records a tombstone for the reservation id.
- *
- * Errors are thrown with `status` and `code` properties to allow HTTP mapping.
+ * Authorization is checked before any Firestore access.
+ * Related records are removed before the tombstone and parent document so a
+ * failed cleanup leaves the reservation available for a safe retry.
  */
 export async function deleteReservationById(
   staffUser: StaffUser | undefined | null,
@@ -38,92 +40,66 @@ export async function deleteReservationById(
   deps: FirestoreDeps = {}
 ) {
   const {
-    getDocById: _getDocById = getDocById,
-    deleteDocById: _deleteDocById = deleteDocById,
-    getCollectionDocs: _getCollectionDocs = getCollectionDocs,
-    recordTombstone: _recordTombstone = recordTombstone,
-    where: _where = where,
+    getDocById: readById = getDocById,
+    deleteDocById: deleteById = deleteDocById,
+    getCollectionDocs: readCollection = getCollectionDocs,
+    recordTombstone: tombstone = recordTombstone,
+    where: makeWhere = where,
   } = deps;
 
-  // Authorize before reading or mutating reservation data.
   if (!staffUser) {
-    const e: any = new Error('AUTHENTICATION_REQUIRED');
-    e.status = 401;
-    e.code = 'AUTHENTICATION_REQUIRED';
-    throw e;
+    throw deletionError(401, 'AUTHENTICATION_REQUIRED', 'Authentication required');
   }
-
   if (!staffUser.isActive) {
-    const e: any = new Error('STAFF_INACTIVE');
-    e.status = 401;
-    e.code = 'STAFF_INACTIVE';
-    throw e;
+    throw deletionError(401, 'STAFF_INACTIVE', 'Active staff account required');
   }
-
   if (staffUser.role !== 'admin') {
-    const e: any = new Error('ADMIN_REQUIRED');
-    e.status = 403;
-    e.code = 'ADMIN_REQUIRED';
-    throw e;
+    throw deletionError(403, 'ADMIN_REQUIRED', 'Administrator authorization required to delete reservations');
   }
-
   if (!reservationId) {
-    const e: any = new Error('RESERVATION_ID_REQUIRED');
-    e.status = 400;
-    e.code = 'RESERVATION_ID_REQUIRED';
-    throw e;
+    throw deletionError(400, 'RESERVATION_ID_REQUIRED', 'Reservation id is required');
   }
 
-  // Single authoritative lookup
-  const existing = await _getDocById<any>('reservation_requests', reservationId);
+  // The single authoritative lookup happens only after authorization.
+  const existing = await readById<any>('reservation_requests', reservationId);
   if (!existing) {
-    const e: any = new Error('RESERVATION_NOT_FOUND');
-    e.status = 404;
-    e.code = 'RESERVATION_NOT_FOUND';
-    throw e;
+    throw deletionError(404, 'RESERVATION_NOT_FOUND', 'Reservation not found');
   }
 
-  // Proceed with deletion of reservation-scoped records only.
-  // 1. Record durable deletion tombstone
-  await _recordTombstone('reservation_requests', reservationId);
+  // Resolve all associated records before making mutations.
+  const [items, tokens, messages, queriedNotes] = await Promise.all([
+    readCollection<any>('reservation_items', makeWhere('reservationRequestId', '==', reservationId)),
+    readCollection<any>('guest_access_tokens', makeWhere('reservationRequestId', '==', reservationId)),
+    readCollection<any>('guest_messages', makeWhere('reservationRequestId', '==', reservationId)),
+    readCollection<any>('coordinator_notes', makeWhere('targetId', '==', reservationId)),
+  ]);
 
-  // 2. Delete reservation itself
-  await _deleteDocById('reservation_requests', reservationId);
+  // Only explicitly reservation-targeted notes belong to this deletion.
+  const notes = queriedNotes.filter((note) => note.targetType === 'reservation');
+  const childRecords: Array<{ collection: string; id: string }> = [
+    ...items.map((item) => ({ collection: 'reservation_items', id: item.id })),
+    ...tokens.map((token) => ({ collection: 'guest_access_tokens', id: token.id })),
+    ...messages.map((message) => ({ collection: 'guest_messages', id: message.id })),
+    ...notes.map((note) => ({ collection: 'coordinator_notes', id: note.id })),
+  ];
 
-  // 3. Delete reservation_items
-  try {
-    const items = await _getCollectionDocs<any>('reservation_items', _where('reservationRequestId', '==', reservationId));
-    await Promise.all(items.map((i) => _deleteDocById('reservation_items', i.id)));
-  } catch (e) {
-    // Log and continue; do not abort whole operation if optional cleanup fails
-    console.error('Error deleting reservation_items during reservation delete:', e);
+  // Wait for all child deletes to settle; if any fails, keep the parent so the
+  // operation can be retried without falsely reporting success.
+  const cleanupResults = await Promise.allSettled(
+    childRecords.map((record) => deleteById(record.collection, record.id))
+  );
+  const failedCleanup = cleanupResults.find((result) => result.status === 'rejected');
+  if (failedCleanup?.status === 'rejected') {
+    throw failedCleanup.reason;
   }
 
-  // 4. Delete guest_access_tokens
-  try {
-    const tokens = await _getCollectionDocs<any>('guest_access_tokens', _where('reservationRequestId', '==', reservationId));
-    await Promise.all(tokens.map((t) => _deleteDocById('guest_access_tokens', t.id)));
-  } catch (e) {
-    console.error('Error deleting guest_access_tokens during reservation delete:', e);
-  }
+  // Tombstone first, then delete the parent. If either operation fails, the
+  // still-existing parent lets an administrator retry the cleanup.
+  await tombstone('reservation_requests', reservationId);
+  await deleteById('reservation_requests', reservationId);
 
-  // 5. Delete guest_messages
-  try {
-    const messages = await _getCollectionDocs<any>('guest_messages', _where('reservationRequestId', '==', reservationId));
-    await Promise.all(messages.map((m) => _deleteDocById('guest_messages', m.id)));
-  } catch (e) {
-    console.error('Error deleting guest_messages during reservation delete:', e);
-  }
-
-  // 6. Delete coordinator_notes targeted at this reservation
-  try {
-    const notes = await _getCollectionDocs<any>('coordinator_notes', _where('targetId', '==', reservationId));
-    // Only delete notes that are reservation-targeted (if a targetType field exists, respect it)
-    const notesToDelete = notes.filter((n) => !n.targetType || n.targetType === 'reservation');
-    await Promise.all(notesToDelete.map((n) => _deleteDocById('coordinator_notes', n.id)));
-  } catch (e) {
-    console.error('Error deleting coordinator_notes during reservation delete:', e);
-  }
-
-  return { success: true, message: `Reservation ${reservationId} permanently deleted and deletion tombstoned.` };
+  return {
+    success: true,
+    message: `Reservation ${reservationId} permanently deleted and deletion tombstoned.`,
+  };
 }
