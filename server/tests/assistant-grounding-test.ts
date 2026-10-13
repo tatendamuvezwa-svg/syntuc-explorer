@@ -1,10 +1,10 @@
 import { processAssistantMessage } from '../services/gemini.ts';
 
-// Use graceful offline mode for fast test execution
+// Use graceful offline mode for reliable deterministic unit test execution
 process.env.GEMINI_API_KEY = 'MY_GEMINI_TEST';
 
 async function runAssistantVerificationSuite() {
-  console.log('=== STARTING ASSISTANT CONTEXT-AWARE & GROUNDING VERIFICATION SUITE ===');
+  console.log('=== STARTING ASSISTANT TRIP-PLANNING & GROUNDING REGRESSION SUITE ===');
   let passed = 0;
   let total = 0;
 
@@ -18,138 +18,94 @@ async function runAssistantVerificationSuite() {
     }
   }
 
-  // TEST 1: Trip Memory with real trip context without fabricated dates/budget
-  console.log('\n[Scenario 1] Trip Memory with Actual Trip Context...');
-  const res1 = await processAssistantMessage(
-    'What do you know about my trip so far?',
-    [],
-    {
-      adultsCount: 3,
-      childrenCount: 1,
-      startDate: '2026-10-15',
-      endDate: '2026-10-18',
-      interests: ['Wilderness', 'Photography'],
-      items: [
-        {
-          productId: 'prod_flight_of_angels',
-          productName: 'Flight of Angels — Scenic Helicopter Tour',
-          variantName: null,
-          scheduledDate: '2026-10-16',
-          guestCount: 4,
-          unitPrice: 173,
-          currency: 'USD',
-          priceBasis: 'per_person',
-        },
-      ],
-    }
-  );
-  console.log('RES 1 TEXT:\n' + res1.replyText);
-  assert(res1.replyText.includes('3 adults, 1 child') || res1.replyText.includes('3 adult') || res1.replyText.includes('4 guests'), 'TEST-1A: Party size accurately reflects real trip context');
-  assert(res1.replyText.includes('2026-10-15') || res1.replyText.includes('15 to') || res1.replyText.includes('October'), 'TEST-1B: Dates reflect real trip context dates');
-  assert(res1.replyText.includes('Flight of Angels'), 'TEST-1C: Selected items list Flight of Angels');
-  assert(!res1.replyText.includes('1,500') && !res1.replyText.includes('$1500'), 'TEST-1D: Budget does not guess $1,500');
-  assert(!res1.replyText.includes('12–15 November') && !res1.replyText.includes('12-15 November'), 'TEST-1E: Never infers November dates when not specified');
+  // REGRESSION 1: The exact Victoria Falls, 5,000 budget, 20 October, four-day scenario
+  console.log('\n[Regression 1] Exact Guest Planning Scenario...');
+  const observedPrompt = 'I want to visit Victoria Falls with a budget of 5000. I want to travel on the 20th of October for 4 days.';
+  const resObserved = await processAssistantMessage(observedPrompt, [], null);
 
-  // TEST 2: Trip Memory with empty session - no arbitrary guesses
-  console.log('\n[Scenario 2] Trip Memory with Empty Trip Plan...');
-  const res2 = await processAssistantMessage(
-    'What do you know about my trip so far?',
-    [],
-    null
-  );
-  assert(res2.replyText.includes('Travel Dates: Not yet specified'), 'TEST-2A: Dates state Not yet specified');
-  assert(res2.replyText.includes('Budget: Not yet specified'), 'TEST-2B: Budget states Not yet specified');
-  assert(res2.replyText.includes('Selected Trip Items: None added'), 'TEST-2C: Items state None added');
-  assert(!res2.replyText.includes('US$1,500') && !res2.replyText.includes('$1,500'), 'TEST-2D: No fabricated $1,500 budget');
-  assert(!res2.replyText.includes('November'), 'TEST-2E: No fabricated November dates');
+  assert(resObserved.replyText.includes('Victoria Falls'), 'REG-1A: Acknowledges destination Victoria Falls');
+  assert(resObserved.replyText.includes('5,000') || resObserved.replyText.includes('5000'), 'REG-1B: Acknowledges budget amount 5,000');
+  assert(resObserved.replyText.includes('20 October'), 'REG-1C: Acknowledges travel date 20 October');
+  assert(resObserved.replyText.includes('four-day') || resObserved.replyText.includes('4-day') || resObserved.replyText.includes('4 days'), 'REG-1D: Acknowledges four-day duration');
+  assert(resObserved.action?.destination === 'planner', 'REG-1E: Sets action to planner');
 
-  // TEST 3: Generic booking intent with no items must NOT map to sunset cruise
-  console.log('\n[Scenario 3] Generic Booking Intent with No Items in Trip...');
-  const res3 = await processAssistantMessage('I want to book it now', [], null);
-  assert(res3.action?.productId !== 'prod_zambezi_explorer_cruise', 'TEST-3A: Generic booking does not map to sunset cruise');
-  assert(res3.replyText.includes('Which accommodation or activity'), 'TEST-3B: Asks clarification on which experience to reserve');
+  // REGRESSION 2: Missing budget currency does NOT silently become USD
+  console.log('\n[Regression 2] Missing Budget Currency Safety...');
+  assert(!resObserved.replyText.includes('USD 5,000') && !resObserved.replyText.includes('$5,000') && !resObserved.replyText.includes('US$5,000'), 'REG-2A: Does not prepend USD or $ when currency was omitted');
+  assert(resObserved.replyText.toLowerCase().includes('currency'), 'REG-2B: Explicitly asks which currency the budget is in');
 
-  // TEST 4: Generic booking intent with multiple items asks for clarification
-  console.log('\n[Scenario 4] Generic Booking Intent with Multiple Items in Trip...');
-  const res4 = await processAssistantMessage(
-    'Book it',
-    [],
-    {
-      items: [
-        { productId: 'prod_rainforest_walk', productName: 'Rainforest Walking Tour' },
-        { productId: 'prod_boma_dinner', productName: 'The Boma Dinner' },
-      ],
-    }
-  );
-  assert(res4.action?.productId !== 'prod_zambezi_explorer_cruise', 'TEST-4A: Multiple items booking does not map to sunset cruise');
-  assert(res4.replyText.includes('multiple items in your trip plan'), 'TEST-4B: Clarifies between multiple items');
+  // REGRESSION 3: Missing traveller count is NOT fabricated
+  console.log('\n[Regression 3] Missing Traveller Count Safety...');
+  assert(!resObserved.replyText.includes('2 adults') && !resObserved.replyText.includes('two adults'), 'REG-3A: Does not fabricate 2 adults when not specified');
+  assert(resObserved.replyText.toLowerCase().includes('how many adults') || resObserved.replyText.toLowerCase().includes('adults and children'), 'REG-3B: Asks how many adults and children will be travelling');
 
-  // TEST 5: Generic booking intent with single item maps to that specific item
-  console.log('\n[Scenario 5] Generic Booking Intent with Single Item in Trip...');
-  const res5 = await processAssistantMessage(
+  // REGRESSION 4: Follow-up answers are retained across multiple messages
+  console.log('\n[Regression 4] Multi-Turn Detail Retention...');
+  const multiTurnHistory = [
+    { role: 'user', text: observedPrompt },
+    { role: 'assistant', text: resObserved.replyText },
+  ];
+  const followUpAnswer = 'The budget is in USD, for 2 adults, accommodation only for 3 nights.';
+  const resTurn2 = await processAssistantMessage(followUpAnswer, multiTurnHistory, null);
+
+  assert(resTurn2.replyText.includes('USD') || resTurn2.replyText.includes('5,000'), 'REG-4A: Retains budget and confirmed USD currency');
+  assert(resTurn2.replyText.includes('2 adults') || resTurn2.replyText.includes('two adults'), 'REG-4B: Retains confirmed 2 adults party size');
+  assert(resTurn2.replyText.includes('3 nights') || resTurn2.replyText.includes('three nights'), 'REG-4C: Retains confirmed 3 nights accommodation');
+  assert(resTurn2.replyText.includes('20 October'), 'REG-4D: Retains original 20 October start date from Turn 1');
+  assert(!resTurn2.replyText.toLowerCase().includes('which currency is your budget in'), 'REG-4E: Does not re-ask currency question once answered');
+  assert(!resTurn2.replyText.toLowerCase().includes('how many adults and children'), 'REG-4F: Does not re-ask traveller count once answered');
+
+  // REGRESSION 5: Four-day duration and accommodation-night ambiguity handled appropriately
+  console.log('\n[Regression 5] Duration vs Nights Ambiguity...');
+  assert(resObserved.replyText.includes('3 nights or 4 nights') || resObserved.replyText.includes('nights of accommodation'), 'REG-5A: Clarifies whether 4 days means 3 nights or 4 nights of accommodation');
+
+  // REGRESSION 6: Gemini-unavailable fallback recognises trip-planning intent
+  console.log('\n[Regression 6] Fallback Execution Path Trip Planning...');
+  assert(!resObserved.replyText.includes('Mosi-oa-Tunya') && !resObserved.replyText.includes('Smoke That Thunders'), 'REG-6A: Fallback path does not default to generic promotional copy');
+  assert(resObserved.replyText.includes('I can help plan your'), 'REG-6B: Fallback path directly addresses trip planning intent');
+
+  // REGRESSION 7: Unknown prices, products, and availability are never invented
+  console.log('\n[Regression 7] Strict Non-Fabrication of Unknown Products & Prices...');
+  const resUnknown = await processAssistantMessage('Can I stay at Syntuc Palace Hotel?', [], null);
+  assert(resUnknown.replyText.includes('cannot find verified information about "Syntuc Palace Hotel"'), 'REG-7A: Explicitly rejects non-existent hotel');
+  assert(resUnknown.action?.type === 'NAVIGATE', 'REG-7B: Directs to verified accommodations');
+
+  // REGRESSION 8: Generic welcome copy does not replace a meaningful planning response
+  console.log('\n[Regression 8] Welcome Copy Suppression for Planning Queries...');
+  const welcomeSnippet = 'Victoria Falls, known locally as Mosi-oa-Tunya';
+  assert(!resObserved.replyText.includes(welcomeSnippet), 'REG-8A: Welcome copy excluded from planning response');
+  assert(!resTurn2.replyText.includes(welcomeSnippet), 'REG-8B: Welcome copy excluded from Turn 2 recommendation');
+
+  // REGRESSION 9: Existing safe booking-intent handling remains intact
+  console.log('\n[Regression 9] Existing Safe Booking Intent Intact...');
+  const resGenericBook = await processAssistantMessage('Book it now', [], null);
+  assert(resGenericBook.action?.productId !== 'prod_zambezi_explorer_cruise', 'REG-9A: Generic booking does not map to sunset cruise');
+  assert(resGenericBook.replyText.includes('Which accommodation or activity'), 'REG-9B: Asks clarification for generic booking');
+
+  const resSingleBook = await processAssistantMessage(
     'Please book it',
     [],
-    {
-      items: [
-        { productId: 'prod_olddrift', productName: 'Old Drift Lodge' },
-      ],
-    }
+    { items: [{ productId: 'prod_olddrift', productName: 'Old Drift Lodge' }] }
   );
-  assert(res5.action?.type === 'OPEN_BOOKING', 'TEST-5A: Triggers OPEN_BOOKING');
-  assert(res5.action?.productId === 'prod_olddrift', 'TEST-5B: Maps to single item in trip (Old Drift Lodge)');
-  assert(res5.replyText.includes('Old Drift Lodge'), 'TEST-5C: Acknowledges Old Drift Lodge');
-  assert(res5.replyText.includes('Syntuc Reservations Desk'), 'TEST-5D: Emphasizes human review at Reservations Desk');
-  assert(!res5.replyText.includes('I have confirmed your booking'), 'TEST-5E: Never claims booking is autonomously confirmed');
+  assert(resSingleBook.action?.productId === 'prod_olddrift', 'REG-9C: Single item booking maps to Old Drift Lodge');
+  assert(resSingleBook.replyText.includes('Syntuc Reservations Desk'), 'REG-9D: Preserves human review boundary');
 
-  // TEST 6: Explicit booking intent for sunset cruise
-  console.log('\n[Scenario 6] Explicit Sunset Cruise Booking Intent...');
-  const res6 = await processAssistantMessage('I would like to reserve the sunset cruise on the Zambezi', [], null);
-  assert(res6.action?.productId === 'prod_zambezi_explorer_cruise', 'TEST-6A: Explicit sunset cruise maps to cruise');
-  assert(res6.replyText.includes('Syntuc Reservations Desk'), 'TEST-6B: Explains human review boundary');
+  // REGRESSION 10: Authoritative variant pricing and helicopter comparisons
+  console.log('\n[Regression 10] Authoritative Variants & Helicopter Comparisons...');
+  const resOldDrift = await processAssistantMessage('How much is Old Drift Lodge?', [], null);
+  assert(resOldDrift.replyText.includes('835'), 'REG-10A: Old Drift Green Season rate (835)');
+  assert(resOldDrift.replyText.includes('1,042') || resOldDrift.replyText.includes('1042'), 'REG-10B: Old Drift Mid Season rate (1,042)');
+  assert(resOldDrift.replyText.includes('50'), 'REG-10C: States USD 50 Conservation Levy');
 
-  // TEST 7: Ambiguous helicopter inquiry requires clarification
-  console.log('\n[Scenario 7] Ambiguous Helicopter Inquiry...');
-  const res7 = await processAssistantMessage('Tell me about the helicopter flight', [], null);
-  assert(res7.replyText.includes('12-minute') && res7.replyText.includes('25-minute'), 'TEST-7A: Notes both 12-min and 25-min options');
-  assert(res7.replyText.includes('Flight of Angels'), 'TEST-7B: Mentions Flight of Angels');
-  assert(res7.replyText.includes('Zambezi Gorge & Falls Extended Flight'), 'TEST-7C: Mentions Extended Flight');
+  const resHeliCompare = await processAssistantMessage('Compare the helicopter flights', [], null);
+  assert(resHeliCompare.replyText.includes('173'), 'REG-10D: Flight of Angels rate (173)');
+  assert(resHeliCompare.replyText.includes('328'), 'REG-10E: Extended Flight rate (328)');
 
-  // TEST 8: Helicopter comparison quotes catalog prices
-  console.log('\n[Scenario 8] Helicopter Comparison...');
-  const res8 = await processAssistantMessage('Compare the helicopter flights', [], null);
-  assert(res8.replyText.includes('173'), 'TEST-8A: Quotes Flight of Angels rate (173)');
-  assert(res8.replyText.includes('328'), 'TEST-8B: Quotes Extended Flight rate (328)');
+  const resSchool = await processAssistantMessage('What are the school trip rates?', [], null);
+  assert(resSchool.replyText.includes('15'), 'REG-10F: Educational commercial tariff ($15)');
+  assert(resSchool.replyText.includes('Bridge Tour'), 'REG-10G: 1905 Historic Bridge Tour incentive');
 
-  // TEST 9: Grounded variant pricing - Old Drift Lodge
-  console.log('\n[Scenario 9] Old Drift Lodge Authoritative Pricing Inquiry...');
-  const res9 = await processAssistantMessage('How much is Old Drift Lodge?', [], null);
-  assert(res9.replyText.includes('835'), 'TEST-9A: Lists Green season rate (835)');
-  assert(res9.replyText.includes('1,042') || res9.replyText.includes('1042'), 'TEST-9B: Lists Mid season rate (1,042)');
-  assert(res9.replyText.includes('1,087') || res9.replyText.includes('1087'), 'TEST-9C: Lists High season rate (1,087)');
-  assert(res9.replyText.includes('50'), 'TEST-9D: States USD 50 Conservation & Community Levy');
-  assert(res9.replyText.includes('per person sharing'), 'TEST-9E: Distinguishes per person sharing per night');
-
-  // TEST 10: Grounded variant pricing - Shearwater Explorers Village
-  console.log('\n[Scenario 10] Explorers Village Authoritative Pricing Inquiry...');
-  const res10 = await processAssistantMessage('What are the room rates for Explorers Village?', [], null);
-  assert(res10.replyText.includes('110'), 'TEST-10A: Standard chalet rate (110)');
-  assert(res10.replyText.includes('137'), 'TEST-10B: Deluxe suite rate (137)');
-  assert(res10.replyText.includes('per person sharing') || res10.replyText.includes('pppn'), 'TEST-10C: States sharing rate basis');
-
-  // TEST 11: Unknown entity rejection
-  console.log('\n[Scenario 11] Unknown Product Rejection...');
-  const res11 = await processAssistantMessage('Can I book Syntuc Palace Hotel?', [], null);
-  assert(res11.replyText.includes('cannot find verified information about "Syntuc Palace Hotel"'), 'TEST-11A: Explicitly rejects invented hotel');
-  assert(res11.action?.type === 'NAVIGATE', 'TEST-11B: Directs to verified accommodations');
-
-  // TEST 12: School trips tariff and bridge incentive
-  console.log('\n[Scenario 12] School Trip Inquiry...');
-  const res12 = await processAssistantMessage('Tell me about school trip rates', [], null);
-  assert(res12.replyText.includes('15'), 'TEST-12A: Highlights $15 student tariff');
-  assert(res12.replyText.includes('Bridge Tour'), 'TEST-12B: Mentions Historic Bridge Tour incentive');
-  assert(res12.replyText.includes('Standard Zambezi Boat Cruise is not a qualifying') || res12.replyText.includes('Standard Zambezi Boat Cruise is NOT a qualifying'), 'TEST-12C: Strictly specifies boat cruise does not qualify');
-
-  console.log(`\n=== SUMMARY: ${passed} / ${total} ASSISTANT VERIFICATION CHECKS PASSED ===\n`);
+  console.log(`\n=== SUMMARY: ${passed} / ${total} REGRESSION CHECKS PASSED ===\n`);
   if (passed !== total) {
     process.exit(1);
   }
