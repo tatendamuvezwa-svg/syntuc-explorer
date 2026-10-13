@@ -7,6 +7,7 @@ import {
   createStaffAuthToken,
 } from '../middleware/auth.ts';
 import { recordEventSafely } from '../services/attribution.ts';
+import { deleteReservationById } from '../lib/reservation-deletion.ts';
 import {
   getFirestoreDb,
   doc,
@@ -315,51 +316,20 @@ router.get('/reservations/:id/messages', requireCoordinatorAuth, async (req: Aut
   }
 });
 
-// DELETE /api/coordinator/reservations/:id - Permanently delete reservation request from Firestore
+// DELETE /api/coordinator/reservations/:id - Admin-only permanent deletion
 router.delete('/reservations/:id', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
-    const { id } = req.params;
-
-    // Authorize before reading or mutating reservation data.
-    if (req.staffUser?.role !== 'admin') {
-      res.status(403).json({
-        error: 'ADMIN_REQUIRED',
-        message: 'Administrator authorization required to delete reservations',
-      });
-      return;
-    }
-
-    const existing = await getDocById<any>('reservation_requests', id);
-    if (!existing) {
-      res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
-      return;
-    }
-
-    // 1. Record durable deletion tombstone
-    await recordTombstone('reservation_requests', id);
-
-    // 2. Delete reservation and associated sub-records
-    await deleteDocById('reservation_requests', id);
-
-    const items = await getCollectionDocs<any>('reservation_items', where('reservationRequestId', '==', id));
-    await Promise.all(items.map((i) => deleteDocById('reservation_items', i.id)));
-
-    const tokens = await getCollectionDocs<any>('guest_access_tokens', where('reservationRequestId', '==', id));
-    await Promise.all(tokens.map((t) => deleteDocById('guest_access_tokens', t.id)));
-
-    const messages = await getCollectionDocs<any>('guest_messages', where('reservationRequestId', '==', id));
-    await Promise.all(messages.map((m) => deleteDocById('guest_messages', m.id)));
-
-    const notes = await getCollectionDocs<any>('coordinator_notes', where('targetId', '==', id));
-    await Promise.all(notes.map((n) => deleteDocById('coordinator_notes', n.id)));
-
-    res.json({
-      success: true,
-      message: `Reservation ${id} permanently deleted and deletion tombstoned in Cloud Firestore.`,
-    });
+    const result = await deleteReservationById(req.staffUser, req.params.id);
+    res.json(result);
   } catch (error: any) {
-    console.error('Error deleting reservation:', error);
-    res.status(500).json({ error: 'FAILED_TO_DELETE_RESERVATION', message: error.message });
+    const status = Number.isInteger(error?.status) ? error.status : 500;
+    if (status >= 500) {
+      console.error('Error deleting reservation:', error);
+    }
+    res.status(status).json({
+      error: error?.code || 'FAILED_TO_DELETE_RESERVATION',
+      message: status >= 500 ? 'Failed to delete reservation' : error?.message,
+    });
   }
 });
 
