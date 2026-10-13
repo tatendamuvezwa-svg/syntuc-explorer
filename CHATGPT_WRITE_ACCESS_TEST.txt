@@ -1,0 +1,2 @@
+Temporary write-access verification for ChatGPT Codex Connector.
+This file is on test/chatgpt-write-access-20261013 only and is intended to be deleted immediately.
