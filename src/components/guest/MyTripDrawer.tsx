@@ -33,12 +33,40 @@ export const MyTripDrawer: React.FC = () => {
     for (const item of tripPlan.items) {
       const prod = item.product;
       const count = item.guestCount || 2;
-      const unit = Number(item.room?.pricePerNight || prod?.basePrice || 0);
+      const variant = item.variant;
+      const isAccom = prod?.productType === 'accommodation';
+      const unit = Number(variant?.price !== undefined ? variant.price : (item.room?.pricePerNight || prod?.basePrice || 0));
+      const basis = variant?.priceBasis || (item.room ? 'per_room_night' : (prod?.priceBasis || (isAccom ? 'per_room_night' : 'per_person')));
 
-      if (prod?.productType === 'accommodation') {
-        const itemNights = 2; // Default planned stay duration
+      if (isAccom) {
+        let itemNights = 2; // Default planned stay duration
+        if (item.scheduledDate && item.checkOutDate) {
+          try {
+            const dIn = new Date(item.scheduledDate).getTime();
+            const dOut = new Date(item.checkOutDate).getTime();
+            const diff = Math.ceil((dOut - dIn) / (1000 * 60 * 60 * 24));
+            if (diff > 0) itemNights = diff;
+          } catch (_) {}
+        }
         nights += itemNights;
-        subtotal += unit * itemNights;
+
+        let accomItemSubtotal = 0;
+        if (basis === 'per_single_room_night' || basis === 'per_room_night') {
+          accomItemSubtotal = unit * itemNights;
+        } else {
+          // per person sharing per night
+          accomItemSubtotal = unit * count * itemNights;
+        }
+
+        // Compulsory fees for accommodation (e.g. conservation levies)
+        if (variant?.compulsoryFees && variant.compulsoryFees.length > 0) {
+          for (const fee of variant.compulsoryFees) {
+            const feeMultiplier = basis === 'per_single_room_night' ? 1 : count;
+            accomItemSubtotal += Number(fee.amount || 0) * feeMultiplier * itemNights;
+          }
+        }
+
+        subtotal += accomItemSubtotal;
       } else {
         const name = ((prod?.name || '') + ' ' + (prod?.slug || '')).toLowerCase();
         if (
@@ -48,7 +76,22 @@ export const MyTripDrawer: React.FC = () => {
         ) {
           qualifyingCount += 1;
         }
-        subtotal += unit * count;
+
+        let actSubtotal = 0;
+        if (basis === 'per_group') {
+          actSubtotal = unit;
+        } else {
+          actSubtotal = unit * count;
+        }
+
+        // Compulsory fees (e.g. $12 National Parks conservation fee)
+        if (variant?.compulsoryFees && variant.compulsoryFees.length > 0) {
+          for (const fee of variant.compulsoryFees) {
+            actSubtotal += Number(fee.amount || 0) * count;
+          }
+        }
+
+        subtotal += actSubtotal;
       }
     }
 
@@ -212,9 +255,25 @@ export const MyTripDrawer: React.FC = () => {
                       {item.product?.name || 'Selected Experience'}
                     </h5>
 
+                    {item.variant && (
+                      <div className="text-xs text-amber-800 font-medium mt-0.5">
+                        Option: {item.variant.name}
+                      </div>
+                    )}
+
                     {item.room && (
                       <div className="text-xs text-stone-600 mt-0.5">
                         Room: <span className="font-medium text-stone-800">{item.room.name}</span>
+                      </div>
+                    )}
+
+                    {item.scheduledDate && (
+                      <div className="text-[11px] text-stone-500 mt-0.5 flex items-center">
+                        <Calendar className="w-3 h-3 mr-1 text-stone-400" />
+                        <span>
+                          {item.scheduledDate}
+                          {item.checkOutDate ? ` → ${item.checkOutDate}` : ''}
+                        </span>
                       </div>
                     )}
 
@@ -222,9 +281,18 @@ export const MyTripDrawer: React.FC = () => {
                       <span className="text-stone-500">
                         {item.guestCount || 2} {item.guestCount === 1 ? 'Guest' : 'Guests'}
                       </span>
-                      <span className="font-bold text-amber-900 font-display">
-                        US${item.room ? item.room.pricePerNight : item.product?.basePrice}
-                      </span>
+                      <div className="text-right">
+                        <span className="font-bold text-amber-900 font-display">
+                          US${item.variant?.price !== undefined ? item.variant.price : (item.room ? item.room.pricePerNight : item.product?.basePrice)}
+                        </span>
+                        <span className="text-[10px] text-stone-400 block">
+                          {item.variant?.priceBasis === 'per_room_night' || item.variant?.priceBasis === 'per_single_room_night'
+                            ? '/ room / nt'
+                            : (item.variant?.priceBasis === 'per_person_sharing_night'
+                              ? 'pppn'
+                              : (item.variant?.priceBasis === 'per_group' ? '/ group' : '/ person'))}
+                        </span>
+                      </div>
                     </div>
                   </div>
 

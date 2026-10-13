@@ -33,14 +33,17 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Calculate nights from stay dates
+  // Calculate nights from stay dates safely with calendar arithmetic
   const calculatedNights = React.useMemo(() => {
     if (!startDate || !endDate) return null;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : null;
+    const partsStart = startDate.split('-').map(Number);
+    const partsEnd = endDate.split('-').map(Number);
+    if (partsStart.length !== 3 || partsEnd.length !== 3) return null;
+    const utcIn = Date.UTC(partsStart[0], partsStart[1] - 1, partsStart[2]);
+    const utcOut = Date.UTC(partsEnd[0], partsEnd[1] - 1, partsEnd[2]);
+    const diffMs = utcOut - utcIn;
+    if (diffMs <= 0) return null;
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
   }, [startDate, endDate]);
 
   // Compute itemized review entries and estimated total
@@ -54,30 +57,64 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
 
     const items = tripPlan.items.map(it => {
       const isAccom = it.product?.productType === 'accommodation';
-      const unitPrice = it.room ? Number(it.room.pricePerNight) : Number(it.product?.basePrice || 0);
+      const variant = it.variant;
+      const unitPrice = Number(variant?.price !== undefined ? variant.price : (it.room ? it.room.pricePerNight : it.product?.basePrice || 0));
+      const basis = variant?.priceBasis || (it.room ? 'per_room_night' : (it.product?.priceBasis || (isAccom ? 'per_room_night' : 'per_person')));
 
       let subtotal = 0;
       let displayBasis = '';
 
       if (isAccom) {
         const nights = calculatedNights || 1;
-        accomNights += calculatedNights || 1;
-        subtotal = unitPrice * nights;
-        displayBasis = calculatedNights ? `${nights} nights × US$${unitPrice}` : `US$${unitPrice} / night (Dates TBD)`;
+        accomNights += nights;
+
+        if (basis === 'per_single_room_night' || basis === 'per_room_night') {
+          subtotal = unitPrice * nights;
+          displayBasis = calculatedNights
+            ? `${nights} nights × US$${unitPrice} (room rate)`
+            : `US$${unitPrice} / room / night`;
+        } else {
+          // per person sharing
+          subtotal = unitPrice * participants * nights;
+          displayBasis = calculatedNights
+            ? `${nights} nights × ${participants} guests × US$${unitPrice}`
+            : `US$${unitPrice} pppn`;
+        }
+
+        // Compulsory fees (e.g. conservation levies)
+        if (variant?.compulsoryFees && variant.compulsoryFees.length > 0) {
+          for (const fee of variant.compulsoryFees) {
+            const mult = basis === 'per_single_room_night' ? 1 : participants;
+            const fTotal = Number(fee.amount || 0) * mult * nights;
+            subtotal += fTotal;
+          }
+        }
       } else {
-        subtotal = unitPrice * participants;
-        displayBasis = `${participants} guests × US$${unitPrice}`;
+        if (basis === 'per_group') {
+          subtotal = unitPrice;
+          displayBasis = `US$${unitPrice} (per group/tour)`;
+        } else {
+          subtotal = unitPrice * participants;
+          displayBasis = `${participants} guests × US$${unitPrice}`;
+        }
+
+        // Compulsory fees (e.g. $12 National Parks conservation fee)
+        if (variant?.compulsoryFees && variant.compulsoryFees.length > 0) {
+          for (const fee of variant.compulsoryFees) {
+            subtotal += Number(fee.amount || 0) * participants;
+          }
+        }
 
         // Check qualifying activities for 1905 Bridge Tour incentive
-        const slug = it.product?.slug || '';
+        const slug = (it.product?.name + ' ' + (it.product?.slug || '')).toLowerCase();
         if (
-          slug.includes('flight') ||
-          slug.includes('helicopter') ||
-          slug.includes('chobe') ||
-          slug.includes('quad') ||
-          slug.includes('sunset') ||
-          slug.includes('cruise') ||
-          slug.includes('elephant')
+          !slug.includes('bridge') &&
+          !(slug.includes('boat cruise') && !slug.includes('sunset')) &&
+          (slug.includes('flight') ||
+            slug.includes('helicopter') ||
+            slug.includes('quad') ||
+            slug.includes('sunset') ||
+            slug.includes('elephant'))
         ) {
           qualifyingActs++;
         }
@@ -88,11 +125,12 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
       return {
         id: it.id,
         name: it.product?.name || 'Selected Experience',
+        variantName: variant?.name || null,
         productType: it.product?.productType,
         roomName: it.room?.name,
         unitPrice,
         displayBasis,
-        subtotal,
+        subtotal: Math.round(subtotal * 100) / 100,
       };
     });
 
@@ -126,6 +164,16 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
       return;
     }
 
+    if (!startDate || !endDate) {
+      setErrorMessage('Arrival date and departure date are required for reservation requests.');
+      return;
+    }
+
+    if (endDate <= startDate) {
+      setErrorMessage('Departure date must be strictly after the arrival date.');
+      return;
+    }
+
     if (!tripPlan?.items || tripPlan.items.length === 0) {
       setErrorMessage('Please add at least one accommodation or experience to your trip first.');
       return;
@@ -135,14 +183,25 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
     setErrorMessage(null);
 
     try {
+      const submissionItems = tripPlan.items.map(it => ({
+        productId: it.productId,
+        roomId: it.roomId || undefined,
+        variantId: it.variantId || undefined,
+        guestCount: it.guestCount || adultsCount + childrenCount,
+        scheduledDate: it.scheduledDate || startDate,
+        checkOutDate: it.checkOutDate || (it.product?.productType === 'accommodation' ? endDate : undefined),
+        notes: it.notes || undefined,
+      }));
+
       const result = await api.submitReservationRequest({
         tripPlanId: tripPlan.id,
+        items: submissionItems,
         fullName,
         email,
         phone,
         country,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
+        startDate,
+        endDate,
         adultsCount,
         childrenCount,
         specialRequests,
@@ -278,25 +337,27 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Arrival Date
+                  Arrival (Check-in) *
                 </label>
                 <input
                   type="date"
+                  required
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-stone-200 focus:outline-hidden"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-stone-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Departure Date
+                  Departure (Check-out) *
                 </label>
                 <input
                   type="date"
+                  required
                   value={endDate}
                   onChange={e => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-stone-200 focus:outline-hidden"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-stone-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
                 />
               </div>
 
@@ -345,7 +406,7 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
                 Itemized Itinerary Review ({reviewItems.length} {reviewItems.length === 1 ? 'item' : 'items'})
               </span>
               <span className="text-[11px] font-semibold text-stone-500">
-                {calculatedNights ? `${calculatedNights} nights stay` : 'Stay dates: TBD'}
+                {calculatedNights ? `${calculatedNights} nights stay` : 'Stay dates: Required'}
               </span>
             </div>
 
@@ -355,6 +416,9 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
                 <div key={item.id} className="pt-2 first:pt-0 flex items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="font-bold text-stone-900">{item.name}</div>
+                    {item.variantName && (
+                      <div className="text-[11px] text-amber-800 font-medium">Option: {item.variantName}</div>
+                    )}
                     {item.roomName && (
                       <div className="text-[11px] text-stone-600">Room: {item.roomName}</div>
                     )}
@@ -370,8 +434,11 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
             {/* 1905 Historic Bridge Tour Incentive Status */}
             {bridgeIncentiveEligible && (
               <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-950 font-medium">
-                <span>🎁 1905 Historic Bridge Tour Incentive Reward</span>
-                <span className="font-bold font-display text-emerald-700">$0 UNLOCKED</span>
+                <span className="flex items-center">
+                  <ShieldCheck className="w-4 h-4 mr-1.5 text-emerald-600 shrink-0" />
+                  <span>Priority Stay Qualified (2+ Nights & 2+ Priority Activities)</span>
+                </span>
+                <span className="font-bold text-emerald-800 font-display">Priority Desk Review</span>
               </div>
             )}
 

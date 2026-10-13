@@ -319,16 +319,38 @@ export const ReservationDetailModal: React.FC<Props> = ({
             ) : accommodationItems.length > 0 ? (
               <div className="space-y-3">
                 {accommodationItems.map(item => (
-                  <div key={item.id} className="bg-white rounded-2xl p-4 border border-stone-200 shadow-xs flex justify-between items-center text-xs">
+                  <div key={item.id} className="bg-white rounded-2xl p-4 border border-stone-200 shadow-xs flex flex-col sm:flex-row justify-between sm:items-center gap-3 text-xs">
                     <div>
                       <div className="font-bold text-stone-900 text-sm">{item.snapshotProductName}</div>
-                      <div className="text-stone-500 text-[11px]">{item.snapshotOperatorName} • Rate basis: {item.snapshotPriceBasis}</div>
+                      {item.variantName && (
+                        <div className="text-amber-800 font-semibold text-[11px] mt-0.5">
+                          Selected Option: {item.variantName}
+                        </div>
+                      )}
+                      {item.roomName && (
+                        <div className="text-stone-700 font-medium text-[11px]">
+                          Room: {item.roomName}
+                        </div>
+                      )}
+                      <div className="text-stone-500 text-[11px] mt-0.5">
+                        {item.snapshotOperatorName} • Basis: {item.snapshotPriceBasis}
+                        {item.scheduledDate && ` • Stay: ${item.scheduledDate} → ${item.checkOutDate || 'TBD'} (${item.nightsCount || 1}N)`}
+                      </div>
+                      {item.feeBreakdown && item.feeBreakdown.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {item.feeBreakdown.map((fb: any, idx: number) => (
+                            <span key={idx} className="bg-stone-100 text-stone-600 text-[10px] px-1.5 py-0.5 rounded">
+                              {fb.name}: US${fb.total}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {item.notes && <div className="text-stone-600 mt-1 italic">Note: {item.notes}</div>}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <div className="font-bold text-amber-800 font-display text-sm">US${item.calculatedSubtotal}</div>
                       <div className="text-[10px] text-stone-400">
-                        US${item.snapshotUnitPrice} × {item.nightsCount || 1} nights × {item.guestCount || 1} guests
+                        Rate: US${item.snapshotUnitPrice} • {item.nightsCount || 1}N • {item.guestCount || 1} guests
                       </div>
                     </div>
                   </div>
@@ -394,8 +416,9 @@ export const ReservationDetailModal: React.FC<Props> = ({
                 <table className="w-full text-left text-xs">
                   <thead className="bg-stone-50 border-b border-stone-200 text-stone-500 text-[10px] uppercase tracking-wider">
                     <tr>
-                      <th className="p-3">Activity</th>
+                      <th className="p-3">Activity & Option</th>
                       <th className="p-3">Operator</th>
+                      <th className="p-3">Date</th>
                       <th className="p-3">Tariff Basis</th>
                       <th className="p-3">Guests</th>
                       <th className="p-3 text-right">Calculated Subtotal</th>
@@ -406,9 +429,18 @@ export const ReservationDetailModal: React.FC<Props> = ({
                       <tr key={idx} className="hover:bg-stone-50/60 transition">
                         <td className="p-3 font-semibold text-stone-900">
                           <div>{item.snapshotProductName}</div>
+                          {item.variantName && (
+                            <div className="text-[11px] text-amber-800 font-medium">Option: {item.variantName}</div>
+                          )}
+                          {item.feeBreakdown && item.feeBreakdown.length > 0 && (
+                            <div className="text-[10px] text-stone-400 font-normal">
+                              Includes {item.feeBreakdown.map((f: any) => `${f.name}: US$${f.total}`).join(', ')}
+                            </div>
+                          )}
                           {item.notes && <div className="text-[10px] text-stone-500 font-normal">{item.notes}</div>}
                         </td>
                         <td className="p-3 text-stone-600">{item.snapshotOperatorName}</td>
+                        <td className="p-3 text-stone-600">{item.scheduledDate || 'Flexible'}</td>
                         <td className="p-3 text-stone-700 font-mono">US${item.snapshotUnitPrice} ({item.snapshotPriceBasis})</td>
                         <td className="p-3 text-stone-700">{item.guestCount || 1}</td>
                         <td className="p-3 text-right font-bold text-stone-900 font-display">US${item.calculatedSubtotal}</td>

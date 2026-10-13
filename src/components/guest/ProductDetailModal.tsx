@@ -44,12 +44,31 @@ function formatVideoEmbed(url: string): { type: 'iframe' | 'video'; embedUrl: st
   return { type: 'iframe', embedUrl: trimmed };
 }
 
+function formatPriceBasisLabel(basis: string): string {
+  switch (basis) {
+    case 'per_person_sharing_night':
+      return 'per person sharing / night';
+    case 'per_single_room_night':
+      return 'per single room / night';
+    case 'per_room_night':
+      return 'per room / night';
+    case 'per_group':
+      return 'per group';
+    case 'per_person':
+    default:
+      return 'per person';
+  }
+}
+
 export const ProductDetailModal: React.FC = () => {
   const { selectedProductId, closeProductDetail, addToTrip, openReservationModal } = useSession();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeMediaUrl, setActiveMediaUrl] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  const [selectedVariantId, setSelectedVariantId] = useState<string>('');
+  const [scheduledDate, setScheduledDate] = useState<string>('');
+  const [checkOutDate, setCheckOutDate] = useState<string>('');
   const [guestCount, setGuestCount] = useState<number>(2);
 
   useEffect(() => {
@@ -63,6 +82,9 @@ export const ProductDetailModal: React.FC = () => {
         if (data.rooms && data.rooms.length > 0) {
           setSelectedRoomId(data.rooms[0].id);
         }
+        if (data.variants && data.variants.length > 0) {
+          setSelectedVariantId(data.variants[0].id);
+        }
       } catch (err) {
         console.error('Failed to load product detail:', err);
       } finally {
@@ -71,6 +93,44 @@ export const ProductDetailModal: React.FC = () => {
     }
     load();
   }, [selectedProductId]);
+
+  const activeVariant = React.useMemo(() => {
+    if (!product?.variants || product.variants.length === 0) return null;
+    return product.variants.find((v: any) => v.id === selectedVariantId) || product.variants[0];
+  }, [product, selectedVariantId]);
+
+  const activeRoom = React.useMemo(() => {
+    if (!product?.rooms || product.rooms.length === 0) return null;
+    return product.rooms.find((r: any) => r.id === selectedRoomId) || product.rooms[0];
+  }, [product, selectedRoomId]);
+
+  const currentPrice = React.useMemo(() => {
+    if (activeVariant) {
+      return Number(activeVariant.price !== undefined ? activeVariant.price : (product?.basePrice ?? 0));
+    }
+    if (activeRoom) {
+      return Number(activeRoom.pricePerNight ?? product?.basePrice ?? 0);
+    }
+    return Number(product?.basePrice ?? 0);
+  }, [activeVariant, activeRoom, product]);
+
+  const currentPriceBasis = React.useMemo(() => {
+    if (activeVariant) {
+      return activeVariant.priceBasis || product?.priceBasis || 'per_person';
+    }
+    if (activeRoom) {
+      return 'per_room_night';
+    }
+    return product?.priceBasis || 'per_person';
+  }, [activeVariant, activeRoom, product]);
+
+  const compulsoryFees = React.useMemo(() => {
+    return activeVariant?.compulsoryFees || [];
+  }, [activeVariant]);
+
+  const totalCompulsoryFeesPerPerson = React.useMemo(() => {
+    return compulsoryFees.reduce((sum: number, f: any) => sum + Number(f.amount || 0), 0);
+  }, [compulsoryFees]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -90,7 +150,10 @@ export const ProductDetailModal: React.FC = () => {
     if (!product) return;
     await addToTrip({
       productId: product.id,
-      roomId: product.productType === 'accommodation' ? selectedRoomId : undefined,
+      roomId: product.productType === 'accommodation' ? (selectedRoomId || undefined) : undefined,
+      variantId: activeVariant?.id || undefined,
+      scheduledDate: scheduledDate || undefined,
+      checkOutDate: checkOutDate || undefined,
       guestCount,
     });
     closeProductDetail();
@@ -200,20 +263,129 @@ export const ProductDetailModal: React.FC = () => {
               {/* Pricing box */}
               <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 shrink-0 text-left md:text-right">
                 <div className="text-xs text-amber-900 font-semibold uppercase tracking-wide">
-                  Catalog Tariff
+                  {activeVariant ? 'Authoritative Tariff' : 'Catalog Tariff'}
                 </div>
                 <div className="text-2xl font-extrabold text-amber-800 font-display mt-0.5">
-                  US${product.basePrice}
+                  US${currentPrice}
                 </div>
                 <div className="text-xs text-stone-500">
-                  {product.priceBasis === 'per_room_night' ? 'per room / night' : 'per person'}
+                  {formatPriceBasisLabel(currentPriceBasis)}
                 </div>
+                {compulsoryFees.length > 0 && (
+                  <div className="mt-1 text-[11px] font-medium text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-md inline-block">
+                    + US${totalCompulsoryFeesPerPerson} {compulsoryFees[0].name.toLowerCase().includes('levy') ? 'levy' : 'fee'}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Description */}
             <div className="prose prose-stone text-sm leading-relaxed text-stone-700">
               <p>{product.description}</p>
+            </div>
+
+            {/* Tariff Variants Section */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="space-y-3 pt-4 border-t border-stone-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-stone-900 font-display flex items-center">
+                    <Layers className="w-4 h-4 mr-2 text-amber-700" />
+                    {product.productType === 'accommodation' ? 'Select Rate & Occupancy Option' : 'Select Experience Tier / Water Season'}
+                  </h3>
+                  <span className="text-xs text-stone-500 font-medium">Authoritative 2026 Rates</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {product.variants.map((v: any) => {
+                    const isSelected = activeVariant?.id === v.id;
+                    const vPrice = Number(v.price !== undefined ? v.price : product.basePrice || 0);
+                    return (
+                      <div
+                        key={v.id}
+                        onClick={() => setSelectedVariantId(v.id)}
+                        className={`p-4 rounded-xl border-2 transition cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-amber-600 bg-amber-50/50 shadow-sm'
+                            : 'border-stone-200 hover:border-stone-300 bg-white'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="text-sm font-bold text-stone-900">{v.name}</h4>
+                            <span className="text-sm font-bold text-amber-800 font-display shrink-0">
+                              US${vPrice}
+                            </span>
+                          </div>
+                          {v.description && (
+                            <p className="text-xs text-stone-500 mt-1 line-clamp-2">{v.description}</p>
+                          )}
+                          {v.mealPlan && (
+                            <div className="mt-1 text-[11px] text-amber-800 font-medium">
+                              🍽️ {v.mealPlan}
+                            </div>
+                          )}
+                          {v.compulsoryFees && v.compulsoryFees.length > 0 && (
+                            <div className="mt-1 text-[11px] text-stone-500">
+                              Includes {v.compulsoryFees[0].name}: US${v.compulsoryFees[0].amount}
+                            </div>
+                          )}
+                          {v.supplierNote && (
+                            <div className="mt-1 text-[10px] text-stone-400 italic">
+                              {v.supplierNote}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
+                          <span className="capitalize font-medium text-stone-600">
+                            {formatPriceBasisLabel(v.priceBasis || 'per_person')}
+                          </span>
+                          <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Verified
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Preferred Dates Selector */}
+            <div className="pt-4 border-t border-stone-200">
+              <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wide mb-3 flex items-center">
+                <Calendar className="w-3.5 h-3.5 mr-2 text-amber-700" />
+                {product.productType === 'accommodation' ? 'Preferred Stay Dates (Check-In & Check-Out)' : 'Preferred Experience Date'}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+                <div>
+                  <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                    {product.productType === 'accommodation' ? 'Check-in Date' : 'Activity Date'}
+                  </label>
+                  <input
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-stone-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                </div>
+                {product.productType === 'accommodation' && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                      Check-out Date
+                    </label>
+                    <input
+                      type="date"
+                      value={checkOutDate}
+                      onChange={(e) => setCheckOutDate(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-stone-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] text-stone-400 mt-1.5">
+                Dates will be confirmed by desk coordinator; required before formal voucher issuance.
+              </p>
             </div>
 
             {/* Accommodation Rooms Section */}
