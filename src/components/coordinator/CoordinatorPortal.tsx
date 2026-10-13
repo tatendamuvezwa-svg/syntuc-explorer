@@ -106,18 +106,29 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     );
     if (!confirmed) return;
 
+    setDeletingReservationId(reservation.id);
     try {
-      setDeletingReservationId(reservation.id);
       await api.deleteReservation(reservation.id);
-      notify(`Reservation ${reservation.referenceNumber} deleted`, 'success');
-      await loadAllData();
-      if (selectedRes?.id === reservation.id) {
-        setSelectedRes(null);
-        setIsDetailModalOpen(false);
-      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to delete reservation';
       notify(message, 'error');
+      setDeletingReservationId(null);
+      return;
+    }
+
+    if (selectedRes?.id === reservation.id) {
+      setSelectedRes(null);
+      setIsDetailModalOpen(false);
+    }
+    notify(`Reservation ${reservation.referenceNumber} deleted`, 'success');
+
+    try {
+      await loadAllData();
+    } catch {
+      notify(
+        `Reservation ${reservation.referenceNumber} was deleted, but the list could not refresh. Please reload the page.`,
+        'error'
+      );
     } finally {
       setDeletingReservationId(null);
     }
