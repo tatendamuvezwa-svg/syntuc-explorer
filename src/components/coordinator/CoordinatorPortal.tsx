@@ -123,12 +123,13 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     notify(`Reservation ${reservation.referenceNumber} deleted`, 'success');
 
     try {
-      await loadAllData();
-    } catch {
-      notify(
-        `Reservation ${reservation.referenceNumber} was deleted, but the list could not refresh. Please reload the page.`,
-        'error'
-      );
+      const refreshed = await loadAllData();
+      if (!refreshed) {
+        notify(
+          `Reservation ${reservation.referenceNumber} was deleted, but the list could not refresh. Please reload the page.`,
+          'error'
+        );
+      }
     } finally {
       setDeletingReservationId(null);
     }
@@ -145,8 +146,8 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [mediaUploadPreview, setMediaUploadPreview] = useState<string | null>(null);
   const [isUploadingMediaFile, setIsUploadingMediaFile] = useState<boolean>(false);
 
-  const loadAllData = async () => {
-    if (!isAuthenticated) return;
+  const loadAllData = async (): Promise<boolean> => {
+    if (!isAuthenticated) return false;
     setLoadingData(true);
     try {
       const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.all([
@@ -178,9 +179,11 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
       }
     } catch (e) {
       console.error('Coordinator data fetch error:', e);
+      return false;
     } finally {
       setLoadingData(false);
     }
+    return true;
   };
 
   const handleToggleStaffActive = async (userId: string) => {
