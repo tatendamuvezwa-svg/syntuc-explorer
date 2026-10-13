@@ -1,0 +1,34 @@
+name: Reservation deletion validation
+
+on:
+  push:
+    branches:
+      - inspect/admin-delete-reservation-on-main-20261013-fix-delete
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run TypeScript validation
+        run: npm run lint
+      - name: Run production build
+        run: npm run build
+      - name: Run isolated reservation deletion tests
+        run: npm run test:reservation-deletion
