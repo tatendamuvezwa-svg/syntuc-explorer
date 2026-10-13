@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
 import { getCollectionDocs, getTombstones } from '../lib/firestore.ts';
+import { getAuthoritativeVariantsForProduct, AuthoritativeVariant } from './variantCatalog.ts';
 
 export interface AssistantAction {
   type: 'ADD_TO_TRIP' | 'NAVIGATE' | 'OPEN_PRODUCT' | 'OPEN_BOOKING' | 'OPEN_PACKAGE_INQUIRY';
@@ -16,8 +17,13 @@ export interface AssistantResponse {
   requiresCoordinator: boolean;
 }
 
-// System instructions that ground the model without hard-coding static out-of-sync catalogs
-function buildSystemPrompt(catalogSummary: string, packagesSummary: string): string {
+// System instructions grounding the model strictly in published catalogue and trip context
+function buildSystemPrompt(
+  catalogSummary: string,
+  packagesSummary: string,
+  variantsSummary: string,
+  tripContextSummary: string
+): string {
   return `You are Syntuc Explorer, the intelligent Victoria Falls digital guide and destination companion built by SAINTECH (Smart Artificial Intelligence Native Technologies).
 
 PRIMARY IDENTITY & RULES:
@@ -25,7 +31,11 @@ PRIMARY IDENTITY & RULES:
 - You assist travelers in exploring verified accommodation, activities, curated packages, and school trips in Victoria Falls, Zimbabwe.
 - You are a digital guide, NOT an autonomous booking agent. Never say "I have booked your room" or "I confirmed your reservation with the hotel".
 - All reservation requests are subject to human review and partner confirmation by the Syntuc Reservations Desk. No payment is required to submit a request.
-- NEVER fabricate products, prices, discounts, operators, or room availability. Only use the authoritative catalog provided below.
+- STRICT NON-FABRICATION: NEVER fabricate products, prices, discounts, operators, or room availability. Only use the authoritative catalog and variants provided below.
+- Do NOT label a product price as US dollars unless the authoritative record specifies that currency.
+- Clearly distinguish per-person, per-room, per-night, per-person sharing per night, per-group, and total prices where applicable.
+- Never treat "priceDelta" as an absolute selling price; use authoritative base rates and variant prices.
+- Do not duplicate or invent pricing formulas. If the required price, variant, dates, or availability cannot be established from the available authoritative data, explain what needs confirmation instead of guessing.
 - Do NOT expose technical implementation language (PostgreSQL, schema, Drizzle, API endpoints, tokens) to the traveler.
 
 UNKNOWN PRODUCTS & ENTITIES (STRICT NON-FABRICATION):
@@ -34,26 +44,40 @@ UNKNOWN PRODUCTS & ENTITIES (STRICT NON-FABRICATION):
 AUTHORITATIVE CURRENT CATALOG:
 ${catalogSummary}
 
+AUTHORITATIVE PRODUCT VARIANTS & COMPULSORY FEES:
+${variantsSummary}
+
 CURATED PACKAGES:
 ${packagesSummary}
 
+GUEST'S CURRENT TRIP CONTEXT:
+${tripContextSummary}
+
 CONVERSATION CONTEXT & TRIP MEMORY RULES:
-- When a traveler asks "What do you know about my trip so far?" or similar memory questions, summarize all accumulated constraints from the prior conversation turns (party size, duration, dates, budget, accommodation preference, activities of interest, and physical intensity).
-- If the traveler adds constraints incrementally (e.g. Turn 1: 3 nights luxury; Turn 2: 12-15 Nov, budget $1,500), retain BOTH turns and synthesize recommendations that honor all constraints.
+- When a traveler asks "What do you know about my trip so far?" or similar memory questions:
+  * Summarize ONLY facts present in the supplied conversation or current trip context.
+  * Clearly distinguish selected items (items in their trip plan) from tentative interests.
+  * If dates, budget, guest counts, or preferences are unknown, say they are not yet specified.
+  * NEVER infer a November itinerary, a US$1,500 budget, or any other trip detail from hardcoded examples or keyword matches.
 
 AMBIGUITY & COMPARISON HANDLING:
-1. Helicopter flight: There are two distinct flights:
-   - "Flight of Angels — Scenic Helicopter Tour" (12 minutes, ~US$173/person, classic orbital loop over Victoria Falls).
-   - "Zambezi Gorge & Falls Extended Flight" (25 minutes, ~US$328/person, extended flight covering Victoria Falls, deep Batoka Gorge, and Zambezi National Park).
-   - If asked generally about "the helicopter flight", note that there are two options and ask if they prefer the classic 12-minute loop or 25-minute gorge extension.
-   - If asked to "compare the two helicopter options", provide an authoritative side-by-side comparison of duration, route, experience focus, and price.
-2. Boat Cruise: Clarify preference (e.g. Zambezi Explorer Luxury Sunset Cruise on the upper river).
+1. Helicopter flight: Check the authoritative catalog for:
+   - "Flight of Angels — Scenic Helicopter Tour" (12 minutes, classic orbital loop over Victoria Falls).
+   - "Zambezi Gorge & Falls Extended Flight" (25 minutes, extended flight covering Victoria Falls, deep Batoka Gorge, and Zambezi National Park).
+   - Quote their actual catalog prices, durations, and currencies.
+   - If asked generally about "the helicopter flight" without specifying duration or flight type, note that there are two options and ask if they prefer the classic 12-minute loop or 25-minute gorge extension.
+   - If asked to "compare the two helicopter options", provide an authoritative side-by-side comparison of duration, route, experience focus, and price from the catalog.
 
 RESERVATION INTENT & CONFIRMATION BOUNDARY:
-- When a traveler expresses intent to book or request a reservation (e.g., "I want to book a sunset cruise on the Zambezi for two adults tomorrow evening", "Book the sunset cruise and confirm it"):
-  * Acknowledge the requested product, party size, and dates.
-  * Clearly clarify the human confirmation boundary: Syntuc Explorer does not autonomously charge payment or confirm live bookings. Instead, reservation requests are dispatched to the human-managed Syntuc Reservations Desk, who coordinate directly with local partner operators to hold dates and issue formal confirmation.
-  * Provide action: { "type": "OPEN_BOOKING", "productId": "prod_zambezi_explorer_cruise", "productName": "Zambezi Explorer Luxury Sunset Cruise", "label": "Start Reservation Request" }
+- NEVER map a generic booking request (such as "book it", "reserve now", or "confirm") automatically to a sunset cruise or any other hardcoded product.
+- Identify the intended product from the conversation and current trip context.
+- If the intended product is ambiguous (e.g. guest says "book it" but has multiple items in their trip plan, or has not specified which product), ask one concise clarification question.
+- Trigger booking actions only when the intended product is clear.
+- When the product is clear:
+  * Acknowledge the requested product, party size, and dates if provided.
+  * Clarify the human confirmation boundary: Syntuc Explorer does not autonomously charge payment or confirm live bookings. Instead, reservation requests are dispatched to the human-managed Syntuc Reservations Desk, who coordinate directly with local partner operators to hold dates and issue formal confirmation.
+  * Provide action: { "type": "OPEN_BOOKING", "productId": "<intended_product_id>", "productName": "<intended_product_name>", "label": "Start Reservation Request" }
+- Do NOT claim that a reservation is confirmed, a partner has accepted, or a payment has been made.
 
 SCHOOL TRIPS & INCENTIVE RULES:
 - Highlight the dedicated Educational Commercial Tariff starting from USD 15/child for accommodation.
@@ -69,12 +93,65 @@ You must respond with valid JSON strictly conforming to this schema:
     "productId": "id_if_applicable",
     "productName": "name_if_applicable",
     "destination": "explore" | "packages" | "planner" | "school-trips",
-    "label": "Clickable button text (e.g., 'Add Flight of Angels to Trip', 'Explore Curated Packages')"
+    "label": "Clickable button text"
   },
-  "requiresCoordinator": boolean (true if guest requests human contact, special group custom rates, or complex dates)
+  "requiresCoordinator": boolean
 }
 
 Output ONLY the raw JSON string with no backticks, markdown markers or preamble.`;
+}
+
+interface CachedCatalogData {
+  timestamp: number;
+  products: any[];
+  packages: any[];
+  variantsByProduct: Record<string, AuthoritativeVariant[]>;
+}
+
+let catalogCache: CachedCatalogData | null = null;
+const CACHE_TTL_MS = 60000; // 1 minute
+
+async function getGroundedCatalogData(): Promise<CachedCatalogData> {
+  const now = Date.now();
+  if (catalogCache && now - catalogCache.timestamp < CACHE_TTL_MS) {
+    return catalogCache;
+  }
+
+  try {
+    const tombstones = await getTombstones();
+    const allProducts = await getCollectionDocs<any>('products');
+    const products = allProducts.filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
+
+    const variantsByProduct: Record<string, AuthoritativeVariant[]> = {};
+    await Promise.all(
+      products.map(async (p) => {
+        const vars = await getAuthoritativeVariantsForProduct(p.id);
+        if (vars && vars.length > 0) {
+          variantsByProduct[p.id] = vars;
+        }
+      })
+    );
+
+    const allPkgs = await getCollectionDocs<any>('packages');
+    const packages = allPkgs.filter((k) => k.isPublished && !tombstones.has(`packages_${k.id}`));
+
+    catalogCache = {
+      timestamp: now,
+      products,
+      packages,
+      variantsByProduct,
+    };
+    return catalogCache;
+  } catch (err) {
+    console.error('Error fetching catalog data for assistant grounding:', err);
+    if (catalogCache) return catalogCache;
+    return {
+      timestamp: now,
+      products: [],
+      packages: [],
+      variantsByProduct: {},
+    };
+  }
 }
 
 export async function processAssistantMessage(
@@ -93,37 +170,89 @@ export async function processAssistantMessage(
     } catch (_) {}
   }
 
-  // Build live catalog summary directly from Firestore
+  // Build live catalog summary and variants directly from Firestore
   let catalogSummary = '';
   let packagesSummary = '';
+  let variantsSummary = '';
+  let currentTripSummary = 'No active trip items or dates recorded in current session.';
+
+  const { products, packages, variantsByProduct } = await getGroundedCatalogData();
+
   try {
-    const tombstones = await getTombstones();
-    const allProducts = await getCollectionDocs<any>('products');
-    const products = allProducts.filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
     catalogSummary = products
       .map(
         p =>
-          `- [${p.id}] ${p.name} (${p.productType}): US$${p.basePrice} (${p.priceBasis}), Location: ${p.location}. Duration: ${p.duration || 'N/A'}. Details: ${p.shortDescription}`
+          `- [${p.id}] ${p.name} (${p.productType}): ${p.currency || 'USD'} ${p.basePrice} (${p.priceBasis}), Location: ${p.location}. Duration: ${p.duration || 'N/A'}. Details: ${p.shortDescription}`
       )
       .join('\n');
 
-    const allPkgs = await getCollectionDocs<any>('packages');
-    const pkgs = allPkgs.filter((k) => k.isPublished && !tombstones.has(`packages_${k.id}`));
-    packagesSummary = pkgs
+    packagesSummary = packages
       .map(
         k =>
-          `- [${k.id}] ${k.name}: US$${k.pricePerPerson}/person (${k.durationDays}D/${k.durationNights}N). ${k.tagline}`
+          `- [${k.id}] ${k.name}: ${k.currency || 'USD'} ${k.pricePerPerson}/person (${k.durationDays}D/${k.durationNights}N). ${k.tagline}`
       )
       .join('\n');
+
+    variantsSummary = Object.entries(variantsByProduct)
+      .map(([prodId, vars]) => {
+        const prod = products.find(p => p.id === prodId);
+        const varLines = vars
+          .map(v => {
+            let feeStr = '';
+            if (v.compulsoryFees && v.compulsoryFees.length > 0) {
+              feeStr = ` Compulsory fees: ${v.compulsoryFees.map((f: any) => `${f.currency} ${f.amount} (${f.basis})`).join(', ')}.`;
+            }
+            return `   * [${v.id}] "${v.name}": ${v.currency} ${v.price} (${v.priceBasis}).${v.season ? ` Season: ${v.season}.` : ''}${v.mealPlan ? ` Meal plan: ${v.mealPlan}.` : ''}${feeStr}${v.description ? ` Details: ${v.description}` : ''}`;
+          })
+          .join('\n');
+        return `Product: ${prod ? prod.name : prodId}\n${varLines}`;
+      })
+      .join('\n\n');
+
+    if (tripContext) {
+      const tripParts: string[] = [];
+      if (tripContext.startDate || tripContext.endDate) {
+        tripParts.push(`Travel dates: ${tripContext.startDate || 'Unspecified'} to ${tripContext.endDate || 'Unspecified'}`);
+      }
+      if (tripContext.adultsCount !== undefined) {
+        tripParts.push(`Party: ${tripContext.adultsCount} adult(s)${tripContext.childrenCount ? `, ${tripContext.childrenCount} child(ren)` : ''}`);
+      }
+      if (tripContext.interests && tripContext.interests.length > 0) {
+        tripParts.push(`Interests: ${tripContext.interests.join(', ')}`);
+      }
+      if (tripContext.intensity) {
+        tripParts.push(`Physical intensity: ${tripContext.intensity}`);
+      }
+      if (tripContext.items && tripContext.items.length > 0) {
+        const itemsList = tripContext.items
+          .map(
+            (it: any) =>
+              `  - ${it.productName || it.productId}${it.variantName ? ` [Variant: ${it.variantName}]` : ''}${it.roomName ? ` [Room: ${it.roomName}]` : ''}${it.scheduledDate ? ` [Scheduled: ${it.scheduledDate}${it.checkOutDate ? ` to ${it.checkOutDate}` : ''}]` : ''}${it.guestCount ? ` [Guests: ${it.guestCount}]` : ''}${it.unitPrice !== null ? ` [Rate: ${it.currency || 'USD'} ${it.unitPrice} (${it.priceBasis || 'standard'})]` : ''}`
+          )
+          .join('\n');
+        tripParts.push(`Selected items in trip plan:\n${itemsList}`);
+      } else {
+        tripParts.push('Selected items in trip plan: None added yet');
+      }
+      currentTripSummary = tripParts.join('\n');
+    }
   } catch (err) {
     console.error('Error fetching catalog from Firestore for assistant grounding:', err);
   }
 
   const lowerMsg = userMessage.toLowerCase().trim();
 
-  // If Gemini API Key is missing, provide graceful intelligent fallback
+  // If Gemini API Key is missing, provide graceful intelligent fallback grounded in the real catalog
   if (!apiKey || apiKey.startsWith('MY_GEMINI_')) {
-    return getGracefulFallback(lowerMsg, userMessage, history);
+    return getGracefulFallback(
+      lowerMsg,
+      userMessage,
+      history,
+      tripContext,
+      products,
+      packages,
+      variantsByProduct
+    );
   }
 
   try {
@@ -159,7 +288,12 @@ export async function processAssistantMessage(
           model: modelName,
           contents: conversationTurns,
           config: {
-            systemInstruction: buildSystemPrompt(catalogSummary, packagesSummary),
+            systemInstruction: buildSystemPrompt(
+              catalogSummary,
+              packagesSummary,
+              variantsSummary,
+              currentTripSummary
+            ),
             temperature: 0.2,
             responseMimeType: 'application/json',
           },
@@ -193,21 +327,53 @@ export async function processAssistantMessage(
         requiresCoordinator: Boolean(parsed.requiresCoordinator),
       };
     } catch (parseErr) {
-      return getGracefulFallback(lowerMsg, userMessage, history);
+      return getGracefulFallback(
+        lowerMsg,
+        userMessage,
+        history,
+        tripContext,
+        products,
+        packages,
+        variantsByProduct
+      );
     }
   } catch (error) {
     console.error('Gemini assistant error, falling back gracefully:', error);
-    return getGracefulFallback(lowerMsg, userMessage, history);
+    return getGracefulFallback(
+      lowerMsg,
+      userMessage,
+      history,
+      tripContext,
+      products,
+      packages,
+      variantsByProduct
+    );
   }
 }
 
 function getGracefulFallback(
   lowerMsg: string,
   originalMsg: string,
-  history: { role?: string; text?: string }[] = []
+  history: { role?: string; text?: string }[] = [],
+  tripContext?: any,
+  products: any[] = [],
+  packages: any[] = [],
+  variantsByProduct: Record<string, AuthoritativeVariant[]> = {}
 ): AssistantResponse {
-  // Combine all history turns for comprehensive multi-turn understanding
-  const fullContext = history.map(h => ((h && h.text) || '').toLowerCase()).join(' ') + ' ' + lowerMsg;
+  // Combine user history turns for conversational context
+  const userHistoryTexts = history
+    .filter(h => h.role === 'user' || h.role === 'guest')
+    .map(h => (h.text || '').toLowerCase());
+  const fullUserContext = [...userHistoryTexts, lowerMsg].join(' ');
+
+  // Helper to find product from catalogue by keywords
+  const findProduct = (idOrKey: string): any => {
+    return products.find(
+      p =>
+        p.id === idOrKey ||
+        p.name.toLowerCase().includes(idOrKey.toLowerCase())
+    );
+  };
 
   // 1. Unknown product rejection (Strict non-fabrication)
   if (
@@ -215,7 +381,8 @@ function getGracefulFallback(
     lowerMsg.includes('palace hotel') ||
     lowerMsg.includes('syntuc hotel') ||
     lowerMsg.includes('fake hotel') ||
-    lowerMsg.includes('invented hotel')
+    lowerMsg.includes('invented hotel') ||
+    lowerMsg.includes('invented lodge')
   ) {
     return {
       replyText:
@@ -235,29 +402,92 @@ function getGracefulFallback(
     lowerMsg.includes('summarize my trip') ||
     lowerMsg.includes('trip so far') ||
     lowerMsg.includes('what have i told you') ||
-    lowerMsg.includes('remember')
+    lowerMsg.includes('what do you remember') ||
+    lowerMsg.includes('remember about my trip')
   ) {
     const memoryPoints: string[] = [];
-    if (fullContext.includes('3 night') || fullContext.includes('three night')) memoryPoints.push('• Duration: 3 nights stay');
-    if (fullContext.includes('wife') || fullContext.includes('two adult') || fullContext.includes('couple') || fullContext.includes('2 adult')) memoryPoints.push('• Party: 2 adults (you and your wife)');
-    if (fullContext.includes('luxury') || fullContext.includes('high end')) memoryPoints.push('• Travel Style: Luxury experience');
-    if (fullContext.includes('comfortable')) memoryPoints.push('• Travel Style: Comfortable, premium accommodation');
-    if (fullContext.includes('zambezi') || fullContext.includes('river')) memoryPoints.push('• River Preference: Time on the Zambezi River');
-    if (fullContext.includes('wildlife') || fullContext.includes('safari') || fullContext.includes('chobe')) memoryPoints.push('• Wildlife: Safari / game viewing experience');
-    if (fullContext.includes('sunset') || fullContext.includes('cruise')) memoryPoints.push('• Sunset Experience: Zambezi sunset cruise');
-    if (fullContext.includes('helicopter') || fullContext.includes('flight of angels')) memoryPoints.push('• Aerial: Scenic helicopter flight over the Falls');
-    if (fullContext.includes('physical') || fullContext.includes('low physical') || fullContext.includes('demanding') || fullContext.includes('strenuous')) memoryPoints.push('• Physical Intensity: Low exertion / relaxing pacing');
-    if (fullContext.includes('12') || fullContext.includes('november') || fullContext.includes('nov')) memoryPoints.push('• Travel Dates: 12–15 November');
-    if (fullContext.includes('1500') || fullContext.includes('1,500') || fullContext.includes('budget')) memoryPoints.push('• Budget: Approx. US$1,500');
 
-    if (memoryPoints.length === 0) {
-      memoryPoints.push('• Victoria Falls discovery journey');
-      memoryPoints.push('• Open to verified accommodations, guided rainforest tours, and Zambezi experiences');
+    // Party size: from actual tripContext or explicit user history
+    if (tripContext && (tripContext.adultsCount !== undefined || tripContext.childrenCount !== undefined)) {
+      const adults = tripContext.adultsCount || 0;
+      const children = tripContext.childrenCount || 0;
+      memoryPoints.push(`• Party Size: ${adults} adult${adults === 1 ? '' : 's'}${children > 0 ? `, ${children} child${children === 1 ? '' : 'ren'}` : ''}`);
+    } else {
+      const matchedParty = userHistoryTexts.find(t => t.includes('adult') || t.includes('couple') || t.includes('solo') || t.includes('family'));
+      if (matchedParty) {
+        if (matchedParty.includes('2 adult') || matchedParty.includes('two adult') || matchedParty.includes('couple')) {
+          memoryPoints.push('• Party Size: 2 adults');
+        } else if (matchedParty.includes('1 adult') || matchedParty.includes('one adult') || matchedParty.includes('solo')) {
+          memoryPoints.push('• Party Size: 1 adult');
+        } else {
+          memoryPoints.push('• Party Size: Mentioned in conversation');
+        }
+      } else {
+        memoryPoints.push('• Party Size: Not yet specified');
+      }
+    }
+
+    // Dates: from actual tripContext or explicitly mentioned in user history
+    if (tripContext && (tripContext.startDate || tripContext.endDate)) {
+      memoryPoints.push(`• Travel Dates: ${tripContext.startDate || 'Unspecified'} to ${tripContext.endDate || 'Unspecified'}`);
+    } else {
+      memoryPoints.push('• Travel Dates: Not yet specified');
+    }
+
+    // Budget: search ONLY for explicit budget stated by the guest in conversation
+    let extractedBudget: string | null = null;
+    for (const text of userHistoryTexts) {
+      const bMatch = text.match(/budget\s*(?:of|is|around|approx|approximately)?\s*[:$]?\s*([$0-9,]+(?:\s*(?:usd|dollars))?)/i);
+      if (bMatch) {
+        extractedBudget = bMatch[1];
+        break;
+      }
+    }
+    if (extractedBudget) {
+      memoryPoints.push(`• Budget: Approx. ${extractedBudget}`);
+    } else {
+      memoryPoints.push('• Budget: Not yet specified');
+    }
+
+    // Selected Trip Items: strictly from current trip plan items
+    if (tripContext && tripContext.items && tripContext.items.length > 0) {
+      const itemsList = tripContext.items
+        .map((it: any) => {
+          const variantStr = it.variantName ? ` — ${it.variantName}` : (it.roomName ? ` — ${it.roomName}` : '');
+          const dateStr = it.scheduledDate ? ` (Scheduled: ${it.scheduledDate}${it.checkOutDate ? ` to ${it.checkOutDate}` : ''})` : '';
+          const guestStr = it.guestCount ? ` [${it.guestCount} guest(s)]` : '';
+          const rateStr = it.unitPrice !== null ? ` [${it.currency || 'USD'} ${it.unitPrice} (${it.priceBasis || 'standard'})]` : '';
+          return `  - ${it.productName || it.productId}${variantStr}${dateStr}${guestStr}${rateStr}`;
+        })
+        .join('\n');
+      memoryPoints.push(`• Selected Trip Items (in your trip plan):\n${itemsList}`);
+    } else {
+      memoryPoints.push('• Selected Trip Items: None added to trip plan yet');
+    }
+
+    // Tentative Interests & Style
+    const tentativeInterests: string[] = [];
+    if (tripContext && tripContext.interests && tripContext.interests.length > 0) {
+      tentativeInterests.push(...tripContext.interests);
+    }
+    if (tripContext && tripContext.intensity) {
+      tentativeInterests.push(`Physical intensity: ${tripContext.intensity}`);
+    }
+    // Check if user conversation mentions specific styles or interests
+    if (fullUserContext.includes('luxury')) tentativeInterests.push('Luxury travel style');
+    if (fullUserContext.includes('wildlife') || fullUserContext.includes('safari')) tentativeInterests.push('Wildlife / safari');
+    if (fullUserContext.includes('river') || fullUserContext.includes('zambezi')) tentativeInterests.push('River experiences');
+
+    const uniqueInterests = Array.from(new Set(tentativeInterests));
+    if (uniqueInterests.length > 0) {
+      memoryPoints.push(`• Tentative Interests / Travel Style: ${uniqueInterests.join(', ')}`);
+    } else {
+      memoryPoints.push('• Tentative Interests: Not yet specified');
     }
 
     return {
       replyText:
-        `Here is what I have recorded for your trip so far based on our conversation:\n\n${memoryPoints.join('\n')}\n\nAll of your preferences are active in our itinerary context. Would you like me to refine specific product selections or prepare a formal reservation request for the Reservations Desk?`,
+        `Here is what I have recorded for your trip based on your actual trip plan and our conversation:\n\n${memoryPoints.join('\n')}\n\nAll details are grounded in your current session. Would you like to adjust dates, browse catalog experiences, or proceed to submit a reservation request?`,
       action: {
         type: 'NAVIGATE',
         destination: 'planner',
@@ -267,14 +497,31 @@ function getGracefulFallback(
     };
   }
 
-  // 3. Helicopter Comparison (Direct side-by-side)
+  // 3. Helicopter Comparison & Ambiguity Handling
+  const flightOfAngels = findProduct('prod_flight_of_angels') || {
+    id: 'prod_flight_of_angels',
+    name: 'Flight of Angels — Scenic Helicopter Tour',
+    basePrice: 173,
+    currency: 'USD',
+    priceBasis: 'per_person',
+    duration: '12 minutes',
+  };
+  const extendedFlight = findProduct('prod_zambezi_extended_flight') || {
+    id: 'prod_zambezi_extended_flight',
+    name: 'Zambezi Gorge & Falls Extended Flight',
+    basePrice: 328,
+    currency: 'USD',
+    priceBasis: 'per_person',
+    duration: '25 minutes',
+  };
+
   if (
     lowerMsg.includes('compare') &&
-    (lowerMsg.includes('helicopter') || lowerMsg.includes('flight') || lowerMsg.includes('options') || lowerMsg.includes('chopper'))
+    (lowerMsg.includes('helicopter') || lowerMsg.includes('flight') || lowerMsg.includes('chopper') || lowerMsg.includes('heli'))
   ) {
     return {
       replyText:
-        'Here is the authoritative side-by-side comparison of our two scenic helicopter flights over Victoria Falls:\n\n1. **Flight of Angels — Scenic Helicopter Tour**:\n   • Duration: 12 minutes\n   • Tariff: ~US$173 per person\n   • Route: Continuous orbital loops directly over the 1,708-metre curtain of Victoria Falls and the roaring spray, offering premier aerial photography.\n\n2. **Zambezi Gorge & Falls Extended Flight**:\n   • Duration: 25 minutes\n   • Tariff: ~US$328 per person\n   • Route: Covers the Falls in full, plus extended low-level flying downstream through the jagged Batoka Gorge and upstream over pristine Zambezi National Park wildlife plains.\n\nBoth flights depart from the Victoria Falls Heliport with courtesy hotel transfers included. If you want maximum Falls photo focus, the 12-minute Flight of Angels is ideal; for wilderness and gorge geology, the 25-minute extended flight is unparalleled.',
+        `Here is the authoritative side-by-side comparison of our two scenic helicopter flights over Victoria Falls:\n\n1. **${flightOfAngels.name}**:\n   • Duration: 12 minutes\n   • Tariff: ${flightOfAngels.currency} ${flightOfAngels.basePrice} per person\n   • Route: Continuous orbital loops directly over the 1,708-metre curtain of Victoria Falls and the roaring spray, offering premier aerial photography.\n\n2. **${extendedFlight.name}**:\n   • Duration: 25 minutes\n   • Tariff: ${extendedFlight.currency} ${extendedFlight.basePrice} per person\n   • Route: Covers the Falls in full, plus extended low-level flying downstream through the jagged Batoka Gorge and upstream over pristine Zambezi National Park wildlife plains.\n\nBoth flights depart from the Victoria Falls Heliport with courtesy hotel transfers included. If you want maximum Falls photo focus, the 12-minute Flight of Angels is ideal; for wilderness and gorge geology, the 25-minute extended flight is unparalleled.`,
       action: {
         type: 'NAVIGATE',
         destination: 'explore',
@@ -284,20 +531,19 @@ function getGracefulFallback(
     };
   }
 
-  // 4. Helicopter Ambiguity (Clarification required)
   if (
-    (lowerMsg.includes('helicopter') || lowerMsg.includes('chopper') || lowerMsg === 'tell me about the helicopter flight' || lowerMsg.includes('heli flight')) &&
+    (lowerMsg.includes('helicopter') || lowerMsg.includes('chopper') || lowerMsg.includes('heli flight') || lowerMsg === 'tell me about the helicopter flight') &&
     !lowerMsg.includes('12') &&
     !lowerMsg.includes('25') &&
     !lowerMsg.includes('angels') &&
     !lowerMsg.includes('extended') &&
     !lowerMsg.includes('gorge') &&
-    !lowerMsg.includes('shorter') &&
-    !lowerMsg.includes('longer')
+    !lowerMsg.includes('book') &&
+    !lowerMsg.includes('reserve')
   ) {
     return {
       replyText:
-        'We offer two distinct scenic helicopter flights over Victoria Falls! Would you prefer the classic 12-minute **Flight of Angels** (approx US$173/person) focusing directly on the Falls and spray, or the 25-minute **Zambezi Gorge & Falls Extended Flight** (approx US$328/person) which also sweeps through the deep Batoka Gorge and Zambezi National Park wildlife plains?',
+        `We offer two distinct scenic helicopter flights over Victoria Falls in our authoritative catalogue! Would you prefer the classic 12-minute **${flightOfAngels.name}** (${flightOfAngels.currency} ${flightOfAngels.basePrice}/person) focusing directly on the Falls and spray, or the 25-minute **${extendedFlight.name}** (${extendedFlight.currency} ${extendedFlight.basePrice}/person) which also sweeps through the deep Batoka Gorge and Zambezi National Park wildlife plains?`,
       action: {
         type: 'NAVIGATE',
         destination: 'explore',
@@ -307,79 +553,212 @@ function getGracefulFallback(
     };
   }
 
-  // 5. Reservation confirmation boundary ("Book and confirm", "Confirm my booking", "Charge my card")
-  if (
-    lowerMsg.includes('confirm') &&
-    (lowerMsg.includes('book') || lowerMsg.includes('reserve') || lowerMsg.includes('payment') || lowerMsg.includes('card') || lowerMsg.includes('charge') || lowerMsg.includes('now'))
-  ) {
+  // 4. Product-Specific Booking Intent & Human-Confirmation Boundary
+  const isBookingIntent =
+    lowerMsg.includes('book') ||
+    lowerMsg.includes('reserve') ||
+    lowerMsg.includes('reservation') ||
+    lowerMsg.includes('confirm') ||
+    lowerMsg.includes('hold a room') ||
+    lowerMsg.includes('charge my card') ||
+    lowerMsg.includes('make a booking');
+
+  if (isBookingIntent) {
+    // Determine intended product:
+    // A. Check if user specified a product in the current message or immediate context
+    let intendedProduct: any = null;
+    let isAmbiguousHelicopter = false;
+
+    if (lowerMsg.includes('flight of angels') || lowerMsg.includes('12-minute') || lowerMsg.includes('12 min')) {
+      intendedProduct = flightOfAngels;
+    } else if (lowerMsg.includes('extended flight') || lowerMsg.includes('25-minute') || lowerMsg.includes('25 min') || lowerMsg.includes('gorge flight')) {
+      intendedProduct = extendedFlight;
+    } else if (lowerMsg.includes('helicopter') || lowerMsg.includes('chopper')) {
+      isAmbiguousHelicopter = true;
+    } else if (lowerMsg.includes('sunset cruise') || lowerMsg.includes('zambezi explorer') || lowerMsg.includes('sunset') || lowerMsg.includes('catamaran')) {
+      intendedProduct = findProduct('prod_zambezi_explorer_cruise');
+    } else if (lowerMsg.includes('white water') || lowerMsg.includes('rafting')) {
+      intendedProduct = findProduct('prod_white_water_rafting');
+    } else if (lowerMsg.includes('old drift')) {
+      intendedProduct = findProduct('prod_olddrift');
+    } else if (lowerMsg.includes('elephant camp')) {
+      intendedProduct = findProduct('prod_elephantcamp');
+    } else if (lowerMsg.includes('rainbow')) {
+      intendedProduct = findProduct('prod_rainbow');
+    } else if (lowerMsg.includes('a\'zambezi') || lowerMsg.includes('azambezi')) {
+      intendedProduct = findProduct('prod_azambezi');
+    } else if (lowerMsg.includes('explorers village') || lowerMsg.includes('explorers')) {
+      intendedProduct = findProduct('prod_explorers');
+    } else if (lowerMsg.includes('boma')) {
+      intendedProduct = findProduct('prod_boma_dinner');
+    } else if (lowerMsg.includes('chobe')) {
+      intendedProduct = findProduct('prod_chobe_safari');
+    } else if (lowerMsg.includes('bridge')) {
+      intendedProduct = findProduct('prod_bridge_adventures');
+    } else if (lowerMsg.includes('rainforest') || lowerMsg.includes('walking tour')) {
+      intendedProduct = findProduct('prod_rainforest_walk');
+    } else if (lowerMsg.includes('simunye')) {
+      intendedProduct = findProduct('prod_simunye_theatre');
+    }
+
+    if (isAmbiguousHelicopter) {
+      return {
+        replyText:
+          `Which helicopter tour would you like to reserve: the 12-minute **${flightOfAngels.name}** (${flightOfAngels.currency} ${flightOfAngels.basePrice}/person) or the 25-minute **${extendedFlight.name}** (${extendedFlight.currency} ${extendedFlight.basePrice}/person)?`,
+        action: {
+          type: 'NAVIGATE',
+          destination: 'explore',
+          label: 'Compare Helicopter Flights in Catalog',
+        },
+        requiresCoordinator: false,
+      };
+    }
+
+    // B. If no product was named in message, check tripContext items
+    if (!intendedProduct) {
+      if (tripContext && tripContext.items && tripContext.items.length === 1) {
+        // Single item in trip plan - clear intent
+        const singleItem = tripContext.items[0];
+        intendedProduct = findProduct(singleItem.productId) || {
+          id: singleItem.productId,
+          name: singleItem.productName || 'Selected Experience',
+        };
+      } else if (tripContext && tripContext.items && tripContext.items.length > 1) {
+        // Multiple items in trip plan - ambiguous intent, ask concise clarification question
+        const itemNames = tripContext.items.map((i: any) => i.productName || i.productId).join(', ');
+        return {
+          replyText:
+            `You currently have multiple items in your trip plan (${itemNames}). Which specific experience would you like to reserve, or would you like to submit a reservation request for your entire trip?`,
+          action: {
+            type: 'OPEN_BOOKING',
+            label: 'Review Trip & Start Reservation Request',
+          },
+          requiresCoordinator: false,
+        };
+      } else {
+        // No items in trip plan and no product named - ask concise clarification question
+        return {
+          replyText:
+            'Which accommodation or activity from our verified Victoria Falls catalogue would you like to reserve? Please let me know the experience name.',
+          action: {
+            type: 'NAVIGATE',
+            destination: 'explore',
+            label: 'Browse Verified Experiences',
+          },
+          requiresCoordinator: false,
+        };
+      }
+    }
+
+    // C. Product is clearly identified -> explain human review and partner confirmation boundary
+    const operatorName = intendedProduct.operatorName || 'our local partner operator';
     return {
       replyText:
-        'To ensure complete accuracy and guarantee actual partner room and departure holds, Syntuc Explorer does not autonomously charge payment or instant-confirm bookings. Instead, when you submit your reservation request, it is immediately reviewed by our human-managed Syntuc Reservations Desk. Our coordinators contact our verified local operators (such as Pure Africa Experiences and Shearwater) directly to secure your dates and issue your official confirmation without upfront payment.',
+        `To ensure confirmed partner holds without charging upfront, Syntuc Explorer does not autonomously charge payment or instantly confirm bookings. When you submit your reservation request for ${intendedProduct.name}, our human-managed Syntuc Reservations Desk reviews the details and coordinates directly with ${operatorName} to secure your dates and issue formal confirmation. Would you like to start your reservation request now?`,
       action: {
         type: 'OPEN_BOOKING',
+        productId: intendedProduct.id,
+        productName: intendedProduct.name,
+        label: `Start Reservation Request for ${intendedProduct.name}`,
+      },
+      requiresCoordinator: false,
+    };
+  }
+
+  // 5. Product Details & Authoritative Variant Inquiries
+  if (lowerMsg.includes('old drift')) {
+    const oldDrift = findProduct('prod_olddrift');
+    const vars = variantsByProduct['prod_olddrift'] || [];
+    const varText = vars.length > 0
+      ? vars.map(v => `• ${v.name}: ${v.currency} ${v.price} (${v.priceBasis === 'per_person_sharing_night' ? 'per person sharing per night' : v.priceBasis})`).join('\n')
+      : '• Green Season: USD 835 pppn\n• Mid Season: USD 1,042 pppn\n• High Season: USD 1,087 pppn';
+    return {
+      replyText:
+        `Old Drift Lodge is an ultra-luxury tented lodge nestled in Zambezi National Park along the Zambezi River. Published authoritative 2026 rates (Fully Inclusive of all meals, local drinks, game drives and river safaris):\n\n${varText}\n\nCompulsory fee: USD 50 Conservation & Community Levy per person per night. The applicable rate depends on your travel dates. Would you like to view Old Drift Lodge details or check dates?`,
+      action: {
+        type: 'OPEN_PRODUCT',
+        productId: 'prod_olddrift',
+        productName: 'Old Drift Lodge',
+        label: 'View Old Drift Lodge Details',
+      },
+      requiresCoordinator: false,
+    };
+  }
+
+  if (lowerMsg.includes('elephant camp')) {
+    const vars = variantsByProduct['prod_elephantcamp'] || [];
+    const varText = vars.length > 0
+      ? vars.map(v => `• ${v.name}: ${v.currency} ${v.price} (${v.priceBasis === 'per_person_sharing_night' ? 'per person sharing/night' : v.priceBasis === 'per_single_room_night' ? 'per single room/night' : v.priceBasis})`).join('\n')
+      : '• Green Season: USD 835 pppn (sharing) / USD 835 (single)\n• Mid Season: USD 1,042 pppn (sharing) / USD 1,564 (single)\n• High Season: USD 1,087 pppn (sharing) / USD 1,632 (single)';
+    return {
+      replyText:
+        `The Elephant Camp is a luxury tented sanctuary situated on a private concession overlooking Victoria Falls spray and the Batoka Gorge. Published authoritative 2026 rates (Fully Inclusive):\n\n${varText}\n\nCompulsory fee: USD 50 Conservation & Community Levy per person per night. Would you like to view The Elephant Camp?`,
+      action: {
+        type: 'OPEN_PRODUCT',
+        productId: 'prod_elephantcamp',
+        productName: 'The Elephant Camp',
+        label: 'View The Elephant Camp Details',
+      },
+      requiresCoordinator: false,
+    };
+  }
+
+  if (lowerMsg.includes('explorers village') || (lowerMsg.includes('explorers') && lowerMsg.includes('village'))) {
+    const vars = variantsByProduct['prod_explorers'] || [];
+    const varText = vars.length > 0
+      ? vars.map(v => `• ${v.name}: ${v.currency} ${v.price} (${v.priceBasis === 'per_person_sharing_night' ? 'per person sharing/night' : v.priceBasis === 'per_single_room_night' ? 'per single room/night' : v.priceBasis})`).join('\n')
+      : '• Standard Garden Chalet: USD 110 pppn (sharing) / USD 176 (single)\n• Deluxe Village Suite: USD 137 pppn (sharing) / USD 218 (single)';
+    return {
+      replyText:
+        `Shearwater Explorers Village offers vibrant lodge accommodation just 400 metres from Victoria Falls. Official 2026 contracted rates (Bed & Breakfast included):\n\n${varText}\n\nAll chalets are air-conditioned and ensuite. Would you like to view room options?`,
+      action: {
+        type: 'OPEN_PRODUCT',
+        productId: 'prod_explorers',
+        productName: 'Shearwater Explorers Village',
+        label: 'View Explorers Village Rooms',
+      },
+      requiresCoordinator: false,
+    };
+  }
+
+  if (lowerMsg.includes('sunset cruise') || lowerMsg.includes('zambezi explorer') || lowerMsg.includes('catamaran')) {
+    const cruise = findProduct('prod_zambezi_explorer_cruise');
+    const vars = variantsByProduct['prod_zambezi_explorer_cruise'] || [];
+    const varText = vars.length > 0
+      ? vars.map(v => `• ${v.name}: ${v.currency} ${v.price} per person (+ USD 12 National Parks River Conservation Fee)`).join('\n')
+      : '• Luxury Deck: USD 69 per person (+ USD 12 National Parks fee)\n• Signature Deck (VIP): USD 110 per person (+ USD 12 National Parks fee)';
+    return {
+      replyText:
+        `The Zambezi Explorer Luxury Sunset Cruise by Pure Africa Experiences glides along the tranquil upper Zambezi River with all-inclusive bar and handcrafted canapés. Published authoritative deck rates:\n\n${varText}\n\nBoth decks offer 2-hour sunset cruises with hotel transfers included. Would you like to view the cruise details?`,
+      action: {
+        type: 'OPEN_PRODUCT',
         productId: 'prod_zambezi_explorer_cruise',
         productName: 'Zambezi Explorer Luxury Sunset Cruise',
-        label: 'Submit Request to Reservations Desk',
-      },
-      requiresCoordinator: true,
-    };
-  }
-
-  // 6. Sunset Cruise reservation intent
-  if (
-    (lowerMsg.includes('book') || lowerMsg.includes('reserve') || lowerMsg.includes('request') || lowerMsg.includes('want to take')) &&
-    (lowerMsg.includes('sunset cruise') || lowerMsg.includes('zambezi cruise') || lowerMsg.includes('sunset') || lowerMsg.includes('zambezi explorer'))
-  ) {
-    return {
-      replyText:
-        'The Zambezi Explorer Luxury Sunset Cruise is an unforgettable way to experience the river! For two adults tomorrow evening, you can submit a formal reservation request. Our Syntuc Reservations Desk will contact Pure Africa Experiences to hold your seats on the luxury catamaran and issue your confirmation. No upfront payment is required to submit.',
-      action: {
-        type: 'OPEN_BOOKING',
-        productId: 'prod_zambezi_explorer_cruise',
-        productName: 'Zambezi Explorer Luxury Sunset Cruise',
-        label: 'Request Sunset Cruise Reservation',
+        label: 'View Sunset Cruise Details',
       },
       requiresCoordinator: false,
     };
   }
 
-  // 7. Addition of dates & budget (Incremental constraint retention)
-  if (
-    (lowerMsg.includes('12') || lowerMsg.includes('november') || lowerMsg.includes('nov') || lowerMsg.includes('dates')) &&
-    (lowerMsg.includes('1500') || lowerMsg.includes('1,500') || lowerMsg.includes('budget') || lowerMsg.includes('dollar'))
-  ) {
+  if (lowerMsg.includes('rafting') || lowerMsg.includes('white water')) {
+    const vars = variantsByProduct['prod_white_water_rafting'] || [];
+    const varText = vars.length > 0
+      ? vars.map(v => `• ${v.name}: ${v.currency} ${v.price} per person (+ USD 12 National Parks River Conservation Fee)`).join('\n')
+      : '• High Water Rafting (Jan–Jul): USD 161 per person (+ USD 12 National Parks fee)\n• Low Water Rafting (Jul–Dec): USD 173 per person (+ USD 12 National Parks fee)';
     return {
       replyText:
-        'Thank you for providing your dates (12–15 November) and budget (~$1,500 for two adults)! November is a warm, dramatic time at the Falls with excellent wildlife viewing. With $1,500, a wonderful combination is 3 nights at A\'Zambezi River Lodge or Rainbow Hotel (~$180/night = $540), paired with the Zambezi Explorer Luxury Sunset Cruise ($92/person = $184), the classic Flight of Angels helicopter tour ($173/person = $346), and the guided Rainforest walking tour ($30/person = $60), totaling approximately $1,130—leaving ample room for dining and park fees.',
+        `Shearwater Batoka Gorge White Water Rafting offers world-renowned Grade 5 rapids beneath Victoria Falls. Published authoritative season variants:\n\n${varText}\n\nIncludes safety briefing, equipment, riverside lunch, and hotel transfers. Rapid sections and water levels are confirmed on day of departure by Shearwater based on river conditions.`,
       action: {
-        type: 'NAVIGATE',
-        destination: 'planner',
-        label: 'Customize Trip with Dates & Budget',
+        type: 'OPEN_PRODUCT',
+        productId: 'prod_white_water_rafting',
+        productName: 'Batoka Gorge White Water Rafting',
+        label: 'View White Water Rafting Details',
       },
       requiresCoordinator: false,
     };
   }
 
-  // 8. Accumulated multi-turn constraints (3 nights, luxury / comfortable, wildlife, sunset, low physical demand)
-  if (
-    (fullContext.includes('3 night') || fullContext.includes('three night')) &&
-    (fullContext.includes('wildlife') || fullContext.includes('safari')) &&
-    (fullContext.includes('sunset') || fullContext.includes('cruise')) &&
-    (fullContext.includes('physical') || fullContext.includes('comfortable') || fullContext.includes('luxury') || fullContext.includes('demanding') || fullContext.includes('relax'))
-  ) {
-    return {
-      replyText:
-        'Here is an ideal 3-night itinerary synthesizing all your accumulated preferences (two adults, comfortable luxury, wildlife, sunset, low physical demand):\n\n• Accommodation: A\'Zambezi River Lodge (comfortable 4-star riverfront setting on the banks of the Zambezi) or Old Drift Lodge.\n• Aerial Adventure (Zero Exertion): Flight of Angels Scenic Helicopter Tour (12 minutes of breathtaking panoramic viewing over Victoria Falls with courtesy transfers).\n• Wildlife: Chobe National Park Full-Day Safari (guided 4x4 game drives and river safari in Botswana) or Elephant Interaction Sanctuary.\n• Sunset Experience: Zambezi Explorer Luxury Sunset Cruise (relaxing luxury catamaran cruise on the tranquil upper Zambezi with handcrafted canapés and drinks).\n\nAll items are verified in our authoritative catalog and feature gentle pacing with zero strenuous hiking.',
-      action: {
-        type: 'NAVIGATE',
-        destination: 'planner',
-        label: 'View Customized Itinerary in Planner',
-      },
-      requiresCoordinator: false,
-    };
-  }
-
-  // 9. Educational School Trip Intelligence
+  // 6. Educational School Trips
   if (
     lowerMsg.includes('school') ||
     lowerMsg.includes('student') ||
@@ -389,31 +768,27 @@ function getGracefulFallback(
   ) {
     return {
       replyText:
-        'We offer dedicated educational commercial tariffs for school delegations! Verified accommodation begins from USD 15/student per night at budget lodges (Khulula, Teak, Reynard, Letsatsi) and USD 25 for teachers, or USD 130 per room at the Rainbow Hotel. Under our official incentive rules, school groups receive a complimentary ($0) 1905 Historic Bridge Tour when booking 2+ nights accommodation AND at least 2 qualifying priority activities (such as quad biking, educational helicopter flight, or elephant interaction).',
+        'We offer dedicated educational commercial tariffs for school delegations! Verified accommodation begins from USD 15/student per night at budget partner lodges (Khulula, Teak, Reynard, Letsatsi) and USD 25 for teachers, or USD 130 per room at the Rainbow Hotel. Under official incentive rules, school groups receive a complimentary ($0) 1905 Historic Bridge Tour when booking 2+ nights accommodation AND at least 2 qualifying priority activities (such as quad biking, educational helicopter flight, or elephant interaction). Standard Zambezi Boat Cruise is not a qualifying priority activity.',
       action: {
         type: 'NAVIGATE',
         destination: 'school-trips',
-        label: 'Open School Trip Commercial Planner',
+        label: 'Open School Trip Planner',
       },
       requiresCoordinator: false,
     };
   }
 
-  // 10. General / Realistic Victoria Falls trip recommendation
+  // 7. General Recommendations & Itineraries
   if (
     lowerMsg.includes('recommend') ||
     lowerMsg.includes('itinerary') ||
     lowerMsg.includes('plan') ||
-    lowerMsg.includes('trip') ||
     lowerMsg.includes('suggest') ||
-    lowerMsg.includes('what to do') ||
-    lowerMsg.includes('3 days') ||
-    lowerMsg.includes('3 day') ||
-    lowerMsg.includes('three day')
+    lowerMsg.includes('what to do')
   ) {
     return {
       replyText:
-        'Here is an authoritative, realistic 3-day itinerary for Victoria Falls:\n\n• Day 1: Arrive and check into your riverfront lodge (e.g. A\'Zambezi River Lodge). In the afternoon, enjoy a guided Victoria Falls Rainforest Walking Tour to see the roaring cataract and David Livingstone statue, followed by the Zambezi Explorer Luxury Sunset Cruise on the upper river.\n• Day 2: Morning Flight of Angels Scenic Helicopter Tour (12 minutes) for breathtaking aerial views. In the afternoon, embark on an Elephant Interaction Sanctuary visit or Batoka Gorge excursion, followed by dinner at The Boma.\n• Day 3: Full-Day Chobe National Park Safari (Botswana river & game drive) or morning craft market cultural tour before departure.\n\nWould you like me to customize this itinerary to your specific dates or party size?',
+        'Here is an authoritative, realistic 3-day itinerary for Victoria Falls based on our verified catalogue:\n\n• Day 1: Arrive and check into your riverfront lodge (e.g. A\'Zambezi River Lodge). In the afternoon, enjoy a guided Victoria Falls Rainforest Walking Tour to see the roaring cataract, followed by the Zambezi Explorer Luxury Sunset Cruise on the upper river.\n• Day 2: Morning Flight of Angels Scenic Helicopter Tour (12 minutes) for breathtaking aerial views. In the afternoon, explore the Batoka Gorge or elephant sanctuary, followed by dinner at The Boma.\n• Day 3: Full-Day Chobe National Park Safari (Botswana river & game drive) or local cultural touring before departure.\n\nAll items are coordinated with verified local operators. Would you like to explore curated packages or customize your trip plan?',
       action: {
         type: 'NAVIGATE',
         destination: 'packages',
@@ -423,11 +798,17 @@ function getGracefulFallback(
     };
   }
 
-  // General Accommodations
-  if (lowerMsg.includes('stay') || lowerMsg.includes('hotel') || lowerMsg.includes('lodge') || lowerMsg.includes('accommodation') || lowerMsg.includes('room')) {
+  // 8. General Accommodations
+  if (
+    lowerMsg.includes('stay') ||
+    lowerMsg.includes('hotel') ||
+    lowerMsg.includes('lodge') ||
+    lowerMsg.includes('accommodation') ||
+    lowerMsg.includes('room')
+  ) {
     return {
       replyText:
-        'Victoria Falls features exceptional verified accommodations to match every style:\n\n• Riverfront: A\'Zambezi River Lodge (direct Zambezi frontage, wildlife on grounds).\n• Panoramic: Victoria Falls Rainbow Hotel (close to town with rooftop spray views).\n• Adventure Hub: Shearwater Explorers Village (vibrant chalets and camping).\n• Ultra-Luxury Tented: Old Drift Lodge & The Elephant Camp (national park wilderness with private plunge pools).\n\nWhich setting would you prefer for your stay?',
+        'Victoria Falls features exceptional verified accommodations to match every style:\n\n• Riverfront: A\'Zambezi River Lodge (direct Zambezi frontage, wildlife on grounds).\n• Town & Spray Views: Victoria Falls Rainbow Hotel (close to town with rooftop panorama).\n• Adventure Hub: Shearwater Explorers Village (vibrant chalets and village suites).\n• Ultra-Luxury Tented: Old Drift Lodge & The Elephant Camp (national park wilderness with private plunge pools).\n\nWhich setting would you prefer for your stay?',
       action: {
         type: 'NAVIGATE',
         destination: 'explore',
@@ -437,8 +818,14 @@ function getGracefulFallback(
     };
   }
 
-  // General Activities
-  if (lowerMsg.includes('activity') || lowerMsg.includes('activities') || lowerMsg.includes('adventure') || lowerMsg.includes('cruise') || lowerMsg.includes('tour')) {
+  // 9. General Activities
+  if (
+    lowerMsg.includes('activity') ||
+    lowerMsg.includes('activities') ||
+    lowerMsg.includes('adventure') ||
+    lowerMsg.includes('cruise') ||
+    lowerMsg.includes('tour')
+  ) {
     return {
       replyText:
         'Our authoritative catalog includes world-renowned Victoria Falls experiences:\n\n• Flight of Angels Scenic Helicopter Tour (12 or 25 minutes)\n• Zambezi Explorer Luxury Sunset Cruise\n• Guided Victoria Falls Rainforest Walking Tour\n• Chobe National Park Full-Day Safari\n• The Boma — Dinner & Drum Show\n• 1905 Historic Bridge Tour\n\nAll activities are coordinated directly with verified licensed operators.',
@@ -451,6 +838,7 @@ function getGracefulFallback(
     };
   }
 
+  // Default welcome response
   return {
     replyText:
       'Victoria Falls, known locally as Mosi-oa-Tunya ("The Smoke That Thunders"), is one of the world\'s seven natural wonders. As your Syntuc Explorer guide, I can recommend verified river lodges, schedule iconic helicopter flights and sunset cruises, or structure educational school trips. How may I assist your journey today?',

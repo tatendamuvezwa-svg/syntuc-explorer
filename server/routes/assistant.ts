@@ -18,7 +18,7 @@ router.post('/chat', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Assistant route error:', error);
     res.status(500).json({
-      replyText: 'I am here to help you discover Victoria Falls. Please let me know which experiences interest you.',
+      replyText: 'I am unable to retrieve verified catalogue details right now. Please try your request again in a moment.',
       action: null,
       requiresCoordinator: false,
     });

@@ -114,10 +114,43 @@ export const SyntucAssistantWidget: React.FC = () => {
     try {
       // Build rich conversation history for multi-turn context
       const history = messages.slice(-15).map(m => ({ role: m.role, text: m.text }));
+      const tripContext = tripPlan
+        ? {
+            tripPlanId: tripPlan.id,
+            title: tripPlan.title,
+            startDate: tripPlan.startDate,
+            endDate: tripPlan.endDate,
+            adultsCount: tripPlan.adultsCount,
+            childrenCount: tripPlan.childrenCount,
+            interests: tripPlan.interests || [],
+            intensity: tripPlan.intensity || null,
+            itemsCount: tripPlan.items?.length || 0,
+            items: (tripPlan.items || []).map(item => ({
+              id: item.id,
+              productId: item.productId,
+              productName: item.product?.name || item.productId,
+              productType: item.product?.productType || null,
+              roomId: item.roomId || null,
+              roomName: item.room?.name || null,
+              variantId: item.variantId || null,
+              variantName: item.variant?.name || null,
+              scheduledDate: item.scheduledDate || null,
+              checkOutDate: item.checkOutDate || null,
+              scheduledTime: item.scheduledTime || null,
+              guestCount: item.guestCount,
+              notes: item.notes || null,
+              priceBasis: item.variant?.priceBasis || item.product?.priceBasis || null,
+              unitPrice: item.variant?.price ?? item.product?.basePrice ?? null,
+              currency: item.variant?.currency || item.product?.currency || 'USD',
+              compulsoryFees: item.variant?.compulsoryFees || (item.product as any)?.compulsoryFees || [],
+            })),
+          }
+        : null;
+
       const response: AssistantResponse = await api.sendAssistantChat(
         message.trim(),
         history,
-        tripPlan ? { itemsCount: tripPlan.items.length, adults: tripPlan.adultsCount } : null
+        tripContext
       );
 
       setMessages(prev => [
@@ -136,7 +169,7 @@ export const SyntucAssistantWidget: React.FC = () => {
         {
           role: 'assistant',
           text:
-            'Victoria Falls offers extraordinary sights including guided rainforest walks, 12-minute or 25-minute helicopter flights, and luxury sunset cruises. How can I help you explore?',
+            'I am currently unable to retrieve a verified answer from the destination catalogue. Please check your connection and try asking again, or browse our verified accommodations and activities directly.',
           action: null,
         },
       ]);
