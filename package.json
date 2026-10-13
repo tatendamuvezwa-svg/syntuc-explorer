@@ -10,7 +10,8 @@
     "start": "NODE_ENV=production tsx server.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:security": "tsx server/tests/r2-security.ts"
+    "test:security": "tsx server/tests/r2-security.ts",
+    "test:reservation-deletion": "tsx server/tests/reservation-deletion-unit.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
