@@ -396,8 +396,8 @@ export const CONFIRMED_PRODUCT_VARIANTS: Record<string, AuthoritativeVariant[]> 
     {
       id: 'var_cruise_luxury_deck',
       productId: 'prod_zambezi_explorer_cruise',
-      name: 'Luxury Deck (Lower & Mid Decks)',
-      description: 'Expansive open-air deck with lounge seating, all-inclusive house bar and handcrafted canapés.',
+      name: 'Sunset Cruise — Luxury Deck (Decks 1 & 2)',
+      description: 'Zambezi Explorer Decks 1 and 2. Summer 16:30–18:30; winter 16:00–18:00. Transfers, canapés and beverages. Capacity 2–116 guests.',
       price: 69,
       priceDelta: '-6',
       currency: 'USD',
@@ -414,7 +414,7 @@ export const CONFIRMED_PRODUCT_VARIANTS: Record<string, AuthoritativeVariant[]> 
       ],
       isActive: true,
       evidenceStatus: 'ESTABLISHED',
-      supplierNote: 'Pure Africa contracted rate: US$69 adult base fare + US$12 National Parks fee (US$81 total).',
+      supplierNote: 'Official Pure Africa 2026 leaflet: US$69 base fare plus US$12 National Park fee per person.',
     },
     {
       id: 'var_cruise_signature_deck',
@@ -437,7 +437,7 @@ export const CONFIRMED_PRODUCT_VARIANTS: Record<string, AuthoritativeVariant[]> 
       ],
       isActive: true,
       evidenceStatus: 'ESTABLISHED',
-      supplierNote: 'Pure Africa contracted rate: US$110 adult base fare + US$12 National Parks fee (US$122 total).',
+      supplierNote: 'Official Pure Africa 2026 leaflet: US$110 base fare plus US$12 National Park fee per person.',
     },
   ],
 
