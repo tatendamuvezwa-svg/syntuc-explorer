@@ -92,6 +92,7 @@ router.post('/campaigns', requireCoordinatorAuth, async (req: AuthenticatedStaff
     const destination = safeText(req.body?.destination, 1000);
     const caption = safeText(req.body?.caption, 2200);
     const hook = safeText(req.body?.hook, 250);
+    const callToAction = safeText(req.body?.callToAction, 250);
     const creativeId = safeText(req.body?.creativeId, 100) || null;
     const hashtags = Array.isArray(req.body?.hashtags) ? req.body.hashtags.map((v: unknown) => safeText(v, 80)).filter(Boolean).slice(0, 10) : [];
     if (!title || !destination || !caption) { res.status(400).json({ error: 'TITLE_DESTINATION_CAPTION_REQUIRED' }); return; }
@@ -104,7 +105,7 @@ router.post('/campaigns', requireCoordinatorAuth, async (req: AuthenticatedStaff
     const record = {
       ...(existing || {}),
       id, title, platform: 'tiktok', campaignType: 'organic', status: existing?.status || 'DRAFT',
-      destination: target.toString(), caption, hook, hashtags, creativeId,
+      destination: target.toString(), caption, hook, callToAction, hashtags, creativeId,
       utmCampaign, clickCount: Number(existing?.clickCount) || 0,
       createdAt: existing?.createdAt || now(), updatedAt: now(),
       createdBy: existing?.createdBy || staffId(req), updatedBy: staffId(req),
