@@ -171,11 +171,6 @@ export const operatorCatalogImport: OperatorCatalogImportItem[] = [
     sourceReference: pa,
     verificationNotes: ['Use the latest Pure Africa catalog rate; confirm exact product title, duration and inclusions against the catalog.'],
   }),
-  product('Pure Africa', 'Pure Africa Sunset Luxury Cruise', 'river-cruises', 69, {
-    authoritativeOverride: true,
-    sourceReference: pa,
-    verificationNotes: ['Keep distinct from Sunset Signature; confirm product title and inclusions from the latest catalog.'],
-  }),
   product('Pure Africa', 'Pure Africa Sunset Signature Cruise', 'river-cruises', 110, {
     authoritativeOverride: true,
     sourceReference: pa,
