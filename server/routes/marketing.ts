@@ -32,8 +32,12 @@ async function resolveGeminiKey(): Promise<string | undefined> {
 router.get('/creatives', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {\n  try { const creatives = await getCollectionDocs<any>('marketing_creatives'); creatives.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); res.json({ creatives }); }\n  catch (error) { console.error('[Marketing] Creative load failed:', error); res.status(500).json({ error: 'CREATIVES_LOAD_FAILED' }); }\n});\n\nrouter.get('/campaigns', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const campaigns = await getCollectionDocs<any>('marketing_campaigns');
-    campaigns.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
-    res.json({ campaigns });
+    const clicks = await getCollectionDocs<any>('marketing_clicks');
+    const clickCounts = new Map<string, number>();
+    clicks.forEach((click) => clickCounts.set(click.campaignId, (clickCounts.get(click.campaignId) || 0) + 1));
+    const enriched = campaigns.map((campaign) => ({ ...campaign, clickCount: clickCounts.get(campaign.id) || 0 }));
+    enriched.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
+    res.json({ campaigns: enriched });
   } catch (error) {
     console.error('[Marketing] Campaign load failed:', error);
     res.status(500).json({ error: 'CAMPAIGNS_LOAD_FAILED' });
