@@ -24,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="text-white/55 hidden sm:inline">| Smart Artificial Intelligence Native Technologies</span>
         </div>
         <div className="flex items-center space-x-4 text-[11px]">
-          <span className="flex items-center text-white/75">
+          <span className="hidden sm:flex items-center text-white/75">
             <MapPin className="w-3 h-3 text-amber-400 mr-1" /> Victoria Falls, Zimbabwe
           </span>
           <button
@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="text-white/65 hover:text-white transition flex items-center font-medium cursor-pointer"
           >
             <UserCheck className="w-3 h-3 mr-1 text-[#C5D8B8]" />
-            {isCoordinatorView ? 'Exit Desk View' : 'Reservations Desk'}
+            {isCoordinatorView ? 'Exit Desk View' : <><span className="hidden sm:inline">Reservations Desk</span><span className="sm:hidden">Desk</span></>}
           </button>
         </div>
       </div>
@@ -55,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-lg sm:text-xl font-semibold tracking-[-0.035em] text-[#24382E] font-display">
                 Syntuc Explorer
               </span>
-              <span className="text-[9px] uppercase font-bold tracking-[0.12em] text-[#5A705F] bg-[#EEF1E9] px-2 py-1 rounded-full border border-[#DCE4D8]">
+              <span className="hidden sm:inline text-[9px] uppercase font-bold tracking-[0.12em] text-[#5A705F] bg-[#EEF1E9] px-2 py-1 rounded-full border border-[#DCE4D8]">
                 Victoria Falls
               </span>
             </div>
@@ -120,10 +120,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   const assistantTrigger = document.getElementById('syntuc-assistant-trigger');
                   if (assistantTrigger) assistantTrigger.click();
                 }}
-                className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-[#263B30] hover:bg-[#34513F] text-white text-sm font-semibold transition cursor-pointer"
+                aria-label="Talk to Syntuc" className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-full bg-[#263B30] hover:bg-[#34513F] text-white text-sm font-semibold transition cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 text-[#E2BE8C]" />
-                <span>Talk to Syntuc</span>
+                <span className="hidden sm:inline">Talk to Syntuc</span>
               </button>
             </>
           ) : (
