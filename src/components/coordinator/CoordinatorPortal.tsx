@@ -268,22 +268,22 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const handleImportOperatorCatalogs = async () => {
     if (staffUser?.role !== 'admin' || isImportingOperatorCatalog) return;
     const confirmed = window.confirm(
-      'Import the supplied Wild Horizons and Shearwater price-list records as unpublished drafts? Existing same-name records will not be overwritten, and unresolved operator mappings will stop the import.'
+      'Import the supplied Wild Horizons, Shearwater and Pure Africa price-list records as unpublished drafts? Existing same-name records will not be overwritten. Missing or duplicate operator mappings will be reported; affected drafts remain unpublished.'
     );
     if (!confirmed) return;
 
     setIsImportingOperatorCatalog(true);
     try {
       const result = await api.importOperatorCatalogs();
-      const summary = `Operator catalog import complete: ${result.created} draft records created, ${result.alreadyImported} already imported, ${result.existingNeedsManualReview} existing records flagged for manual review, ${(result.errors || []).length} errors. Nothing was published.`;
-      notify(summary, result.errors?.length ? 'error' : 'success');
+      const mappingIssues = Array.isArray(result.operatorMappingIssues) ? result.operatorMappingIssues : [];
+      const summary = `Operator catalog import complete: ${result.created} draft records created, ${result.updatedAuthoritative || 0} authoritative records updated, ${result.alreadyImported} already imported, ${result.existingNeedsManualReview} existing records flagged for manual review, ${mappingIssues.length} operator mapping issues, ${(result.errors || []).length} write errors. Nothing was published.`;
+      notify(summary, (result.errors?.length || mappingIssues.length) ? 'error' : 'success');
       await loadAllData();
       if (result.skipped?.length) {
         console.warn('Catalog import skipped existing records for manual review:', result.skipped);
       }
-      if (result.errors?.length) {
-        console.error('Catalog import errors:', result.errors);
-      }
+      if (mappingIssues.length) console.error('Catalog import operator mapping issues; affected drafts must remain unpublished:', mappingIssues);
+      if (result.errors?.length) console.error('Catalog import errors:', result.errors);
     } catch (e: any) {
       notify(e.message || 'Operator catalog import failed. No products should be published.', 'error');
     } finally {
