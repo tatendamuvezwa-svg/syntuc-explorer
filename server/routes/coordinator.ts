@@ -401,6 +401,10 @@ router.post('/notes', requireCoordinatorAuth, async (req: AuthenticatedStaffRequ
 // POST /api/coordinator/catalog/import-operator-pricelists
 // Explicit, authenticated, idempotent draft-only import. Never publishes imported products.
 router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  if (req.staffUser?.role !== 'admin') {
+    res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Only an administrator can import operator price lists.' });
+    return;
+  }
   try {
     const operators = await getCollectionDocs<any>('operators');
     const normalize = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
