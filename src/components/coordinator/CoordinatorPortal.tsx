@@ -74,6 +74,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [r2Report, setR2Report] = useState<any>(null);
   const [runningR2, setRunningR2] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(false);
+  const [isImportingOperatorCatalog, setIsImportingOperatorCatalog] = useState<boolean>(false);
 
   // Catalogue Management Modals & Filters
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
@@ -232,6 +233,11 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   };
 
   const handleTogglePublishProduct = async (id: string, currentStatus: boolean) => {
+    const target = products.find((item) => item.id === id) as any;
+    if (!currentStatus && target?.catalogImportKey && target.catalogImportStatus !== 'VERIFIED') {
+      notify('Verify the operator, source price, additional fees, inclusions and supplier details before publishing this imported product.', 'error');
+      return;
+    }
     try {
       await api.toggleProductPublish(id, !currentStatus);
       await loadAllData();
@@ -240,7 +246,57 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     }
   };
 
+  const handleVerifyImportedCatalogItem = async (id: string, isPackage: boolean, name: string) => {
+    if (staffUser?.role !== 'admin') {
+      notify('Administrator access is required to verify imported catalog records.', 'error');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Confirm that you have checked the source price list, operator ownership, current base price, mandatory fees, package inclusions/exclusions and supplier attribution for "${name}". Only proceed if those details have been verified.`
+    );
+    if (!confirmed) return;
+    try {
+      if (isPackage) await api.verifyImportedPackage(id);
+      else await api.verifyImportedProduct(id);
+      notify(`${name} marked verified. Review it once more before publishing.`, 'success');
+      await loadAllData();
+    } catch (e: any) {
+      notify(e.message || `Failed to verify ${name}`, 'error');
+    }
+  };
+
+  const handleImportOperatorCatalogs = async () => {
+    if (staffUser?.role !== 'admin' || isImportingOperatorCatalog) return;
+    const confirmed = window.confirm(
+      'Import the supplied Wild Horizons and Shearwater price-list records as unpublished drafts? Existing same-name records will not be overwritten, and unresolved operator mappings will stop the import.'
+    );
+    if (!confirmed) return;
+
+    setIsImportingOperatorCatalog(true);
+    try {
+      const result = await api.importOperatorCatalogs();
+      const summary = `Operator catalog import complete: ${result.created} draft records created, ${result.alreadyImported} already imported, ${result.existingNeedsManualReview} existing records flagged for manual review, ${(result.errors || []).length} errors. Nothing was published.`;
+      notify(summary, result.errors?.length ? 'error' : 'success');
+      await loadAllData();
+      if (result.skipped?.length) {
+        console.warn('Catalog import skipped existing records for manual review:', result.skipped);
+      }
+      if (result.errors?.length) {
+        console.error('Catalog import errors:', result.errors);
+      }
+    } catch (e: any) {
+      notify(e.message || 'Operator catalog import failed. No products should be published.', 'error');
+    } finally {
+      setIsImportingOperatorCatalog(false);
+    }
+  };
+
   const handleTogglePublishPackage = async (id: string, currentStatus: boolean) => {
+    const target = packages.find((item) => item.id === id) as any;
+    if (!currentStatus && target?.catalogImportKey && target.catalogImportStatus !== 'VERIFIED') {
+      notify('Verify the operator, source price, additional fees, inclusions and supplier details before publishing this imported package.', 'error');
+      return;
+    }
     try {
       await api.updatePackage(id, { isPublished: !currentStatus });
       await loadAllData();
@@ -778,7 +834,18 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 flex-wrap">
+                {staffUser?.role === 'admin' && (
+                  <button
+                    onClick={handleImportOperatorCatalogs}
+                    disabled={isImportingOperatorCatalog}
+                    className="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 disabled:opacity-50 text-sky-900 border border-sky-200 font-semibold text-xs transition flex items-center cursor-pointer"
+                    title="Import Wild Horizons and Shearwater as unpublished draft records; requires exact operator mapping."
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isImportingOperatorCatalog ? 'animate-spin' : ''}`} />
+                    <span>{isImportingOperatorCatalog ? 'Importing…' : 'Import Operator Price Lists'}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setPackageToEdit(null);
@@ -943,6 +1010,21 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
 
                           <h4 className="text-base font-bold text-stone-900 mt-1 truncate">{p.name}</h4>
                           <p className="text-xs text-stone-500 line-clamp-2 mt-0.5">{p.shortDescription}</p>
+                          <p className="text-[11px] font-semibold text-sky-800 mt-1">Operator: {p.operatorName || 'Unassigned — review required'}</p>
+                          {(p as any).catalogImportKey && (p as any).catalogImportStatus !== 'VERIFIED' && (
+                            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-950">
+                              <p className="font-bold uppercase tracking-wide">Imported draft · verification required</p>
+                              {Array.isArray((p as any).mandatoryFees) && (p as any).mandatoryFees.length > 0 && (
+                                <p className="mt-1">Additional fees: {(p as any).mandatoryFees.map((fee: any) => `${fee.name}: ${fee.amount === null ? 'amount unconfirmed' : `US$${fee.amount}`}`).join('; ')}</p>
+                              )}
+                              {Array.isArray((p as any).verificationNotes) && (p as any).verificationNotes.length > 0 && (
+                                <ul className="mt-1 list-disc pl-4">{(p as any).verificationNotes.map((note: string, index: number) => <li key={index}>{note}</li>)}</ul>
+                              )}
+                              {staffUser?.role === 'admin' && (
+                                <button onClick={() => handleVerifyImportedCatalogItem(p.id, false, p.name)} className="mt-2 rounded-md bg-amber-700 px-2 py-1 font-bold text-white hover:bg-amber-800">Mark Verified</button>
+                              )}
+                            </div>
+                          )}
 
                           <div className="mt-2 text-xs font-semibold text-stone-700">
                             Tariff: <span className="text-amber-800 font-display font-bold">US${p.basePrice}</span> ({p.priceBasis})
@@ -1023,7 +1105,13 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                     >
                       <div className="flex items-start gap-4">
                         <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-stone-100 shrink-0 border border-stone-200">
-                          <img src={pkg.primaryImageUrl} alt="" className="w-full h-full object-cover" />
+                          {pkg.primaryImageUrl ? (
+                            <img src={pkg.primaryImageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-stone-300">
+                              <ImageIcon className="w-6 h-6" />
+                            </div>
+                          )}
                           <span
                             className={`absolute top-1 left-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-xs ${
                               pkg.isPublished ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
@@ -1045,6 +1133,21 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
 
                           <h4 className="text-base font-bold text-stone-900 mt-1 truncate">{pkg.name}</h4>
                           <p className="text-xs text-stone-500 line-clamp-2 mt-0.5">{pkg.tagline}</p>
+                          <p className="text-[11px] font-semibold text-sky-800 mt-1">Operator: {(pkg as any).operatorName || 'Unassigned — review required'}</p>
+                          {(pkg as any).catalogImportKey && (pkg as any).catalogImportStatus !== 'VERIFIED' && (
+                            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-950">
+                              <p className="font-bold uppercase tracking-wide">Imported package · verification required</p>
+                              {Array.isArray((pkg as any).mandatoryFees) && (pkg as any).mandatoryFees.length > 0 && (
+                                <p className="mt-1">Additional fees: {(pkg as any).mandatoryFees.map((fee: any) => `${fee.name}: ${fee.amount === null ? 'amount unconfirmed' : `US$${fee.amount}`}`).join('; ')}</p>
+                              )}
+                              {Array.isArray((pkg as any).verificationNotes) && (pkg as any).verificationNotes.length > 0 && (
+                                <ul className="mt-1 list-disc pl-4">{(pkg as any).verificationNotes.map((note: string, index: number) => <li key={index}>{note}</li>)}</ul>
+                              )}
+                              {staffUser?.role === 'admin' && (
+                                <button onClick={() => handleVerifyImportedCatalogItem(pkg.id, true, pkg.name)} className="mt-2 rounded-md bg-amber-700 px-2 py-1 font-bold text-white hover:bg-amber-800">Mark Verified</button>
+                              )}
+                            </div>
+                          )}
 
                           <div className="mt-2 text-xs font-semibold text-stone-700">
                             Tariff: <span className="text-amber-800 font-display font-bold">US${pkg.pricePerPerson}</span> (per person)

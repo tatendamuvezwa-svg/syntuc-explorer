@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { operatorCatalogImport } from '../data/operatorCatalogImport.ts';
 import crypto from 'crypto';
 import {
   requireCoordinatorAuth,
@@ -397,6 +398,217 @@ router.post('/notes', requireCoordinatorAuth, async (req: AuthenticatedStaffRequ
   }
 });
 
+// POST /api/coordinator/catalog/import-operator-pricelists
+// Explicit, authenticated, idempotent draft-only import. Never publishes imported products.
+router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  if (req.staffUser?.role !== 'admin') {
+    res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Only an administrator can import operator price lists.' });
+    return;
+  }
+  try {
+    const operators = await getCollectionDocs<any>('operators');
+    const normalize = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const aliases: Record<string, string[]> = {
+      'Wild Horizons': ['wild horizons', 'wild horizons victoria falls', 'wild horizons zimbabwe'],
+      'Shearwater': ['shearwater', 'shearwater victoria falls'],
+      'Pure Africa': ['pure africa', 'pure africa experiences'],
+    };
+    const operatorIds: Record<string, string> = {};
+
+    for (const canonicalName of ['Wild Horizons', 'Shearwater', 'Pure Africa']) {
+      const accepted = new Set((aliases[canonicalName] || []).map(normalize));
+      const matches = operators.filter((operator) => accepted.has(normalize(operator.name)));
+      if (matches.length !== 1 || !matches[0]?.id) {
+        res.status(409).json({
+          error: 'OPERATOR_MAPPING_NOT_UNAMBIGUOUS',
+          message: `Expected exactly one canonical operator record for "${canonicalName}", found ${matches.length}. No products were imported. Resolve operator records first.`,
+          operator: canonicalName,
+          matches: matches.map((operator) => ({ id: operator.id, name: operator.name })),
+        });
+        return;
+      }
+      operatorIds[canonicalName] = matches[0].id;
+    }
+
+    const existingProducts = await getCollectionDocs<any>('products');
+    const existingPackages = await getCollectionDocs<any>('packages');
+    const tombstones = await getTombstones();
+    const activeExisting = existingProducts.filter((p) => !tombstones.has(`products_${p.id}`));
+    const activeExistingPackages = existingPackages.filter((p) => !tombstones.has(`packages_${p.id}`));
+    const existingKeys = new Set([...activeExisting, ...activeExistingPackages].map((p) => p.catalogImportKey).filter(Boolean));
+    const results = { created: 0, updatedAuthoritative: 0, alreadyImported: 0, existingNeedsManualReview: 0, errors: [] as string[], skipped: [] as Array<{ name: string; operator: string; reason: string }> };
+    const now = new Date().toISOString();
+
+    for (const item of operatorCatalogImport) {
+      const operatorId = operatorIds[item.operatorName];
+      const importKey = `operator-pricelist-v1:${normalize(item.operatorName).replace(/ /g, '-') }:${normalize(item.name).replace(/ /g, '-')}`;
+      if (existingKeys.has(importKey)) {
+        results.alreadyImported++;
+        continue;
+      }
+
+      // Packages live in the packages collection; activities/transfers stay in products.
+      const isPackage = item.productType === 'package';
+      const targetExisting = isPackage ? activeExistingPackages : activeExisting;
+      const sameOperatorName = targetExisting.find((p) =>
+        (p.operatorId === operatorId || !p.operatorId) && normalize(p.name) === normalize(item.name)
+      );
+      if (sameOperatorName && item.authoritativeOverride && sameOperatorName.operatorId === operatorId) {
+        // The newest Pure Africa catalog is explicitly authoritative. Preserve the existing
+        // document ID/history and update only source-controlled catalog fields.
+        try {
+          const updates: Record<string, unknown> = {
+            sourceReference: item.sourceReference,
+            catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
+            verificationNotes: item.verificationNotes,
+            catalogSourceAuthority: 'LATEST_SUPPLIED_PURE_AFRICA_CATALOG',
+            catalogSourceUpdatedAt: now,
+            isPublished: false,
+            updatedAt: now,
+          };
+          if (isPackage) {
+            updates.pricePerPerson = String(item.basePrice);
+            updates.inclusions = item.inclusions;
+            updates.exclusions = item.exclusions;
+            updates.mandatoryFees = item.mandatoryFees;
+            await updateDocById('packages', sameOperatorName.id, updates);
+          } else {
+            updates.basePrice = String(item.basePrice);
+            updates.currency = 'USD';
+            updates.priceBasis = item.priceBasis;
+            updates.inclusions = item.inclusions;
+            updates.exclusions = item.exclusions;
+            updates.mandatoryFees = item.mandatoryFees;
+            await updateDocById('products', sameOperatorName.id, updates);
+          }
+          results.updatedAuthoritative = (results as any).updatedAuthoritative || 0;
+          (results as any).updatedAuthoritative++;
+          existingKeys.add(importKey);
+          continue;
+        } catch (error) {
+          results.errors.push(`Failed authoritative update for ${item.operatorName}: ${item.name} (${sameOperatorName.id}): ${String(error)}`);
+          continue;
+        }
+      }
+      if (sameOperatorName) {
+        results.existingNeedsManualReview++;
+        results.skipped.push({ name: item.name, operator: item.operatorName, reason: `Existing ${isPackage ? 'package' : 'product'} ${sameOperatorName.id} requires manual source/rate reconciliation; no overwrite performed.` });
+        continue;
+      }
+
+      const productId = (isPackage ? 'imp_pkg_' : 'imp_') + crypto.createHash('sha256').update(importKey).digest('hex').slice(0, 20);
+      const targetCollection = isPackage ? 'packages' : 'products';
+      if (tombstones.has(`${targetCollection}_${productId}`)) {
+        results.errors.push(`Deterministic ID ${productId} is tombstoned; manual review required for ${item.operatorName}: ${item.name}`);
+        continue;
+      }
+      if (targetExisting.some((p) => p.id === productId)) {
+        results.errors.push(`Deterministic ID collision for ${item.operatorName}: ${item.name}`);
+        continue;
+      }
+
+      const newProduct = {
+        id: productId,
+        slug: `${normalize(item.name).replace(/ /g, '-')}-${productId.slice(-6)}`,
+        name: item.name,
+        productType: 'activity',
+        catalogItemType: item.productType,
+        categorySlug: item.categorySlug,
+        operatorId,
+        propertyId: null,
+        shortDescription: item.shortDescription,
+        description: item.shortDescription,
+        location: 'Victoria Falls, Zimbabwe',
+        duration: null,
+        basePrice: String(item.basePrice),
+        currency: 'USD',
+        priceBasis: item.priceBasis,
+        inclusions: item.inclusions,
+        exclusions: item.exclusions,
+        mandatoryFees: item.mandatoryFees,
+        sourceReference: item.sourceReference,
+        catalogImportKey: importKey,
+        catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
+        verificationNotes: item.verificationNotes,
+        isPublished: false,
+        isFeatured: false,
+        availabilityNote: 'Subject to operator confirmation; draft import not bookable until verified.',
+        primaryMediaId: null,
+        videoUrl: null,
+        evidenceStatus: 'NEEDS_VERIFICATION',
+        createdAt: now,
+        updatedAt: now,
+        importedByStaffId: req.staffUser!.id,
+      };
+
+      try {
+        if (isPackage) {
+          const newPackage = {
+            id: productId,
+            slug: `${normalize(item.name).replace(/ /g, '-')}-${productId.slice(-6)}`,
+            name: item.name,
+            tagline: `Operator package from ${item.operatorName}`,
+            description: item.shortDescription,
+            durationDays: 1,
+            durationNights: 0,
+            pricePerPerson: String(item.basePrice),
+            currency: 'USD',
+            highlights: item.inclusions,
+            inclusions: item.inclusions,
+            exclusions: item.exclusions,
+            primaryImageUrl: null,
+            videoUrl: null,
+            operatorId,
+            operatorName: item.operatorName,
+            catalogItemType: 'package',
+            categorySlug: item.categorySlug,
+            mandatoryFees: item.mandatoryFees,
+            sourceReference: item.sourceReference,
+            catalogImportKey: importKey,
+            catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
+            verificationNotes: item.verificationNotes,
+            priceBasis: item.priceBasis,
+            isPublished: false,
+            createdAt: now,
+            updatedAt: now,
+            importedByStaffId: req.staffUser!.id,
+          };
+          await setDocById('packages', productId, newPackage, false);
+          activeExistingPackages.push(newPackage);
+        } else {
+          await setDocById('products', productId, newProduct, false);
+          activeExisting.push(newProduct);
+        }
+        const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+        await setDocById('product_revisions', revId, {
+          id: revId,
+          productId,
+          collectionName: isPackage ? 'packages' : 'products',
+          modifiedByStaffId: req.staffUser!.id,
+          previousSnapshot: null,
+          changeSummary: `Draft operator price-list import: ${item.operatorName} — ${item.name}`,
+          createdAt: now,
+        });
+        existingKeys.add(importKey);
+        results.created++;
+      } catch (error: any) {
+        results.errors.push(`${item.operatorName} — ${item.name}: ${error?.message || 'write failed'}`);
+      }
+    }
+
+    res.status(results.errors.length ? 207 : 200).json({
+      success: results.errors.length === 0,
+      message: 'Operator catalog import completed. Imported products remain unpublished drafts.',
+      operatorMapping: operatorIds,
+      totalSourceRecords: operatorCatalogImport.length,
+      ...results,
+    });
+  } catch (error: any) {
+    console.error('Operator catalog import failed:', error);
+    res.status(500).json({ error: 'OPERATOR_CATALOG_IMPORT_FAILED', message: error?.message || 'Unknown error' });
+  }
+});
+
 // GET /api/coordinator/products - All products from Firestore (including unpublished/draft)
 router.get('/products', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
@@ -620,6 +832,10 @@ router.patch('/products/:id/publish', requireCoordinatorAuth, async (req: Authen
     }
 
     const newStatus = isPublished !== undefined ? Boolean(isPublished) : !current.isPublished;
+    if (newStatus && current.catalogImportKey && current.catalogImportStatus !== 'VERIFIED') {
+      res.status(409).json({ error: 'CATALOG_VERIFICATION_REQUIRED', message: 'Imported price-list records must be verified by an administrator before publication.' });
+      return;
+    }
     const nowIso = new Date().toISOString();
 
     await updateDocById('products', id, {
@@ -645,6 +861,42 @@ router.patch('/products/:id/publish', requireCoordinatorAuth, async (req: Authen
   } catch (error) {
     console.error('Error toggling product publish state:', error);
     res.status(500).json({ error: 'FAILED_TO_TOGGLE_PUBLISH' });
+  }
+});
+
+// PATCH /api/coordinator/products/:id/verify - Explicit administrator verification gate for imported drafts
+router.patch('/products/:id/verify', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  if (req.staffUser?.role !== 'admin') {
+    res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Only an administrator can verify imported catalog records.' });
+    return;
+  }
+  try {
+    const { id } = req.params;
+    const current = await getDocById<any>('products', id);
+    if (!current) {
+      res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
+      return;
+    }
+    if (!current.catalogImportKey) {
+      res.status(400).json({ error: 'NOT_AN_IMPORTED_PRODUCT', message: 'This verification action is only for imported price-list records.' });
+      return;
+    }
+    const now = new Date().toISOString();
+    await updateDocById('products', id, {
+      catalogImportStatus: 'VERIFIED',
+      evidenceStatus: 'ESTABLISHED',
+      verifiedAt: now,
+      verifiedByStaffId: req.staffUser!.id,
+      updatedAt: now,
+    });
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId, productId: id, collectionName: 'products', modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: current, changeSummary: `Imported product verified by administrator: ${current.name}`, createdAt: now,
+    });
+    res.json({ success: true, catalogImportStatus: 'VERIFIED' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'FAILED_TO_VERIFY_IMPORTED_PRODUCT', message: error?.message || 'Unknown error' });
   }
 });
 
@@ -1001,6 +1253,10 @@ router.put('/packages/:id', requireCoordinatorAuth, async (req: AuthenticatedSta
       res.status(404).json({ error: 'PACKAGE_NOT_FOUND' });
       return;
     }
+    if (isPublished === true && current.catalogImportKey && current.catalogImportStatus !== 'VERIFIED') {
+      res.status(409).json({ error: 'CATALOG_VERIFICATION_REQUIRED', message: 'Imported price-list packages must be verified by an administrator before publication.' });
+      return;
+    }
 
     const updatedData: any = {
       updatedAt: new Date().toISOString(),
@@ -1026,6 +1282,42 @@ router.put('/packages/:id', requireCoordinatorAuth, async (req: AuthenticatedSta
     res.json({ success: true, package: updated });
   } catch (error) {
     res.status(500).json({ error: 'FAILED_TO_UPDATE_PACKAGE' });
+  }
+});
+
+// PATCH /api/coordinator/packages/:id/verify - Explicit administrator verification gate for imported package drafts
+router.patch('/packages/:id/verify', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  if (req.staffUser?.role !== 'admin') {
+    res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Only an administrator can verify imported catalog records.' });
+    return;
+  }
+  try {
+    const { id } = req.params;
+    const current = await getDocById<any>('packages', id);
+    if (!current) {
+      res.status(404).json({ error: 'PACKAGE_NOT_FOUND' });
+      return;
+    }
+    if (!current.catalogImportKey) {
+      res.status(400).json({ error: 'NOT_AN_IMPORTED_PACKAGE', message: 'This verification action is only for imported price-list records.' });
+      return;
+    }
+    const now = new Date().toISOString();
+    await updateDocById('packages', id, {
+      catalogImportStatus: 'VERIFIED',
+      evidenceStatus: 'ESTABLISHED',
+      verifiedAt: now,
+      verifiedByStaffId: req.staffUser!.id,
+      updatedAt: now,
+    });
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId, productId: id, collectionName: 'packages', modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: current, changeSummary: `Imported package verified by administrator: ${current.name}`, createdAt: now,
+    });
+    res.json({ success: true, catalogImportStatus: 'VERIFIED' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'FAILED_TO_VERIFY_IMPORTED_PACKAGE', message: error?.message || 'Unknown error' });
   }
 });
 
