@@ -205,6 +205,11 @@ export async function calculateAuthoritativePricing(
           selectedVariant = productVariants.find((v) => v.id === 'var_cruise_luxury_deck') || productVariants[0];
         } else if (product.id === 'prod_simunye_theatre') {
           selectedVariant = productVariants.find((v) => v.id === 'var_simunye_adult') || productVariants[0];
+        } else if (product.id.startsWith('prod_pure_africa_')) {
+          // Pure Africa products use catalogue variants for vessel/deck/dining selection
+          // and mandatory fee calculation. If no variant was supplied, use the first
+          // published option as a safe default; guests can explicitly select another.
+          selectedVariant = productVariants[0];
         }
       }
     }
