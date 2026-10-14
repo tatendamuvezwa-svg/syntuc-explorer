@@ -35,7 +35,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
 
   // Active sub-view
-  const [subView, setSubView] = useState<'overview' | 'sources' | 'campaigns' | 'ads' | 'reservations' | 'builder'>(
+  const [subView, setSubView] = useState<'overview' | 'sources' | 'campaigns' | 'ads' | 'reservations' | 'builder' | 'studio'>(
     'overview'
   );
 
@@ -45,7 +45,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const [loadingJourney, setLoadingJourney] = useState<boolean>(false);
 
   // Link Builder state
-  const [builderBaseUrl, setBuilderBaseUrl] = useState<string>('https://syntuc.com/');
+  const [builderBaseUrl, setBuilderBaseUrl] = useState<string>('https://syntuc-explorer.ai.studio/');
   const [builderSource, setBuilderSource] = useState<string>('tiktok');
   const [builderMedium, setBuilderMedium] = useState<string>('paid_social');
   const [builderCampaign, setBuilderCampaign] = useState<string>('helicopter_launch');
