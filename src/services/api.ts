@@ -630,4 +630,50 @@ export const api = {
     }
     return res.json();
   },
+
+  // --- TikTok-first Marketing Studio ---
+  async getMarketingCampaigns(): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/campaigns`, { headers: getStaffHeaders() });
+    if (!res.ok) throw new Error('Failed to load marketing campaigns');
+    return res.json();
+  },
+  async getMarketingCreatives(): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/creatives`, { headers: getStaffHeaders() });
+    if (!res.ok) throw new Error('Failed to load marketing creatives');
+    return res.json();
+  },
+  async generateMarketingDraft(input: { topic: string; audience?: string; tone?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/generate`, { method: 'POST', headers: getStaffHeaders(), body: JSON.stringify(input) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'AI copy generation failed');
+    return data;
+  },
+  async saveMarketingCampaign(input: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/campaigns`, { method: 'POST', headers: getStaffHeaders(), body: JSON.stringify(input) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || 'Campaign save failed');
+    return data;
+  },
+  async uploadMarketingVideo(file: File): Promise<any> {
+    const body = new FormData();
+    body.append('file', file);
+    body.append('name', file.name);
+    const headers = getStaffHeaders();
+    delete headers['Content-Type'];
+    const res = await fetch(`${API_BASE}/marketing/videos`, { method: 'POST', headers, body });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || 'Video upload failed');
+    return data;
+  },
+  async downloadMarketingVideo(id: string): Promise<Blob> {
+    const res = await fetch(`${API_BASE}/marketing/videos/${encodeURIComponent(id)}`, { headers: getStaffHeaders() });
+    if (!res.ok) throw new Error('Video download failed');
+    return res.blob();
+  },
+  async recordMarketingPublished(id: string, input: { publishedUrl?: string; postId?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/campaigns/${encodeURIComponent(id)}/published`, { method: 'POST', headers: getStaffHeaders(), body: JSON.stringify(input) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || 'Could not record publication');
+    return data;
+  },
 };
