@@ -9,14 +9,77 @@ import { getAuthoritativeVariantsForProduct } from '../services/variantCatalog.t
 
 const router = Router();
 
+// Canonical Pure Africa catalog entries. These read-only fallbacks appear only when the
+// corresponding Firestore product is missing; Firestore records and coordinator edits always win.
+const PURE_AFRICA_FALLBACK_PRODUCTS = [
+  {
+    id: 'prod_zambezi_explorer_cruise',
+    operatorId: 'op_pure_africa',
+    propertyId: null,
+    name: 'Zambezi Explorer Luxury Sunset Cruise',
+    slug: 'zambezi-explorer-luxury-sunset-cruise',
+    productType: 'activity',
+    categorySlug: 'river-cruises',
+    shortDescription: 'A sunset cruise on the Zambezi with two deck experiences.',
+    description: 'Enjoy a sunset cruise aboard the Zambezi Explorer. Choose the Luxury Deck or Signature Deck; the selected deck determines the fare and service level.',
+    location: 'Pure Africa Waterfront Jetty, Victoria Falls',
+    duration: '2 hours (sunset)',
+    basePrice: '69',
+    currency: 'USD',
+    priceBasis: 'per_person',
+    inclusions: ['Cruise experience', 'Deck-specific food and beverage service as described by the selected variant'],
+    exclusions: ['US$12 National Parks River Conservation Fee per person, charged in addition to the base fare'],
+    suitability: ['Couples', 'Families', 'Groups'],
+    isPublished: true,
+    isFeatured: true,
+    availabilityNote: 'Luxury Deck: US$69 + US$12 conservation fee = US$81 per adult. Signature Deck: US$110 + US$12 fee = US$122 per adult. Confirm departure and availability with the Reservations Desk.',
+    primaryMediaId: 'med_2db2d6add31909b4f3d0adcf',
+    videoUrl: null,
+    evidenceStatus: 'SUPPORTED',
+    operatorName: 'Pure Africa',
+    _fallbackImageUrl: '/uploads/med_2db2d6add31909b4f3d0adcf.jpeg',
+  },
+  {
+    id: 'prod_potjie_dining',
+    operatorId: 'op_pure_africa',
+    propertyId: null,
+    name: 'The Eatery Waterfront Potjie Dining',
+    slug: 'the-eatery-waterfront-potjie-dining',
+    productType: 'activity',
+    categorySlug: 'dining',
+    shortDescription: 'A traditional potjie dining experience at the waterfront.',
+    description: 'Experience The Eatery Waterfront Potjie Dining at Pure Africa. Scheduled dining begins at 18:30 and lasts approximately 2.5 hours.',
+    location: 'Pure Africa Waterfront, Victoria Falls',
+    duration: '2.5 hours (from 18:30)',
+    basePrice: '45',
+    currency: 'USD',
+    priceBasis: 'per_person',
+    inclusions: ['Potjie dining experience as described by the operator'],
+    exclusions: ['Any add-ons or services not explicitly listed in the operator confirmation'],
+    suitability: ['Couples', 'Families', 'Groups'],
+    isPublished: true,
+    isFeatured: true,
+    availabilityNote: 'US$45 per person. Confirm operating date, menu and availability with the Reservations Desk before confirming.',
+    primaryMediaId: 'med_c586325b4fea5fe25236ca20',
+    videoUrl: null,
+    evidenceStatus: 'SUPPORTED',
+    operatorName: 'Pure Africa',
+    _fallbackImageUrl: '/uploads/med_c586325b4fea5fe25236ca20.jpeg',
+  },
+];
+
 // GET all published products with primary media and operator info
 router.get('/products', async (req: Request, res: Response) => {
   try {
     const tombstones = await getTombstones();
     const allProducts = await getCollectionDocs<any>('products');
-    const products = allProducts
-      .filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const visibleFirestoreProducts = allProducts
+      .filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
+    const existingIds = new Set(visibleFirestoreProducts.map((p) => p.id));
+    const products = [
+      ...visibleFirestoreProducts,
+      ...PURE_AFRICA_FALLBACK_PRODUCTS.filter((p) => !existingIds.has(p.id) && !tombstones.has(`products_${p.id}`)),
+    ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     const operators = await getCollectionDocs<any>('operators');
     const operatorMap = new Map(operators.map((o) => [o.id, o]));
@@ -37,7 +100,7 @@ router.get('/products', async (req: Request, res: Response) => {
       return {
         ...p,
         operatorName: op?.name || 'Syntuc Partner',
-        primaryImageUrl: primaryMedia?.url || null,
+        primaryImageUrl: primaryMedia?.url || p._fallbackImageUrl || null,
         primaryImageAlt: primaryMedia?.altText || p.name,
       };
     });
