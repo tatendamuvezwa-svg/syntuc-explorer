@@ -794,6 +794,10 @@ router.patch('/products/:id/publish', requireCoordinatorAuth, async (req: Authen
     }
 
     const newStatus = isPublished !== undefined ? Boolean(isPublished) : !current.isPublished;
+    if (newStatus && current.catalogImportKey && current.catalogImportStatus !== 'VERIFIED') {
+      res.status(409).json({ error: 'CATALOG_VERIFICATION_REQUIRED', message: 'Imported price-list records must be verified by an administrator before publication.' });
+      return;
+    }
     const nowIso = new Date().toISOString();
 
     await updateDocById('products', id, {
@@ -1209,6 +1213,10 @@ router.put('/packages/:id', requireCoordinatorAuth, async (req: AuthenticatedSta
     const current = await getDocById<any>('packages', id);
     if (!current) {
       res.status(404).json({ error: 'PACKAGE_NOT_FOUND' });
+      return;
+    }
+    if (isPublished === true && current.catalogImportKey && current.catalogImportStatus !== 'VERIFIED') {
+      res.status(409).json({ error: 'CATALOG_VERIFICATION_REQUIRED', message: 'Imported price-list packages must be verified by an administrator before publication.' });
       return;
     }
 
