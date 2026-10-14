@@ -83,7 +83,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [packageToEdit, setPackageToEdit] = useState<PackageType | null>(null);
   const [catalogFilter, setCatalogFilter] = useState<
-    'all' | 'accommodation' | 'activity' | 'package' | 'published' | 'draft'
+    'all' | 'accommodation' | 'activity' | 'unclassified' | 'package' | 'published' | 'draft'
   >('all');
   const [catalogSearch, setCatalogSearch] = useState<string>('');
 
@@ -907,6 +907,17 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                   Activities ({products.filter(p => p.productType === 'activity').length})
                 </button>
                 <button
+                  onClick={() => setCatalogFilter('unclassified')}
+                  className={`px-3 py-1.5 rounded-lg transition ${
+                    catalogFilter === 'unclassified'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'text-stone-600 hover:bg-stone-100'
+                  }`}
+                  title="Records with missing or unsupported product type; review and classify before publishing"
+                >
+                  Needs Classification ({products.filter(p => p.productType !== 'accommodation' && p.productType !== 'activity').length})
+                </button>
+                <button
                   onClick={() => setCatalogFilter('package')}
                   className={`px-3 py-1.5 rounded-lg transition ${
                     catalogFilter === 'package'
@@ -959,6 +970,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                   .filter(p => {
                     if (catalogFilter === 'accommodation') return p.productType === 'accommodation';
                     if (catalogFilter === 'activity') return p.productType === 'activity';
+                    if (catalogFilter === 'unclassified') return p.productType !== 'accommodation' && p.productType !== 'activity';
                     if (catalogFilter === 'published') return p.isPublished;
                     if (catalogFilter === 'draft') return !p.isPublished;
                     return true;
