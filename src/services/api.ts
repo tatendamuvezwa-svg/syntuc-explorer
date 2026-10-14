@@ -379,6 +379,28 @@ export const api = {
     return res.json();
   },
 
+  async verifyImportedProduct(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/products/${encodeURIComponent(id)}/verify`, {
+      method: 'PATCH',
+      headers: getStaffHeaders(),
+      body: JSON.stringify({}),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload.message || payload.error || 'Failed to verify imported product');
+    return payload;
+  },
+
+  async verifyImportedPackage(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/packages/${encodeURIComponent(id)}/verify`, {
+      method: 'PATCH',
+      headers: getStaffHeaders(),
+      body: JSON.stringify({}),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload.message || payload.error || 'Failed to verify imported package');
+    return payload;
+  },
+
   // --- Coordinator Product Variant Management ---
   async getCoordinatorProductVariants(productId: string): Promise<ProductVariant[]> {
     const res = await fetch(`${API_BASE}/coordinator/products/${encodeURIComponent(productId)}/variants`, {
