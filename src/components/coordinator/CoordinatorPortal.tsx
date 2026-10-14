@@ -1015,7 +1015,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                             <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-950">
                               <p className="font-bold uppercase tracking-wide">Imported draft · verification required</p>
                               {Array.isArray((p as any).mandatoryFees) && (p as any).mandatoryFees.length > 0 && (
-                                <p className="mt-1">Additional fees: {(p as any).mandatoryFees.map((fee: any) => `${fee.name}: ${fee.amount === null ? 'amount unconfirmed' : `US${fee.amount}`}`).join('; ')}</p>
+                                <p className="mt-1">Additional fees: {(p as any).mandatoryFees.map((fee: any) => `${fee.name}: ${fee.amount === null ? 'amount unconfirmed' : `US$${fee.amount}`}`).join('; ')}</p>
                               )}
                               {Array.isArray((p as any).verificationNotes) && (p as any).verificationNotes.length > 0 && (
                                 <ul className="mt-1 list-disc pl-4">{(p as any).verificationNotes.map((note: string, index: number) => <li key={index}>{note}</li>)}</ul>
@@ -1138,7 +1138,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                             <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[10px] text-amber-950">
                               <p className="font-bold uppercase tracking-wide">Imported package · verification required</p>
                               {Array.isArray((pkg as any).mandatoryFees) && (pkg as any).mandatoryFees.length > 0 && (
-                                <p className="mt-1">Additional fees: {(pkg as any).mandatoryFees.map((fee: any) => `${fee.name}: ${fee.amount === null ? 'amount unconfirmed' : `US${fee.amount}`}`).join('; ')}</p>
+                                <p className="mt-1">Additional fees: {(pkg as any).mandatoryFees.map((fee: any) => `${fee.name}: ${fee.amount === null ? 'amount unconfirmed' : `US$${fee.amount}`}`).join('; ')}</p>
                               )}
                               {Array.isArray((pkg as any).verificationNotes) && (pkg as any).verificationNotes.length > 0 && (
                                 <ul className="mt-1 list-disc pl-4">{(pkg as any).verificationNotes.map((note: string, index: number) => <li key={index}>{note}</li>)}</ul>
