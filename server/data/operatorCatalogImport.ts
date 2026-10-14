@@ -7,7 +7,7 @@ export type CatalogFee = {
 };
 
 export type OperatorCatalogImportItem = {
-  operatorName: 'Wild Horizons' | 'Shearwater';
+  operatorName: 'Wild Horizons' | 'Shearwater' | 'Pure Africa';
   name: string;
   categorySlug: string;
   productType: 'activity' | 'package' | 'transfer' | 'fee';
@@ -19,10 +19,12 @@ export type OperatorCatalogImportItem = {
   mandatoryFees: CatalogFee[];
   sourceReference: string;
   verificationNotes: string[];
+  authoritativeOverride?: boolean;
 };
 
 const wh = 'Wild Horizons brochure summary supplied by the user; original brochure verification required';
 const sh = '2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication';
+const pa = 'Latest Pure Africa catalog supplied by the user on 14 October 2026; authoritative over all earlier Pure Africa catalog prices.';
 
 const fee = (
   name: string,
@@ -48,7 +50,7 @@ const product = (
   inclusions: [],
   exclusions: ['Draft import: verify current rate, fees, inclusions, availability and operator source before publishing.'],
   mandatoryFees: [],
-  sourceReference: operatorName === 'Wild Horizons' ? wh : sh,
+  sourceReference: operatorName === 'Wild Horizons' ? wh : operatorName === 'Shearwater' ? sh : pa,
   verificationNotes: [],
   ...options,
 });
@@ -151,4 +153,64 @@ export const operatorCatalogImport: OperatorCatalogImportItem[] = [
   product('Shearwater', 'Simunye', 'culture', 58, { verificationNotes: ['Confirm exact experience identity, supplier and inclusions.'] }),
   product('Shearwater', 'Victoria Falls Airport Transfer — One Way', 'transfers', 28, { productType: 'transfer', priceBasis: 'per_transfer', verificationNotes: ['Confirm pickup zone, capacity and service provider.'] }),
   product('Shearwater', 'Livingstone Airport Transfer — One Way', 'transfers', 40, { productType: 'transfer', priceBasis: 'per_transfer', verificationNotes: ['Confirm pickup zone, capacity and service provider.'] }),
+
+  // PURE AFRICA — latest supplied catalog is authoritative and overrides older Pure Africa rates only.
+  product('Pure Africa', 'Zambezi Explorer Luxury Sunset Cruise', 'river-cruises', 69, {
+    authoritativeOverride: true,
+    shortDescription: 'Luxury sunset cruise on the Zambezi River, supplied by Pure Africa.',
+    sourceReference: pa,
+    verificationNotes: ['Authoritative latest Pure Africa catalog rate replaces older Pure Africa listing prices. Confirm inclusions and duration against the supplied catalog before publication.'],
+  }),
+  product('Pure Africa', 'Pure Africa Sunrise Cruise', 'river-cruises', 92, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Use the latest Pure Africa catalog rate; confirm exact product title, duration and inclusions against the catalog.'],
+  }),
+  product('Pure Africa', 'Pure Africa Lunch Cruise', 'river-cruises', 92, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Use the latest Pure Africa catalog rate; confirm exact product title, duration and inclusions against the catalog.'],
+  }),
+  product('Pure Africa', 'Pure Africa Sunset Luxury Cruise', 'river-cruises', 69, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Keep distinct from Sunset Signature; confirm product title and inclusions from the latest catalog.'],
+  }),
+  product('Pure Africa', 'Pure Africa Sunset Signature Cruise', 'river-cruises', 110, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Keep distinct from Sunset Luxury; confirm product title and inclusions from the latest catalog.'],
+  }),
+  product('Pure Africa', 'Pure Africa Dinner Cruise', 'river-cruises', 110, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Use the latest Pure Africa catalog rate; confirm exact product title, duration and inclusions against the catalog.'],
+  }),
+  product('Pure Africa', 'Pure Africa Classic Dinner', 'dining', 185, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Confirm dining venue, menu, transfers and inclusions against the latest Pure Africa catalog.'],
+  }),
+  product('Pure Africa', 'The Eatery Waterfront Potjie Dining — Lunch', 'dining', 43, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Latest catalog lists Eatery lunch at $43. Keep separate from dinner and legacy generic Potjie listing; verify exact variant and inclusions.'],
+  }),
+  product('Pure Africa', 'The Eatery Waterfront Potjie Dining — Dinner', 'dining', 49, {
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['Latest catalog lists Eatery dinner at $49. Keep separate from lunch and legacy generic Potjie listing; verify exact variant and inclusions.'],
+  }),
+  product('Pure Africa', 'Pure Africa Cruise and Dinner Combination — Standard', 'packages', 110, {
+    productType: 'package',
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['The supplied catalog summary contains a $110 cruise-and-dinner combination; confirm exact cruise, meal, inclusions and rate basis before publication.'],
+  }),
+  product('Pure Africa', 'Pure Africa Cruise and Dinner Combination — Signature', 'packages', 156, {
+    productType: 'package',
+    authoritativeOverride: true,
+    sourceReference: pa,
+    verificationNotes: ['The supplied catalog summary contains a $156 cruise-and-dinner combination; confirm exact cruise, meal, inclusions and rate basis before publication.'],
+  }),
 ];
