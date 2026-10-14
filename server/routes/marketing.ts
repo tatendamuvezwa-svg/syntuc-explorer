@@ -80,7 +80,7 @@ router.post('/campaigns', requireCoordinatorAuth, async (req: AuthenticatedStaff
     const hook = safeText(req.body?.hook, 250);
     const callToAction = safeText(req.body?.callToAction, 250);
     const creativeName = safeText(req.body?.creativeName, 160) || null;
-    const creativeSize = Number.isFinite(Number(req.body?.creativeSize)) && Number(req.body?.creativeSize) > 0 ? Math.min(Number(req.body.creativeSize), 8 * 1024 * 1024) : null;
+    const creativeSize = Number.isFinite(Number(req.body?.creativeSize)) && Number(req.body?.creativeSize) > 0 ? Math.min(Number(req.body.creativeSize), 2 * 1024 * 1024 * 1024) : null;
     const hashtags = Array.isArray(req.body?.hashtags) ? req.body.hashtags.map((v: unknown) => safeText(v, 80)).filter(Boolean).slice(0, 10) : [];
     if (!title || !destination || !caption) { res.status(400).json({ error: 'TITLE_DESTINATION_CAPTION_REQUIRED' }); return; }
     let target: URL;
