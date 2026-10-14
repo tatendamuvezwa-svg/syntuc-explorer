@@ -32,3 +32,5 @@ jobs:
         run: npm run build
       - name: Run isolated reservation deletion tests
         run: npm run test:reservation-deletion
+      - name: Run operator catalog import tests
+        run: npm run test:operator-catalog-import
