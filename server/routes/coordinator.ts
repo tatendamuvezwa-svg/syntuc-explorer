@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { operatorCatalogImport } from '../data/operatorCatalogImport.ts';
+import { operatorCatalogImport, resolveOperatorMappings } from '../data/operatorCatalogImport.ts';
 import crypto from 'crypto';
 import {
   requireCoordinatorAuth,
@@ -407,28 +407,10 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
   }
   try {
     const operators = await getCollectionDocs<any>('operators');
+    const { operatorIds, issues: operatorMappingIssues } = resolveOperatorMappings(operators);
     const normalize = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    const aliases: Record<string, string[]> = {
-      'Wild Horizons': ['wild horizons', 'wild horizons victoria falls', 'wild horizons zimbabwe'],
-      'Shearwater': ['shearwater', 'shearwater victoria falls'],
-      'Pure Africa': ['pure africa', 'pure africa experiences'],
-    };
-    const operatorIds: Record<string, string> = {};
-
-    for (const canonicalName of ['Wild Horizons', 'Shearwater', 'Pure Africa']) {
-      const accepted = new Set((aliases[canonicalName] || []).map(normalize));
-      const matches = operators.filter((operator) => accepted.has(normalize(operator.name)));
-      if (matches.length !== 1 || !matches[0]?.id) {
-        res.status(409).json({
-          error: 'OPERATOR_MAPPING_NOT_UNAMBIGUOUS',
-          message: `Expected exactly one canonical operator record for "${canonicalName}", found ${matches.length}. No products were imported. Resolve operator records first.`,
-          operator: canonicalName,
-          matches: matches.map((operator) => ({ id: operator.id, name: operator.name })),
-        });
-        return;
-      }
-      operatorIds[canonicalName] = matches[0].id;
-    }
+    // Import drafts even if operator documents are missing or duplicated. The source
+    // operator name and a blocking verification note remain on each affected draft.
 
     const existingProducts = await getCollectionDocs<any>('products');
     const existingPackages = await getCollectionDocs<any>('packages');
@@ -441,6 +423,8 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
 
     for (const item of operatorCatalogImport) {
       const operatorId = operatorIds[item.operatorName];
+      const mappingIssue = operatorMappingIssues.find((issue) => issue.operator === item.operatorName);
+      const verificationNotes = [...item.verificationNotes, ...(mappingIssue ? [`Operator mapping unresolved: ${item.operatorName} has ${mappingIssue.found} matching operator records. Resolve the operator record before verifying or publishing this draft.`] : [])];
       const importKey = `operator-pricelist-v1:${normalize(item.operatorName).replace(/ /g, '-') }:${normalize(item.name).replace(/ /g, '-')}`;
       if (existingKeys.has(importKey)) {
         results.alreadyImported++;
@@ -453,14 +437,15 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       const sameOperatorName = targetExisting.find((p) =>
         (p.operatorId === operatorId || !p.operatorId) && normalize(p.name) === normalize(item.name)
       );
-      if (sameOperatorName && item.authoritativeOverride && sameOperatorName.operatorId === operatorId) {
+      if (operatorId && sameOperatorName && item.authoritativeOverride && sameOperatorName.operatorId === operatorId) {
         // The newest Pure Africa catalog is explicitly authoritative. Preserve the existing
         // document ID/history and update only source-controlled catalog fields.
         try {
           const updates: Record<string, unknown> = {
             sourceReference: item.sourceReference,
             catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
-            verificationNotes: item.verificationNotes,
+            verificationNotes,
+            operatorName: item.operatorName,
             catalogSourceAuthority: 'LATEST_SUPPLIED_PURE_AFRICA_CATALOG',
             catalogSourceUpdatedAt: now,
             isPublished: false,
@@ -514,7 +499,8 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         productType: 'activity',
         catalogItemType: item.productType,
         categorySlug: item.categorySlug,
-        operatorId,
+        operatorId: operatorId || null,
+        operatorName: item.operatorName,
         propertyId: null,
         shortDescription: item.shortDescription,
         description: item.shortDescription,
@@ -529,7 +515,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         sourceReference: item.sourceReference,
         catalogImportKey: importKey,
         catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
-        verificationNotes: item.verificationNotes,
+        verificationNotes,
         isPublished: false,
         isFeatured: false,
         availabilityNote: 'Subject to operator confirmation; draft import not bookable until verified.',
@@ -558,7 +544,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
             exclusions: item.exclusions,
             primaryImageUrl: null,
             videoUrl: null,
-            operatorId,
+            operatorId: operatorId || null,
             operatorName: item.operatorName,
             catalogItemType: 'package',
             categorySlug: item.categorySlug,
@@ -566,7 +552,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
             sourceReference: item.sourceReference,
             catalogImportKey: importKey,
             catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
-            verificationNotes: item.verificationNotes,
+            verificationNotes,
             priceBasis: item.priceBasis,
             isPublished: false,
             createdAt: now,
@@ -596,10 +582,11 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       }
     }
 
-    res.status(results.errors.length ? 207 : 200).json({
-      success: results.errors.length === 0,
-      message: 'Operator catalog import completed. Imported products remain unpublished drafts.',
+    res.status(results.errors.length || operatorMappingIssues.length ? 207 : 200).json({
+      success: results.errors.length === 0 && operatorMappingIssues.length === 0,
+      message: 'Operator catalog import completed. Imported products remain unpublished drafts. Resolve operator mapping issues before verification or publication.',
       operatorMapping: operatorIds,
+      operatorMappingIssues,
       totalSourceRecords: operatorCatalogImport.length,
       ...results,
     });
