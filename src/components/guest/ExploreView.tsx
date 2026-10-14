@@ -23,6 +23,7 @@ export const ExploreView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeFilter, setActiveFilter] = useState<'all' | 'accommodation' | 'activity'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedOperator, setSelectedOperator] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const { openProductDetail, addToTrip, openReservationModal, openSchoolPlanner } = useSession();
@@ -45,12 +46,23 @@ export const ExploreView: React.FC = () => {
     loadData();
   }, []);
 
+  const activityOperators = useMemo(() => {
+    return Array.from(new Set(
+      products
+        .filter(product => product.productType === 'activity')
+        .map(product => (product.operatorName || '').trim())
+        .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       // Type filter
       if (activeFilter !== 'all' && p.productType !== activeFilter) return false;
       // Category filter
       if (selectedCategory !== 'all' && p.categorySlug !== selectedCategory) return false;
+      // Operator filter applies to activities only.
+      if (activeFilter === 'activity' && selectedOperator !== 'all' && p.operatorName !== selectedOperator) return false;
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -61,7 +73,7 @@ export const ExploreView: React.FC = () => {
       }
       return true;
     });
-  }, [products, activeFilter, selectedCategory, searchQuery]);
+  }, [products, activeFilter, selectedCategory, selectedOperator, searchQuery]);
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
@@ -151,6 +163,7 @@ export const ExploreView: React.FC = () => {
                 onClick={() => {
                   setActiveFilter('all');
                   setSelectedCategory('all');
+                  setSelectedOperator('all');
                 }}
                 className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
                   activeFilter === 'all'
@@ -164,6 +177,7 @@ export const ExploreView: React.FC = () => {
                 onClick={() => {
                   setActiveFilter('accommodation');
                   setSelectedCategory('all');
+                  setSelectedOperator('all');
                 }}
                 className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
                   activeFilter === 'accommodation'
@@ -178,6 +192,7 @@ export const ExploreView: React.FC = () => {
                 onClick={() => {
                   setActiveFilter('activity');
                   setSelectedCategory('all');
+                  setSelectedOperator('all');
                 }}
                 className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
                   activeFilter === 'activity'
@@ -233,6 +248,36 @@ export const ExploreView: React.FC = () => {
                 </button>
               ))}
           </div>
+
+          {/* Operator filter: activity suppliers often offer several experiences. */}
+          {activeFilter === 'activity' && activityOperators.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2 border-t border-stone-100 pt-4 sm:flex-row sm:items-start">
+              <span className="flex shrink-0 items-center gap-1.5 pt-1 text-xs font-medium text-stone-500">
+                <Filter className="h-3 w-3" /> Operator:
+              </span>
+              <div className="flex min-w-0 flex-wrap gap-2" role="group" aria-label="Filter activities by operator">
+                <button
+                  type="button"
+                  aria-pressed={selectedOperator === 'all'}
+                  onClick={() => setSelectedOperator('all')}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${selectedOperator === 'all' ? 'bg-[#263B30] text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                >
+                  All Operators
+                </button>
+                {activityOperators.map(operator => (
+                  <button
+                    key={operator}
+                    type="button"
+                    aria-pressed={selectedOperator === operator}
+                    onClick={() => setSelectedOperator(operator)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${selectedOperator === operator ? 'bg-[#54775A] text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}
+                  >
+                    {operator}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Product Cards Grid */}
@@ -264,6 +309,7 @@ export const ExploreView: React.FC = () => {
               onClick={() => {
                 setActiveFilter('all');
                 setSelectedCategory('all');
+                setSelectedOperator('all');
                 setSearchQuery('');
               }}
               className="mt-4 px-4 py-2 rounded-xl bg-amber-600 text-white text-xs font-semibold"
