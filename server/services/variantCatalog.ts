@@ -474,6 +474,155 @@ export const CONFIRMED_PRODUCT_VARIANTS: Record<string, AuthoritativeVariant[]> 
       supplierNote: 'Proof of age may be requested by theatre ushers at entry.',
     },
   ],
+  // Pure Africa 2026 official leaflet: Sunrise Cruise
+  prod_pure_africa_sunrise_cruise: [
+    {
+      id: 'var_pure_africa_sunrise_reflections',
+      productId: 'prod_pure_africa_sunrise_cruise',
+      name: 'Standard Sunrise Cruise — Zambezi Reflections',
+      description: '06:00–08:00; departures 05:30–10:00 on request. English breakfast, transfers. Minimum 4, maximum 30 guests.',
+      price: 92, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '2 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Fee excluded from base price.'
+    },
+    {
+      id: 'var_pure_africa_sunrise_kalunda',
+      productId: 'prod_pure_africa_sunrise_cruise',
+      name: 'Private Sunrise Cruise — Kalunda',
+      description: 'Private vessel; 05:30–10:00 departure window on request. Continental breakfast and transfers. Minimum 2, maximum 6 guests.',
+      price: 92, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '2 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official leaflet lists US$92 per person; confirm private charter terms with supplier.'
+    }
+  ],
+  // Pure Africa 2026 official leaflet: Lunch Cruise
+  prod_pure_africa_lunch_cruise: [
+    {
+      id: 'var_pure_africa_lunch_reflections',
+      productId: 'prod_pure_africa_lunch_cruise',
+      name: 'Standard Lunch Cruise — Zambezi Reflections',
+      description: '12:00–14:00; transfers, three-course lunch and beverages. Minimum 4, maximum 30 guests.',
+      price: 92, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '2 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Fee excluded from base price.'
+    },
+    {
+      id: 'var_pure_africa_lunch_kalunda',
+      productId: 'prod_pure_africa_lunch_cruise',
+      name: 'Private Lunch Cruise — Kalunda',
+      description: '12:00–14:00; transfers, three-course lunch and beverages. Minimum 2, maximum 6 guests.',
+      price: 92, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '2 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official leaflet lists US$92 per person; confirm private charter terms with supplier.'
+    }
+  ],
+  // Pure Africa 2026 official leaflet: Dinner Cruise aboard Zambezi Breeze
+  prod_pure_africa_dinner_cruise: [
+    {
+      id: 'var_pure_africa_zambezi_breeze_dinner',
+      productId: 'prod_pure_africa_dinner_cruise',
+      name: 'Dinner Cruise — Zambezi Breeze',
+      description: '17:00–20:00; four-course dinner, beverages and transfers. Capacity 2–70 guests.',
+      price: 110, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '3 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Fee excluded from base price.'
+    }
+  ],
+  // Pure Africa 2026 official leaflet: Classic Dinner Cruise
+  prod_pure_africa_classic_dinner_cruise: [
+    {
+      id: 'var_pure_africa_classic_dinner',
+      productId: 'prod_pure_africa_classic_dinner_cruise',
+      name: 'Classic Dinner Cruise — Zambezi Reflections',
+      description: '17:00–19:00 cruise until sunset, then float at the jetty until 20:00. Six-course dinner and premium beverages. No children under 12.',
+      price: 185, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '3 hours',
+      compulsoryFees: [{ name: 'National Parks Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Fee excluded from base price.'
+    }
+  ],
+  // Pure Africa 2026 official leaflet: Eatery Dinner options
+  prod_pure_africa_eatery_dinner: [
+    {
+      id: 'var_pure_africa_eatery_alacarte',
+      productId: 'prod_pure_africa_eatery_dinner',
+      name: 'The Eatery Dinner — Three-course à la carte',
+      description: '18:00–21:00. Dinner only; transfers and beverages excluded.',
+      price: 49, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '3 hours', isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet.'
+    },
+    {
+      id: 'var_pure_africa_eatery_potjie',
+      productId: 'prod_pure_africa_eatery_dinner',
+      name: 'The Eatery Potjie Dinner — Three-course Potjie',
+      description: '18:00–21:00. Three-course Potjie dinner only; transfers and beverages excluded.',
+      price: 49, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '3 hours', isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet.'
+    }
+  ],
+  // Pure Africa 2026 official leaflet: Eatery Dinner & Sunset Cruise Combo
+  prod_pure_africa_eatery_dinner_sunset_combo: [
+    {
+      id: 'var_pure_africa_eatery_combo_luxury',
+      productId: 'prod_pure_africa_eatery_dinner_sunset_combo',
+      name: 'Luxury Deck — Dinner & Sunset Cruise Combo',
+      description: 'Summer 16:30–21:00; winter 16:00–21:00. Three-course dinner at The Eatery. Luxury Deck capacity 2–40.',
+      price: 110, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '5 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Dinner beverages excluded; fee additional.'
+    },
+    {
+      id: 'var_pure_africa_eatery_combo_signature',
+      productId: 'prod_pure_africa_eatery_dinner_sunset_combo',
+      name: 'Signature Deck — Dinner & Sunset Cruise Combo',
+      description: 'Summer 16:30–21:00; winter 16:00–21:00. Three-course dinner at The Eatery. Signature Deck capacity 2–34.',
+      price: 156, priceDelta: '46', currency: 'USD', priceBasis: 'per_person',
+      duration: '5 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Dinner beverages excluded; fee additional.'
+    }
+  ],
+  // Pure Africa 2026 official leaflet: Eatery Potjie Dinner & Sunset Cruise Combo
+  prod_pure_africa_eatery_potjie_sunset_combo: [
+    {
+      id: 'var_pure_africa_potjie_combo_luxury',
+      productId: 'prod_pure_africa_eatery_potjie_sunset_combo',
+      name: 'Luxury Deck — Potjie Dinner & Sunset Cruise Combo',
+      description: 'Summer 16:30–21:00; winter 16:00–21:00. Three-course Potjie dinner at The Eatery. Luxury Deck capacity 2–40.',
+      price: 110, priceDelta: '0', currency: 'USD', priceBasis: 'per_person',
+      duration: '5 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Beverages at The Eatery excluded; fee additional.'
+    },
+    {
+      id: 'var_pure_africa_potjie_combo_signature',
+      productId: 'prod_pure_africa_eatery_potjie_sunset_combo',
+      name: 'Signature Deck — Potjie Dinner & Sunset Cruise Combo',
+      description: 'Summer 16:30–21:00; winter 16:00–21:00. Three-course Potjie dinner at The Eatery. Signature Deck capacity 2–34.',
+      price: 156, priceDelta: '46', currency: 'USD', priceBasis: 'per_person',
+      duration: '5 hours',
+      compulsoryFees: [{ name: 'National Park Fee', amount: 12, currency: 'USD', basis: 'per_person' }],
+      isActive: true, evidenceStatus: 'SUPPORTED',
+      supplierNote: 'Official Pure Africa 2026 leaflet. Beverages at The Eatery excluded; fee additional.'
+    }
+  ]
 };
 
 /**
