@@ -12,7 +12,7 @@ import {
   updateDocById,
   getCollectionDocs,
   where,
-  getTombstones,
+  hasTombstone,
 } from '../lib/firestore.ts';
 
 const router = Router();
@@ -131,11 +131,19 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     }
 
     // Idempotency / Duplicate Submission Protection
-    const tombstones = await getTombstones();
-    const existingReservations = (await getCollectionDocs<any>(
+    const sessionReservations = await getCollectionDocs<any>(
       'reservation_requests',
       where('guestSessionId', '==', currentSessionId)
-    )).filter((r) => !tombstones.has(`reservation_requests_${r.id}`));
+    );
+    const tombstoneChecks = await Promise.all(
+      sessionReservations.map(async (reservation) => ({
+        reservation,
+        deleted: await hasTombstone('reservation_requests', reservation.id),
+      }))
+    );
+    const existingReservations = tombstoneChecks
+      .filter((entry) => !entry.deleted)
+      .map((entry) => entry.reservation);
 
     const matchingRecent = existingReservations
       .filter((r) => Number(r.authoritativeTotal) === pricingResult.authoritativeTotal)
@@ -447,17 +455,16 @@ router.get('/guest/:token', async (req, res: Response) => {
       return;
     }
 
-    await updateDocById('guest_access_tokens', tokenRecord.id, {
-      lastAccessedAt: new Date().toISOString(),
-    });
-
-    // A deleted reservation must remain unavailable even if a stale token
-    // or external initialization process attempts to restore its document.
-    const tombstones = await getTombstones();
-    if (tombstones.has(`reservation_requests_${tokenRecord.reservationRequestId}`)) {
+    // Check before mutating the token so deleted reservations stay unavailable.
+    // This lookup fails closed if Firestore cannot verify the tombstone.
+    if (await hasTombstone('reservation_requests', tokenRecord.reservationRequestId)) {
       res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
       return;
     }
+
+    await updateDocById('guest_access_tokens', tokenRecord.id, {
+      lastAccessedAt: new Date().toISOString(),
+    });
 
     const reservation = await getDocById<any>(
       'reservation_requests',
