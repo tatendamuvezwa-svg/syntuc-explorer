@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   Calculator,
   Play,
-  Image as ImageIcon,
   Check,
 } from 'lucide-react';
 
