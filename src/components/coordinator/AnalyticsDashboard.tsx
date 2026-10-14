@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api.ts';
+import { MarketingStudio } from './MarketingStudio.tsx';
 import {
   TrendingUp,
   Users,
@@ -34,7 +35,7 @@ export const AnalyticsDashboard: React.FC = () => {
   const [endDate, setEndDate] = useState<string>('');
 
   // Active sub-view
-  const [subView, setSubView] = useState<'overview' | 'sources' | 'campaigns' | 'ads' | 'reservations' | 'builder'>(
+  const [subView, setSubView] = useState<'overview' | 'sources' | 'campaigns' | 'ads' | 'reservations' | 'builder' | 'studio'>(
     'overview'
   );
 
@@ -182,6 +183,7 @@ export const AnalyticsDashboard: React.FC = () => {
           { id: 'ads', label: 'Ad Creatives (utm_content)', icon: Layers },
           { id: 'reservations', label: 'Reservation Attribution', icon: DollarSign },
           { id: 'builder', label: 'Campaign URL Builder', icon: Share2 },
+          { id: 'studio', label: 'AI Content Studio', icon: Sparkles },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = subView === tab.id;
@@ -214,6 +216,8 @@ export const AnalyticsDashboard: React.FC = () => {
           <p className="text-xs mt-1">{error}</p>
         </div>
       )}
+
+      {subView === 'studio' && <MarketingStudio />}
 
       {data && (
         <>
