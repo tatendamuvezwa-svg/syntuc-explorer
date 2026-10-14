@@ -122,8 +122,9 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const product = await getDocById<any>('products', id);
-    if (!product) {
+    const firestoreProduct = await getDocById<any>('products', id);
+    const product = firestoreProduct || PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === id) || null;
+    if (!product || tombstones.has(`products_${id}`)) {
       res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
       return;
     }
@@ -162,7 +163,7 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       rooms,
       variants,
       media,
-      primaryImageUrl: primaryMedia?.url || null,
+      primaryImageUrl: primaryMedia?.url || product._fallbackImageUrl || null,
       primaryImageAlt: primaryMedia?.altText || product.name,
     });
   } catch (error) {
