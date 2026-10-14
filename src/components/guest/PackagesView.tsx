@@ -24,18 +24,18 @@ export const PackagesView: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#FBFAF7] py-14 sm:py-18">
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-12">
         {/* Header */}
         <div className="max-w-2xl">
-          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3 h-3 text-amber-700" />
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-[#EEF1E9] text-[#365D43] text-xs font-semibold uppercase tracking-wider mb-3">
+            <Sparkles className="w-3 h-3 text-[#967044]" />
             <span>Curated Multi-Day Journeys</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-stone-900 font-display">
+          <h1 className="text-4xl sm:text-5xl font-medium tracking-[-0.04em] text-[#263B30] font-display">
             Victoria Falls Packages
           </h1>
-          <p className="mt-2 text-stone-600 text-sm leading-relaxed">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-stone-600 sm:text-lg">
             Thoughtfully packaged combinations of verified accommodations, scenic helicopter flights, rainforest walking tours, and Zambezi river safaris.
           </p>
         </div>
@@ -44,7 +44,7 @@ export const PackagesView: React.FC = () => {
         {loading ? (
           <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8 animate-pulse">
             {[1, 2, 3].map(i => (
-              <div key={i} className="bg-white rounded-2xl h-96 border border-stone-200" />
+              <div key={i} className="bg-white rounded-2xl h-96 border border-[#E8E5DE]" />
             ))}
           </div>
         ) : (
@@ -53,7 +53,7 @@ export const PackagesView: React.FC = () => {
               <div
                 key={pkg.id}
                 id={pkg.id}
-                className="bg-white rounded-3xl border border-stone-200/90 shadow-xs hover:shadow-xl hover:shadow-stone-900/5 transition-all overflow-hidden flex flex-col justify-between"
+                className="bg-white rounded-2xl border border-[#E8E5DE] shadow-[0_4px_24px_rgba(38,59,48,0.035)] hover:shadow-[0_16px_44px_rgba(38,59,48,0.09)] transition-all overflow-hidden flex flex-col justify-between"
               >
                 <div>
                   {/* Hero image banner */}
@@ -61,16 +61,16 @@ export const PackagesView: React.FC = () => {
                     <img
                       src={pkg.primaryImageUrl}
                       alt={pkg.name}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-cover hover:scale-[1.025] transition-transform duration-500"
                     />
                     <div className="absolute top-3 left-3 bg-stone-950/80 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-lg flex items-center">
-                      <Clock className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                      <Clock className="w-3.5 h-3.5 mr-1 text-[#E2BE8C]" />
                       {pkg.durationDays} Days / {pkg.durationNights} Nights
                     </div>
 
                     <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-stone-900 px-3 py-1 rounded-xl shadow-md text-right">
                       <div className="text-[10px] text-stone-500 uppercase font-semibold">From</div>
-                      <div className="text-lg font-extrabold text-amber-800 font-display leading-tight">
+                      <div className="text-xl font-medium text-[#263B30] font-display leading-tight">
                         US${pkg.pricePerPerson}
                       </div>
                       <div className="text-[10px] text-stone-400">per person</div>
@@ -79,9 +79,9 @@ export const PackagesView: React.FC = () => {
 
                   {/* Body */}
                   <div className="p-6">
-                    <h3 className="text-xl font-bold text-stone-900 font-display">{pkg.name}</h3>
-                    <p className="text-xs text-amber-800 font-semibold mt-1">{pkg.tagline}</p>
-                    <p className="mt-3 text-xs text-stone-600 leading-relaxed">{pkg.description}</p>
+                    <h3 className="text-2xl font-medium tracking-[-0.025em] text-[#263B30] font-display">{pkg.name}</h3>
+                    <p className="text-xs text-[#967044] font-semibold mt-2">{pkg.tagline}</p>
+                    <p className="mt-3 text-sm text-stone-600 leading-6">{pkg.description}</p>
 
                     {/* Highlights */}
                     {pkg.highlights && pkg.highlights.length > 0 && (
@@ -92,7 +92,7 @@ export const PackagesView: React.FC = () => {
                         <ul className="space-y-1.5 text-xs text-stone-700">
                           {pkg.highlights.map((hl, i) => (
                             <li key={i} className="flex items-start">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mr-2 shrink-0 mt-0.5" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#54775A] mr-2 shrink-0 mt-0.5" />
                               <span>{hl}</span>
                             </li>
                           ))}
@@ -110,7 +110,7 @@ export const PackagesView: React.FC = () => {
                       await addToTrip({ productId: pkg.id });
                       openReservationModal();
                     }}
-                    className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs shadow-md shadow-amber-600/20 transition flex items-center justify-center cursor-pointer"
+                    className="w-full min-h-12 py-3.5 rounded-full bg-[#263B30] hover:bg-[#34513F] text-white font-semibold text-sm transition flex items-center justify-center cursor-pointer"
                   >
                     <span>Inquire About This Package</span>
                     <ArrowRight className="w-4 h-4 ml-1.5" />
