@@ -1,20 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import fs from 'fs';
-import multer from 'multer';
 import { GoogleGenAI } from '@google/genai';
 import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware/auth.ts';
 import { getDocById, setDocById, updateDocById, getCollectionDocs } from '../lib/firestore.ts';
 
 const router = Router();
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ['video/mp4', 'video/webm', 'video/quicktime'];
-    cb(null, allowed.includes(file.mimetype));
-  },
-});
 const now = () => new Date().toISOString();
 const PUBLIC_APP_URL = process.env.PUBLIC_APP_URL || 'https://syntuc.com/';
 const PUBLIC_APP_ORIGIN = new URL(PUBLIC_APP_URL).origin;
@@ -31,11 +21,6 @@ async function resolveGeminiKey(): Promise<string | undefined> {
 }
 
 // Coordinator-only campaign workspace. Public click redirects are intentionally isolated below.
-router.get('/creatives', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
-  try { const creatives = await getCollectionDocs<any>('marketing_creatives'); creatives.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); res.json({ creatives }); }
-  catch (error) { console.error('[Marketing] Creative load failed:', error); res.status(500).json({ error: 'CREATIVES_LOAD_FAILED' }); }
-});
-
 router.get('/campaigns', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const campaigns = await getCollectionDocs<any>('marketing_campaigns');
@@ -93,7 +78,8 @@ router.post('/campaigns', requireCoordinatorAuth, async (req: AuthenticatedStaff
     const caption = safeText(req.body?.caption, 2200);
     const hook = safeText(req.body?.hook, 250);
     const callToAction = safeText(req.body?.callToAction, 250);
-    const creativeId = safeText(req.body?.creativeId, 100) || null;
+    const creativeName = safeText(req.body?.creativeName, 160) || null;
+    const creativeSize = Number.isFinite(Number(req.body?.creativeSize)) && Number(req.body?.creativeSize) > 0 ? Math.min(Number(req.body.creativeSize), 8 * 1024 * 1024) : null;
     const hashtags = Array.isArray(req.body?.hashtags) ? req.body.hashtags.map((v: unknown) => safeText(v, 80)).filter(Boolean).slice(0, 10) : [];
     if (!title || !destination || !caption) { res.status(400).json({ error: 'TITLE_DESTINATION_CAPTION_REQUIRED' }); return; }
     let target: URL;
@@ -105,7 +91,7 @@ router.post('/campaigns', requireCoordinatorAuth, async (req: AuthenticatedStaff
     const record = {
       ...(existing || {}),
       id, title, platform: 'tiktok', campaignType: 'organic', status: existing?.status || 'DRAFT',
-      destination: target.toString(), caption, hook, callToAction, hashtags, creativeId,
+      destination: target.toString(), caption, hook, callToAction, hashtags, creativeName, creativeSize,
       utmCampaign, clickCount: Number(existing?.clickCount) || 0,
       createdAt: existing?.createdAt || now(), updatedAt: now(),
       createdBy: existing?.createdBy || staffId(req), updatedBy: staffId(req),
@@ -142,45 +128,6 @@ router.post('/campaigns/:id/published', requireCoordinatorAuth, async (req: Auth
   }
 });
 
-// Upload video to Firestore in sub-1MB chunks. Never rely on container-local disk for persistence.
-router.post('/videos', requireCoordinatorAuth, upload.single('file'), async (req: AuthenticatedStaffRequest, res: Response) => {
-  try {
-    if (!req.file) { res.status(400).json({ error: 'VIDEO_REQUIRED' }); return; }
-    const id = 'vid_' + crypto.randomBytes(10).toString('hex');
-    const base64 = req.file.buffer.toString('base64');
-    const chunkSize = 300 * 1024;
-    const chunks = Math.ceil(base64.length / chunkSize);
-    for (let i = 0; i < chunks; i++) {
-      await setDocById('marketing_video_chunks', `${id}_${i}`, { id: `${id}_${i}`, videoId: id, index: i, data: base64.slice(i * chunkSize, (i + 1) * chunkSize), createdAt: now() });
-    }
-    const creative = { id, name: safeText(req.body?.name, 160) || req.file.originalname.slice(0, 160), mimeType: req.file.mimetype, size: req.file.size, chunkCount: chunks, status: 'READY', createdAt: now(), createdBy: staffId(req) };
-    await setDocById('marketing_creatives', id, creative);
-    res.json({ creative });
-  } catch (error: any) {
-    console.error('[Marketing] Video upload failed:', error);
-    res.status(500).json({ error: 'VIDEO_UPLOAD_FAILED', message: 'Video could not be stored. Check the file is MP4, WebM or MOV and under 8 MB.' });
-  }
-});
-
-router.get('/videos/:id', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
-  try {
-    const id = safeText(req.params.id, 100);
-    const creative = await getDocById<any>('marketing_creatives', id);
-    if (!creative) { res.status(404).json({ error: 'VIDEO_NOT_FOUND' }); return; }
-    const docs = await getCollectionDocs<any>('marketing_video_chunks');
-    const parts = docs.filter(d => d.videoId === id).sort((a, b) => a.index - b.index);
-    if (parts.length !== creative.chunkCount) { res.status(500).json({ error: 'VIDEO_STORAGE_INCOMPLETE' }); return; }
-    const buffer = Buffer.from(parts.map(p => p.data).join(''), 'base64');
-    res.setHeader('Content-Type', creative.mimeType || 'video/mp4');
-    res.setHeader('Content-Disposition', `attachment; filename="${String(creative.name || 'syntuc-video').replace(/["\\r\\n]/g, '_')}"`);
-    res.setHeader('Content-Length', buffer.length);
-    res.send(buffer);
-  } catch (error) {
-    console.error('[Marketing] Video download failed:', error);
-    res.status(500).json({ error: 'VIDEO_DOWNLOAD_FAILED' });
-  }
-});
-
 // Tracked campaign redirect: public endpoint; destination is revalidated against a fixed canonical origin.
 router.get('/c/:id', async (req: Request, res: Response) => {
   try {
@@ -193,7 +140,7 @@ router.get('/c/:id', async (req: Request, res: Response) => {
     target.searchParams.set('utm_source', source);
     target.searchParams.set('utm_medium', campaign.campaignType === 'paid' ? 'paid_social' : 'organic_social');
     target.searchParams.set('utm_campaign', campaign.utmCampaign || campaign.id);
-    target.searchParams.set('utm_content', campaign.creativeId || campaign.id);
+    target.searchParams.set('utm_content', campaign.creativeId || campaign.creativeName || campaign.id);
     const clickId = 'clk_' + crypto.randomBytes(12).toString('hex');
     await setDocById('marketing_clicks', clickId, { id: clickId, campaignId: id, occurredAt: now(), referrer: safeText(req.get('referer'), 500), userAgent: safeText(req.get('user-agent'), 300) });
     await updateDocById('marketing_campaigns', id, { clickCount: (Number(campaign.clickCount) || 0) + 1, lastClickAt: now() });
