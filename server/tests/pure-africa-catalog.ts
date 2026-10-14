@@ -5,7 +5,7 @@ import { PURE_AFRICA_FALLBACK_PRODUCTS } from '../routes/catalog.ts';
 import { CONFIRMED_PRODUCT_VARIANTS } from '../services/variantCatalog.ts';
 
 const products = PURE_AFRICA_FALLBACK_PRODUCTS;
-const byId = new Map(products.map((product) => [product.id, product]));
+const byId = new Map<string, any>(products.map((product: any) => [product.id, product] as [string, any]));
 
 const requiredIds = [
   'prod_pure_africa_sunrise_cruise',
