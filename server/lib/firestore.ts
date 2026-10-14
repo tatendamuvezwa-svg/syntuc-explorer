@@ -117,6 +117,14 @@ export async function recordTombstone(collectionName: string, recordId: string):
   });
 }
 
+/** Strict point lookup for callers that must fail closed when tombstone reads fail. */
+export async function hasTombstone(collectionName: string, recordId: string): Promise<boolean> {
+  const fdb = getFirestoreDb();
+  const tombstoneId = `${collectionName}_${recordId}`;
+  const snap = await getDoc(doc(fdb, 'deleted_records', tombstoneId));
+  return snap.exists();
+}
+
 export async function getTombstones(): Promise<Set<string>> {
   const fdb = getFirestoreDb();
   const set = new Set<string>();
