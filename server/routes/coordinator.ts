@@ -426,9 +426,11 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
     }
 
     const existingProducts = await getCollectionDocs<any>('products');
+    const existingPackages = await getCollectionDocs<any>('packages');
     const tombstones = await getTombstones();
     const activeExisting = existingProducts.filter((p) => !tombstones.has(`products_${p.id}`));
-    const existingKeys = new Set(activeExisting.map((p) => p.catalogImportKey).filter(Boolean));
+    const activeExistingPackages = existingPackages.filter((p) => !tombstones.has(`packages_${p.id}`));
+    const existingKeys = new Set([...activeExisting, ...activeExistingPackages].map((p) => p.catalogImportKey).filter(Boolean));
     const results = { created: 0, alreadyImported: 0, existingNeedsManualReview: 0, errors: [] as string[], skipped: [] as Array<{ name: string; operator: string; reason: string }> };
     const now = new Date().toISOString();
 
@@ -440,19 +442,20 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         continue;
       }
 
-      // Same-name products under the same operator may be legacy catalog entries.
-      // Never overwrite them or silently create a second listing.
-      const sameOperatorName = activeExisting.find((p) =>
+      // Packages live in the packages collection; activities/transfers stay in products.
+      const isPackage = item.productType === 'package';
+      const targetExisting = isPackage ? activeExistingPackages : activeExisting;
+      const sameOperatorName = targetExisting.find((p) =>
         p.operatorId === operatorId && normalize(p.name) === normalize(item.name)
       );
       if (sameOperatorName) {
         results.existingNeedsManualReview++;
-        results.skipped.push({ name: item.name, operator: item.operatorName, reason: `Existing product ${sameOperatorName.id} requires manual source/rate reconciliation; no overwrite performed.` });
+        results.skipped.push({ name: item.name, operator: item.operatorName, reason: `Existing ${isPackage ? 'package' : 'product'} ${sameOperatorName.id} requires manual source/rate reconciliation; no overwrite performed.` });
         continue;
       }
 
-      const productId = 'imp_' + crypto.createHash('sha256').update(importKey).digest('hex').slice(0, 24);
-      if (activeExisting.some((p) => p.id === productId)) {
+      const productId = (isPackage ? 'imp_pkg_' : 'imp_') + crypto.createHash('sha256').update(importKey).digest('hex').slice(0, 20);
+      if (targetExisting.some((p) => p.id === productId)) {
         results.errors.push(`Deterministic ID collision for ${item.operatorName}: ${item.name}`);
         continue;
       }
@@ -492,18 +495,54 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       };
 
       try {
-        await setDocById('products', productId, newProduct, false);
+        if (isPackage) {
+          const newPackage = {
+            id: productId,
+            slug: `${normalize(item.name).replace(/ /g, '-')}-${productId.slice(-6)}`,
+            name: item.name,
+            tagline: `Operator package from ${item.operatorName}`,
+            description: item.shortDescription,
+            durationDays: 1,
+            durationNights: 0,
+            pricePerPerson: String(item.basePrice),
+            currency: 'USD',
+            highlights: item.inclusions,
+            inclusions: item.inclusions,
+            exclusions: item.exclusions,
+            primaryImageUrl: null,
+            videoUrl: null,
+            operatorId,
+            operatorName: item.operatorName,
+            catalogItemType: 'package',
+            categorySlug: item.categorySlug,
+            mandatoryFees: item.mandatoryFees,
+            sourceReference: item.sourceReference,
+            catalogImportKey: importKey,
+            catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
+            verificationNotes: item.verificationNotes,
+            priceBasis: item.priceBasis,
+            isPublished: false,
+            createdAt: now,
+            updatedAt: now,
+            importedByStaffId: req.staffUser!.id,
+          };
+          await setDocById('packages', productId, newPackage, false);
+          activeExistingPackages.push(newPackage);
+        } else {
+          await setDocById('products', productId, newProduct, false);
+          activeExisting.push(newProduct);
+        }
         const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
         await setDocById('product_revisions', revId, {
           id: revId,
           productId,
+          collectionName: isPackage ? 'packages' : 'products',
           modifiedByStaffId: req.staffUser!.id,
           previousSnapshot: null,
           changeSummary: `Draft operator price-list import: ${item.operatorName} — ${item.name}`,
           createdAt: now,
         });
         existingKeys.add(importKey);
-        activeExisting.push(newProduct);
         results.created++;
       } catch (error: any) {
         results.errors.push(`${item.operatorName} — ${item.name}: ${error?.message || 'write failed'}`);
