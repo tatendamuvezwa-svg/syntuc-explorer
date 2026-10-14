@@ -267,7 +267,7 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "capacityNote": "2–40 guests",
     "isPublished": true,
     "isFeatured": true,
-    "availabilityNote": "Select à la carte or Potjie dinner. Transfers and beverages are excluded.",
+    "availabilityNote": "Select à la carte or Potjie dinner. Transfers and beverages are excluded. Thumbnail shows the Potjie option.",
     "primaryMediaId": "med_c586325b4fea5fe25236ca20",
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
