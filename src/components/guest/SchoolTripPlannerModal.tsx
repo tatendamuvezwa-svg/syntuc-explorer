@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from '../../context/SessionContext.tsx';
+import { Product } from '../../types/index.ts';
 import { api } from '../../services/api.ts';
 import {
   X,
@@ -11,6 +12,9 @@ import {
   ArrowRight,
   ShieldCheck,
   Calculator,
+  Play,
+  Image as ImageIcon,
+  Check,
 } from 'lucide-react';
 
 export const SchoolTripPlannerModal: React.FC = () => {
@@ -36,6 +40,7 @@ export const SchoolTripPlannerModal: React.FC = () => {
     includeBridgeTour: true,
   });
 
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [quoteResult, setQuoteResult] = useState<any>(null);
   const [loadingQuote, setLoadingQuote] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -49,6 +54,26 @@ export const SchoolTripPlannerModal: React.FC = () => {
   const [arrivalDate, setArrivalDate] = useState<string>('');
   const [departureDate, setDepartureDate] = useState<string>('');
   const [specialRequests, setSpecialRequests] = useState<string>('');
+
+  // Reuse verified catalogue media for school-specific product cards.
+  useEffect(() => {
+    if (!isSchoolPlannerOpen) return;
+    let cancelled = false;
+    api.getProducts()
+      .then((products: Product[]) => {
+        if (!cancelled) setCatalogProducts(products.filter(product => product.isPublished));
+      })
+      .catch(error => console.error('Unable to load school planner product media:', error));
+    return () => { cancelled = true; };
+  }, [isSchoolPlannerOpen]);
+
+  const mediaFor = (terms: string[]) => {
+    const normalizedTerms = terms.map(term => term.toLowerCase());
+    return catalogProducts.find(product =>
+      product.productType === 'activity' &&
+      normalizedTerms.some(term => product.name.toLowerCase().includes(term))
+    );
+  };
 
   // Recalculate quote whenever parameters change
   useEffect(() => {
@@ -297,281 +322,98 @@ export const SchoolTripPlannerModal: React.FC = () => {
 
             {/* Accommodation Tier */}
             <div className="space-y-4 pt-4 border-t border-stone-100">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs uppercase font-bold tracking-wider text-stone-400">
-                  2. Educational Accommodation Tier
-                </h4>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-stone-600 font-medium">Nights:</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={nightsCount}
-                    onChange={e => setNightsCount(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-16 px-2 py-1 text-xs rounded-lg border border-stone-200"
-                  />
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs uppercase font-bold tracking-wider text-stone-500">2. Educational Accommodation</h4>
+                  <p className="text-xs text-stone-500 mt-1">Choose the stay that fits your school's budget.</p>
                 </div>
+                <label className="flex items-center gap-2 text-xs text-stone-600 font-medium shrink-0">
+                  Nights
+                  <input aria-label="Accommodation nights" type="number" min="0" value={nightsCount} onChange={e => setNightsCount(Math.max(0, parseInt(e.target.value) || 0))} className="w-16 px-2.5 py-2 text-xs rounded-xl border border-stone-200" />
+                </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Budget */}
-                <div
-                  onClick={() => setAccommodationTier('budget')}
-                  className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
-                    accommodationTier === 'budget'
-                      ? 'border-emerald-600 bg-emerald-50/40 shadow-xs'
-                      : 'border-stone-200 bg-white'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="text-xs font-bold text-stone-900">
-                      Budget School Lodges
-                    </span>
-                    <span className="text-xs font-bold text-emerald-800 font-display">
-                      From US$15
-                    </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button type="button" aria-pressed={accommodationTier === 'budget'} onClick={() => setAccommodationTier('budget')} className={`group text-left overflow-hidden rounded-2xl border transition-all ${accommodationTier === 'budget' ? 'border-[#54775A] ring-2 ring-[#54775A]/15 shadow-md' : 'border-stone-200 hover:border-stone-300'}`}>
+                  <div className="relative h-36 bg-stone-100 overflow-hidden">
+                    <img src={catalogProducts.find(p => p.productType === 'accommodation' && /khulula|teak|reynard|letsatsi/i.test(p.name))?.primaryImageUrl || 'https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&w=900&q=80'} alt="Budget school lodge accommodation" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                    <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-stone-700">School budget</span>
+                    {accommodationTier === 'budget' && <span className="absolute right-3 top-3 rounded-full bg-[#263B30] p-1.5 text-white"><Check className="w-3.5 h-3.5" /></span>}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#17251D]/90 to-transparent px-4 pb-3 pt-8"><span className="text-xl font-bold text-white">US$15 <span className="text-xs font-medium text-white/80">/ student / night</span></span></div>
                   </div>
-                  <p className="text-[11px] text-stone-500 mt-1">
-                    Khulula Lodge, Teak Lodge, Reynard Cottages, Letsatsi. Shared dormitory or multiple beds.
-                  </p>
-                  <div className="mt-2 text-[10px] text-emerald-700 font-semibold">
-                    US$15 per child / night
+                  <div className="p-4">
+                    <h5 className="font-semibold text-[#263B30]">Budget School Lodges</h5>
+                    <p className="mt-1 text-xs leading-relaxed text-stone-600">Khulula Lodge, Teak Lodge, Reynard Cottages and Letsatsi. Shared dormitory or multi-bed rooms.</p>
+                    <p className="mt-3 text-xs font-semibold text-[#54775A]">Estimated accommodation: US${15 * studentCount * nightsCount}</p>
                   </div>
-                </div>
+                </button>
 
-                {/* Rainbow Hotel */}
-                <div
-                  onClick={() => setAccommodationTier('rainbow_hotel')}
-                  className={`p-4 rounded-2xl border-2 transition cursor-pointer ${
-                    accommodationTier === 'rainbow_hotel'
-                      ? 'border-emerald-600 bg-emerald-50/40 shadow-xs'
-                      : 'border-stone-200 bg-white'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="text-xs font-bold text-stone-900">
-                      Victoria Falls Rainbow Hotel
-                    </span>
-                    <span className="text-xs font-bold text-emerald-800 font-display">
-                      US$130 / room
-                    </span>
+                <button type="button" aria-pressed={accommodationTier === 'rainbow_hotel'} onClick={() => setAccommodationTier('rainbow_hotel')} className={`group text-left overflow-hidden rounded-2xl border transition-all ${accommodationTier === 'rainbow_hotel' ? 'border-[#54775A] ring-2 ring-[#54775A]/15 shadow-md' : 'border-stone-200 hover:border-stone-300'}`}>
+                  <div className="relative h-36 bg-stone-100 overflow-hidden">
+                    <img src={catalogProducts.find(p => p.productType === 'accommodation' && /rainbow hotel/i.test(p.name))?.primaryImageUrl || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=900&q=80'} alt="Victoria Falls Rainbow Hotel" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                    <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-stone-700">Hotel standard</span>
+                    {accommodationTier === 'rainbow_hotel' && <span className="absolute right-3 top-3 rounded-full bg-[#263B30] p-1.5 text-white"><Check className="w-3.5 h-3.5" /></span>}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#17251D]/90 to-transparent px-4 pb-3 pt-8"><span className="text-xl font-bold text-white">US$130 <span className="text-xs font-medium text-white/80">/ room / night</span></span></div>
                   </div>
-                  <p className="text-[11px] text-stone-500 mt-1">
-                    Premium hotel standard. USD 130 per room shared by two children (USD 65 / child).
-                  </p>
-                  <div className="mt-2 text-[10px] text-emerald-700 font-semibold">
-                    {Math.ceil(studentCount / 2)} rooms allocated
+                  <div className="p-4">
+                    <h5 className="font-semibold text-[#263B30]">Victoria Falls Rainbow Hotel</h5>
+                    <p className="mt-1 text-xs leading-relaxed text-stone-600">Premium hotel stay with two students sharing each room, subject to room allocation.</p>
+                    <p className="mt-3 text-xs font-semibold text-[#54775A]">{Math.ceil(studentCount / 2)} rooms · estimated US${130 * Math.ceil(studentCount / 2) * nightsCount} / night total</p>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
 
-            {/* Activities Checkboxes */}
-            <div className="space-y-4 pt-4 border-t border-stone-100">
-              <h4 className="text-xs uppercase font-bold tracking-wider text-stone-400">
-                3. Educational Activities (Special Tariffs)
-              </h4>
-
-              <div className="space-y-2 text-xs">
-                {/* Rainforest Tour */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-stone-200 hover:bg-stone-50 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.rainforestTour}
-                    onChange={() => toggleActivity('rainforestTour')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">
-                        Rainforest Guided Walking Tour
-                      </span>
-                      <span className="font-semibold text-emerald-800 font-display">
-                        Primary $1 / Secondary $4
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      Naturalist guide and park access. Teachers: 1 per 20 students gets half-price ($4).
-                    </p>
-                  </div>
-                </label>
-
-                {/* Helicopter */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50/60 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.helicopterFlight}
-                    onChange={() => toggleActivity('helicopterFlight')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">
-                        School Educational Helicopter Flight
-                      </span>
-                      <span className="font-semibold text-emerald-800 font-display">
-                        US$70 / student
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      ★ PRIORITY ACTIVITY for Bridge Tour incentive. Special school group flight.
-                    </p>
-                  </div>
-                </label>
-
-                {/* Quad Biking */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50/60 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.quadBiking}
-                    onChange={() => toggleActivity('quadBiking')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">
-                        Supervised Quad Biking
-                      </span>
-                      <span className="font-semibold text-emerald-800 font-display">
-                        US$10 / student
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      ★ PRIORITY ACTIVITY for Bridge Tour incentive. Guided terrain safety track.
-                    </p>
-                  </div>
-                </label>
-
-                {/* Elephant Sanctuary */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50/60 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.elephantInteraction}
-                    onChange={() => toggleActivity('elephantInteraction')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">
-                        Elephant Sanctuary Educational Interaction
-                      </span>
-                      <span className="font-semibold text-emerald-800 font-display">
-                        Primary $10 / Secondary $20
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      ★ PRIORITY ACTIVITY for Bridge Tour incentive. Wildlife conservation talk.
-                    </p>
-                  </div>
-                </label>
-
-                {/* Standalone Safari Game Drive */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50/60 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.gameDrive}
-                    onChange={() => toggleActivity('gameDrive')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">
-                        Zambezi National Park Safari Game Drive
-                      </span>
-                      <span className="font-semibold text-emerald-800 font-display">
-                        US$15 / student
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      ★ PRIORITY ACTIVITY for Bridge Tour incentive. Open 4x4 guided wildlife safari.
-                    </p>
-                  </div>
-                </label>
-
-                {/* Standard Boat Cruise */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-stone-200 hover:bg-stone-50 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.boatCruise}
-                    onChange={() => toggleActivity('boatCruise')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">
-                        Standard Zambezi River Boat Cruise
-                      </span>
-                      <span className="font-semibold text-stone-800 font-display">
-                        US$10 / student + Park Fee
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      Educational river cruise. (Note: Does NOT count toward Bridge Tour incentive).
-                    </p>
-                  </div>
-                </label>
-
-                {/* Crocodile Farm */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-stone-200 hover:bg-stone-50 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.crocodileFarm}
-                    onChange={() => toggleActivity('crocodileFarm')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">Crocodile Farm Educational Tour</span>
-                      <span className="font-semibold text-stone-800 font-display">
-                        Primary $3 / Secondary $4
-                      </span>
-                    </div>
-                  </div>
-                </label>
-
-                {/* Airport Tour */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border border-stone-200 hover:bg-stone-50 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.airportTour}
-                    onChange={() => toggleActivity('airportTour')}
-                    className="mt-0.5 rounded text-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-800">Airport Aviation Tour</span>
-                      <span className="font-semibold text-stone-800 font-display">
-                        US$3 / student
-                      </span>
-                    </div>
-                  </div>
-                </label>
-
-                {/* Historic Bridge Tour */}
-                <label className="flex items-start space-x-3 p-3 rounded-xl border-2 border-amber-300 bg-amber-50/50 hover:bg-amber-50 transition cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedActivities.includeBridgeTour}
-                    onChange={() => toggleActivity('includeBridgeTour')}
-                    className="mt-0.5 rounded text-amber-600"
-                  />
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-stone-900">
-                        Victoria Falls Historic 1905 Bridge Tour
-                      </span>
-                      <span className="font-bold text-emerald-800 font-display">
-                        {quoteResult?.bridgeIncentiveQualified ? 'COMPLIMENTARY ($0)' : 'Standard $20'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-600">
-                      {quoteResult?.bridgeIncentiveQualified
-                        ? '✓ Complimentary $0 benefit unlocked via qualification criteria!'
-                        : 'Requires 2 nights accommodation + 2 qualifying priority activities for $0 waiver.'}
-                    </p>
-                  </div>
-                </label>
+            {/* Activities: standard Syntuc product-card presentation */}
+            <div className="space-y-4 pt-5 border-t border-stone-100">
+              <div>
+                <h4 className="text-xs uppercase font-bold tracking-wider text-stone-500">3. Educational Activities</h4>
+                <p className="mt-1 text-xs text-stone-500">Select experiences for your delegation. Each card shows its school tariff and available media.</p>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {([
+                  { key: 'rainforestTour', title: 'Rainforest Guided Walking Tour', price: educationLevel === 'primary' ? 'US$1' : 'US$4', basis: 'per student', description: 'Explore the rainforest viewpoints with a naturalist guide and park access.', terms: ['rainforest guided', 'rainforest walking', 'guided walking tour'], priority: false, fallback: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'helicopterFlight', title: 'School Educational Helicopter Flight', price: 'US$70', basis: 'per student', description: 'A special school-group scenic flight over Victoria Falls and the surrounding gorge.', terms: ['flight of angels', 'helicopter', 'scenic flight'], priority: true, fallback: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'quadBiking', title: 'Supervised Quad Biking', price: 'US$10', basis: 'per student', description: 'A supervised terrain ride with safety guidance for the student group.', terms: ['quad biking', 'quad bike'], priority: true, fallback: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'elephantInteraction', title: 'Elephant Sanctuary Educational Interaction', price: educationLevel === 'primary' ? 'US$10' : 'US$20', basis: 'per student', description: 'An educational wildlife encounter focused on elephant conservation.', terms: ['elephant interaction', 'elephant camp', 'elephant sanctuary'], priority: true, fallback: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'gameDrive', title: 'Zambezi National Park Safari Game Drive', price: 'US$15', basis: 'per student', description: 'A guided open-vehicle safari exploring the wildlife of Zambezi National Park.', terms: ['safari game drive', 'game drive'], priority: true, fallback: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'boatCruise', title: 'Standard Zambezi River Boat Cruise', price: 'US$10', basis: 'per student + park fee', description: 'An educational river cruise introducing students to the Zambezi ecosystem.', terms: ['sunset cruise', 'river cruise', 'boat cruise'], priority: false, fallback: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'crocodileFarm', title: 'Crocodile Farm Educational Tour', price: educationLevel === 'primary' ? 'US$3' : 'US$4', basis: 'per student', description: 'A guided educational visit focused on crocodiles and local wildlife.', terms: ['crocodile farm'], priority: false, fallback: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'airportTour', title: 'Airport Aviation Tour', price: 'US$3', basis: 'per student', description: 'An aviation-focused educational visit introducing students to airport operations.', terms: ['airport aviation', 'airport tour'], priority: false, fallback: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=900&q=80' },
+                  { key: 'includeBridgeTour', title: 'Victoria Falls Historic 1905 Bridge Tour', price: quoteResult?.bridgeIncentiveQualified ? 'COMPLIMENTARY' : 'US$20', basis: quoteResult?.bridgeIncentiveQualified ? 'incentive reward' : 'per student', description: 'Discover the history and engineering of the iconic Victoria Falls Bridge.', terms: ['historic bridge', 'bridge adventures'], priority: false, fallback: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=900&q=80' },
+                ] as const).map(activity => {
+                  const selected = Boolean(selectedActivities[activity.key]);
+                  const mediaProduct = mediaFor(activity.terms);
+                  const imageUrl = mediaProduct?.primaryImageUrl || activity.fallback;
+                  return (
+                    <label key={activity.key} className={`group block overflow-hidden rounded-2xl border bg-white cursor-pointer transition-all duration-200 ${selected ? 'border-[#54775A] ring-2 ring-[#54775A]/15 shadow-md' : 'border-stone-200 hover:border-stone-300 hover:shadow-sm'}`}>
+                      <input type="checkbox" checked={selected} onChange={() => toggleActivity(activity.key)} className="sr-only" />
+                      <div className="relative h-40 overflow-hidden bg-stone-100">
+                        <img src={imageUrl} alt={mediaProduct?.primaryImageAlt || activity.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#17251D]/75 via-transparent to-transparent" />
+                        <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-stone-700">{activity.priority ? 'Bridge incentive eligible' : 'School tariff'}</span>
+                        {selected && <span className="absolute right-3 top-3 rounded-full bg-[#263B30] p-1.5 text-white"><Check className="w-3.5 h-3.5" /></span>}
+                        <div className="absolute inset-x-0 bottom-0 p-3">
+                          <div className="text-xl font-bold text-white">{activity.price} <span className="text-xs font-medium text-white/80">{activity.basis}</span></div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <h5 className="text-sm font-semibold leading-snug text-[#263B30]">{activity.title}</h5>
+                          {activity.priority && <Gift className="h-4 w-4 shrink-0 text-[#A87938]" aria-label="May qualify for Bridge Tour incentive" />}
+                        </div>
+                        <p className="mt-2 text-xs leading-relaxed text-stone-600">{activity.description}</p>
+                        {mediaProduct?.operatorName && <p className="mt-3 text-[11px] font-semibold text-[#54775A]">{mediaProduct.operatorName}</p>}
+                        {mediaProduct?.videoUrl && <a href={mediaProduct.videoUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-[11px] font-semibold text-stone-700 hover:bg-stone-200"><Play className="h-3 w-3" /> Watch experience video</a>}
+                        {activity.key === 'boatCruise' && <p className="mt-2 text-[10px] text-amber-800">Standard boat cruise does not qualify for the Bridge Tour incentive.</p>}
+                        {activity.key === 'includeBridgeTour' && <p className="mt-2 text-[10px] text-stone-500">{quoteResult?.bridgeIncentiveQualified ? 'Your current selection qualifies for the complimentary bridge tour.' : 'Requires 2+ nights and 2 qualifying priority activities.'}</p>}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-stone-500">Product photos and video links appear when verified media exists in the Syntuc catalogue. School-specific tariffs remain authoritative for this planner.</p>
 
               {/* School Coordinator & Travel Dates */}
               <div className="pt-4 border-t border-stone-200 space-y-3">
