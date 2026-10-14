@@ -10,7 +10,7 @@ type Campaign = {
 };
 
 const PUBLIC_ORIGIN = 'https://syntuc.com';
-const emptyDraft = { title: '', topic: '', audience: 'Travellers planning a Victoria Falls visit', tone: 'Helpful, vivid and credible', hook: '', caption: '', hashtags: [] as string[], callToAction: '', destination: PUBLIC_ORIGIN + '/', creativeName: '', creativeSize: null };
+const emptyDraft: { title: string; topic: string; audience: string; tone: string; hook: string; caption: string; hashtags: string[]; callToAction: string; destination: string; creativeName: string; creativeSize: number | null } = { title: '', topic: '', audience: 'Travellers planning a Victoria Falls visit', tone: 'Helpful, vivid and credible', hook: '', caption: '', hashtags: [], callToAction: '', destination: PUBLIC_ORIGIN + '/', creativeName: '', creativeSize: null };
 
 export const MarketingStudio: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
