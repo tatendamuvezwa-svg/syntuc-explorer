@@ -29,7 +29,7 @@ async function resolveGeminiKey(): Promise<string | undefined> {
 }
 
 // Coordinator-only campaign workspace. Public click redirects are intentionally isolated below.
-router.get('/campaigns', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
+router.get('/creatives', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {\n  try { const creatives = await getCollectionDocs<any>('marketing_creatives'); creatives.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); res.json({ creatives }); }\n  catch (error) { console.error('[Marketing] Creative load failed:', error); res.status(500).json({ error: 'CREATIVES_LOAD_FAILED' }); }\n});\n\nrouter.get('/campaigns', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const campaigns = await getCollectionDocs<any>('marketing_campaigns');
     campaigns.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
