@@ -11,6 +11,7 @@ import mediaRoutes from './server/routes/media.ts';
 import schoolTripRoutes from './server/routes/schoolTrips.ts';
 import assistantRoutes from './server/routes/assistant.ts';
 import analyticsRoutes from './server/routes/analytics.ts';
+import marketingRoutes from './server/routes/marketing.ts';
 import { getFirestoreDb } from './server/lib/firestore.ts';
 
 dotenv.config();
@@ -72,6 +73,7 @@ app.use('/api/media', mediaRoutes);
 app.use('/api/school-trips', schoolTripRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/marketing', marketingRoutes);
 
 // Server startup with direct authoritative Cloud Firestore
 async function startServer() {
