@@ -76,6 +76,8 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [loadingData, setLoadingData] = useState<boolean>(false);
   const [isImportingOperatorCatalog, setIsImportingOperatorCatalog] = useState<boolean>(false);
   const [isOperatorImportConfirmationOpen, setIsOperatorImportConfirmationOpen] = useState<boolean>(false);
+  const [catalogItemPendingVerification, setCatalogItemPendingVerification] = useState<{ id: string; isPackage: boolean; name: string } | null>(null);
+  const [isVerifyingCatalogItem, setIsVerifyingCatalogItem] = useState<boolean>(false);
 
   // Catalogue Management Modals & Filters
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
@@ -247,22 +249,29 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     }
   };
 
-  const handleVerifyImportedCatalogItem = async (id: string, isPackage: boolean, name: string) => {
+  // Use an in-app confirmation: native window.confirm may be suppressed in embedded previews/webviews.
+  const handleVerifyImportedCatalogItem = (id: string, isPackage: boolean, name: string) => {
     if (staffUser?.role !== 'admin') {
       notify('Administrator access is required to verify imported catalog records.', 'error');
       return;
     }
-    const confirmed = window.confirm(
-      `Confirm that you have checked the source price list, operator ownership, current base price, mandatory fees, package inclusions/exclusions and supplier attribution for "${name}". Only proceed if those details have been verified.`
-    );
-    if (!confirmed) return;
+    setCatalogItemPendingVerification({ id, isPackage, name });
+  };
+
+  const confirmVerifyImportedCatalogItem = async () => {
+    const pending = catalogItemPendingVerification;
+    if (!pending || staffUser?.role !== 'admin' || isVerifyingCatalogItem) return;
+    setIsVerifyingCatalogItem(true);
     try {
-      if (isPackage) await api.verifyImportedPackage(id);
-      else await api.verifyImportedProduct(id);
-      notify(`${name} marked verified. Review it once more before publishing.`, 'success');
+      if (pending.isPackage) await api.verifyImportedPackage(pending.id);
+      else await api.verifyImportedProduct(pending.id);
+      setCatalogItemPendingVerification(null);
+      notify(`${pending.name} marked verified. Review it once more before publishing.`, 'success');
       await loadAllData();
     } catch (e: any) {
-      notify(e.message || `Failed to verify ${name}`, 'error');
+      notify(e.message || `Failed to verify ${pending.name}`, 'error');
+    } finally {
+      setIsVerifyingCatalogItem(false);
     }
   };
 
@@ -1557,6 +1566,50 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
           }`}
         >
           {portalNotice.text}
+        </div>
+      )}
+
+      {/* In-app imported catalogue verification confirmation; works in embedded previews */}
+      {catalogItemPendingVerification && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-stone-950/60 p-4" role="presentation">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="verify-catalog-item-title"
+            aria-describedby="verify-catalog-item-description"
+            className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 id="verify-catalog-item-title" className="text-base font-bold text-stone-900">Verify imported catalogue record?</h3>
+                <p className="mt-0.5 text-xs text-stone-500">Administrator action · {catalogItemPendingVerification.isPackage ? 'package' : 'product'}</p>
+              </div>
+            </div>
+            <p id="verify-catalog-item-description" className="text-sm leading-6 text-stone-700">
+              Before marking <strong>{catalogItemPendingVerification.name}</strong> as verified, confirm that you checked the source price list, operator ownership, current base price, mandatory fees, inclusions and exclusions, and supplier attribution. Verification does not publish this item.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setCatalogItemPendingVerification(null)}
+                disabled={isVerifyingCatalogItem}
+                className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmVerifyImportedCatalogItem}
+                disabled={isVerifyingCatalogItem || staffUser?.role !== 'admin'}
+                className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isVerifyingCatalogItem ? 'Verifying…' : 'Confirm verification'}
+              </button>
+            </div>
+          </section>
         </div>
       )}
 
