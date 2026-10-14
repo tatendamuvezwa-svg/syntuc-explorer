@@ -11,7 +11,7 @@ const router = Router();
 
 // Canonical Pure Africa catalog entries. These read-only fallbacks appear only when the
 // corresponding Firestore product is missing; Firestore records and coordinator edits always win.
-const PURE_AFRICA_FALLBACK_PRODUCTS = [
+export const PURE_AFRICA_FALLBACK_PRODUCTS = [
   {
     id: 'prod_zambezi_explorer_cruise',
     operatorId: 'op_pure_africa',
