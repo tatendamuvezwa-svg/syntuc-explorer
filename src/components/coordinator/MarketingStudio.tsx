@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../../services/api.ts';
-import { Check, Copy, ExternalLink, LoaderCircle, Megaphone, Plus, RefreshCw, Sparkles, Upload, Video } from 'lucide-react';
+import { Check, Copy, ExternalLink, LoaderCircle, Megaphone, Plus, RefreshCw, Sparkles, Video } from 'lucide-react';
 
 type Campaign = {
   id: string; title: string; platform: string; status: string; destination: string;
@@ -126,7 +126,7 @@ export const MarketingStudio: React.FC = () => {
 
       <div className="space-y-5">
         <div className="rounded-3xl border border-stone-200 bg-white p-5">
-          <div className="flex items-center gap-2"><Video className="text-amber-700" size={18}/><h4 className="font-bold text-stone-900">Video & Creative Library</h4></div>
+          <div className="flex items-center gap-2"><Video className="text-amber-700" size={18}/><h4 className="font-bold text-stone-900">Video Selection for TikTok</h4></div>
           <p className="mt-2 text-xs leading-5 text-stone-500">Choose an MP4, WebM or MOV video from this device. The video itself is not uploaded to Syntuc Explorer or stored in Firestore. Open TikTok below and select the same local file there. Saved campaigns retain only the filename and size; reselect the file after refreshing or returning later.</p>
           <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={e=>{ const file=e.target.files?.[0] || null; setVideoFile(file); if(file){ setError(''); updateDraft({creativeName:file.name, creativeSize:file.size}); } }} className="mt-4 block w-full text-xs text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-2 file:font-semibold"/>
           {videoFile && <p className="mt-2 text-xs text-stone-600">Selected locally: {videoFile.name} · {(videoFile.size/1024/1024).toFixed(2)} MB</p>}
