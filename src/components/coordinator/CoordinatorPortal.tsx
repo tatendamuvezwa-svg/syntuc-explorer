@@ -97,15 +97,12 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     setTimeout(() => setPortalNotice(null), 5000);
   };
 
-  // Admin-only reservation deletion
+  // Admin-only reservation deletion. Use an in-app dialog instead of window.confirm,
+  // which can be suppressed by embedded previews and webviews.
   const [deletingReservationId, setDeletingReservationId] = useState<string | null>(null);
+  const [reservationPendingDeletion, setReservationPendingDeletion] = useState<ReservationRequest | null>(null);
 
   const handleDeleteReservation = async (reservation: ReservationRequest) => {
-    const confirmed = window.confirm(
-      `Permanently delete reservation ${reservation.referenceNumber}? This action is irreversible.`
-    );
-    if (!confirmed) return;
-
     setDeletingReservationId(reservation.id);
     try {
       await api.deleteReservation(reservation.id);
@@ -695,7 +692,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                         {staffUser?.role === 'admin' && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteReservation(res)}
+                            onClick={() => setReservationPendingDeletion(res)}
                             disabled={deletingReservationId === res.id}
                             className="px-3 py-1 text-xs font-semibold bg-rose-50 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 rounded-lg transition cursor-pointer border border-rose-200"
                             title="Delete reservation (admin only)"
@@ -1429,6 +1426,75 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
           </div>
         )}
       </div>
+
+      {/* Visible feedback for coordinator actions */}
+      {portalNotice && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className={`fixed top-20 right-4 z-[110] max-w-sm rounded-xl border px-4 py-3 text-sm font-medium shadow-xl ${
+            portalNotice.type === 'error'
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+        >
+          {portalNotice.text}
+        </div>
+      )}
+
+      {/* In-app permanent deletion confirmation; independent of browser popup support */}
+      {reservationPendingDeletion && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/60 p-4"
+          role="presentation"
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-reservation-title"
+            aria-describedby="delete-reservation-description"
+            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 id="delete-reservation-title" className="text-base font-bold text-stone-900">
+                  Permanently delete reservation?
+                </h3>
+                <p className="mt-0.5 text-xs text-stone-500">Administrator action</p>
+              </div>
+            </div>
+            <p id="delete-reservation-description" className="text-sm leading-6 text-stone-700">
+              You are about to permanently delete reservation{' '}
+              <strong className="font-mono">{reservationPendingDeletion.referenceNumber || reservationPendingDeletion.id}</strong>.
+              This cannot be undone. Only this reservation and its associated reservation records will be removed.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setReservationPendingDeletion(null)}
+                className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingReservationId !== null}
+                onClick={() => {
+                  const reservation = reservationPendingDeletion;
+                  setReservationPendingDeletion(null);
+                  void handleDeleteReservation(reservation);
+                }}
+                className="rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deletingReservationId === reservationPendingDeletion.id ? 'Deleting…' : 'Confirm permanent deletion'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Full Internal Reservation Detail View & Lifecycle Modal */}
       <ReservationDetailModal
