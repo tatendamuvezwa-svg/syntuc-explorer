@@ -5,7 +5,7 @@ const normalize = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-
 
 assert.ok(operatorCatalogImport.length > 0, 'catalog import data must not be empty');
 
-const allowedOperators = new Set(['Wild Horizons', 'Shearwater']);
+const allowedOperators = new Set(['Wild Horizons', 'Shearwater', 'Pure Africa']);
 const keys = new Set<string>();
 
 for (const item of operatorCatalogImport) {
@@ -28,5 +28,7 @@ for (const item of operatorCatalogImport) {
 
 assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Wild Horizons'));
 assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Shearwater'));
+assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Pure Africa'));
+assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Pure Africa' && item.name === 'Zambezi Explorer Luxury Sunset Cruise' && item.basePrice === 69 && item.authoritativeOverride));
 assert.ok(operatorCatalogImport.some((item) => item.productType === 'package'));
 console.log(`Operator catalog import data passed validation: ${operatorCatalogImport.length} records.`);
