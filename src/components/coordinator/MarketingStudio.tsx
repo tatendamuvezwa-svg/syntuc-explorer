@@ -10,7 +10,7 @@ type Campaign = {
 };
 type Creative = { id: string; name: string; mimeType: string; size: number; status: string; createdAt: string };
 
-const PUBLIC_ORIGIN = 'https://syntuc-explorer.ai.studio';
+const PUBLIC_ORIGIN = 'https://syntuc.com';
 const emptyDraft = { title: '', topic: '', audience: 'Travellers planning a Victoria Falls visit', tone: 'Helpful, vivid and credible', hook: '', caption: '', hashtags: [] as string[], callToAction: '', destination: PUBLIC_ORIGIN + '/', creativeId: '' };
 
 export const MarketingStudio: React.FC = () => {
