@@ -185,10 +185,11 @@ router.get('/dashboard', requireCoordinatorAuth, async (req: AuthenticatedStaffR
     filteredVisitors.forEach((v) => uniqueVisitorIds.add(v.visitorId));
 
     const totalVisitors = uniqueVisitorIds.size;
-    const newVisitorsCount = filteredVisitors.filter((v) => {
+    const newVisitorIds = new Set(filteredVisitors.filter((v) => {
       if (!timeFilterStart) return true;
       return v.firstSeenAt >= timeFilterStart;
-    }).length;
+    }).map((v) => v.visitorId));
+    const newVisitorsCount = [...newVisitorIds].filter((visitorId) => uniqueVisitorIds.has(visitorId)).length;
     const returningVisitorsCount = Math.max(0, totalVisitors - newVisitorsCount);
     const totalSessionsCount = filteredSessions.length;
 
