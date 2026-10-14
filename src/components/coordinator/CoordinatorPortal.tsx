@@ -97,6 +97,44 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     setTimeout(() => setPortalNotice(null), 5000);
   };
 
+  // Admin-only reservation deletion
+  const [deletingReservationId, setDeletingReservationId] = useState<string | null>(null);
+
+  const handleDeleteReservation = async (reservation: ReservationRequest) => {
+    const confirmed = window.confirm(
+      `Permanently delete reservation ${reservation.referenceNumber}? This action is irreversible.`
+    );
+    if (!confirmed) return;
+
+    setDeletingReservationId(reservation.id);
+    try {
+      await api.deleteReservation(reservation.id);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete reservation';
+      notify(message, 'error');
+      setDeletingReservationId(null);
+      return;
+    }
+
+    if (selectedRes?.id === reservation.id) {
+      setSelectedRes(null);
+      setIsDetailModalOpen(false);
+    }
+    notify(`Reservation ${reservation.referenceNumber} deleted`, 'success');
+
+    try {
+      const refreshed = await loadAllData();
+      if (!refreshed) {
+        notify(
+          `Reservation ${reservation.referenceNumber} was deleted, but the list could not refresh. Please reload the page.`,
+          'error'
+        );
+      }
+    } finally {
+      setDeletingReservationId(null);
+    }
+  };
+
   // Media state
   const [selectedProductForMedia, setSelectedProductForMedia] = useState<string>('');
   const [productMediaList, setProductMediaList] = useState<any[]>([]);
@@ -108,8 +146,8 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [mediaUploadPreview, setMediaUploadPreview] = useState<string | null>(null);
   const [isUploadingMediaFile, setIsUploadingMediaFile] = useState<boolean>(false);
 
-  const loadAllData = async () => {
-    if (!isAuthenticated) return;
+  const loadAllData = async (): Promise<boolean> => {
+    if (!isAuthenticated) return false;
     setLoadingData(true);
     try {
       const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.all([
@@ -141,9 +179,11 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
       }
     } catch (e) {
       console.error('Coordinator data fetch error:', e);
+      return false;
     } finally {
       setLoadingData(false);
     }
+    return true;
   };
 
   const handleToggleStaffActive = async (userId: string) => {
@@ -649,6 +689,18 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                           >
                             <ExternalLink className="w-3 h-3 mr-1 text-stone-500" />
                             <span>Guest Link</span>
+                          </button>
+                        )}
+
+                        {staffUser?.role === 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReservation(res)}
+                            disabled={deletingReservationId === res.id}
+                            className="px-3 py-1 text-xs font-semibold bg-rose-50 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed text-rose-700 rounded-lg transition cursor-pointer border border-rose-200"
+                            title="Delete reservation (admin only)"
+                          >
+                            {deletingReservationId === res.id ? 'Deleting...' : 'Delete'}
                           </button>
                         )}
 

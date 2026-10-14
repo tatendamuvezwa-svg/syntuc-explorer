@@ -12,6 +12,7 @@ import {
   updateDocById,
   getCollectionDocs,
   where,
+  hasTombstone,
 } from '../lib/firestore.ts';
 
 const router = Router();
@@ -130,10 +131,19 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     }
 
     // Idempotency / Duplicate Submission Protection
-    const existingReservations = await getCollectionDocs<any>(
+    const sessionReservations = await getCollectionDocs<any>(
       'reservation_requests',
       where('guestSessionId', '==', currentSessionId)
     );
+    const tombstoneChecks = await Promise.all(
+      sessionReservations.map(async (reservation) => ({
+        reservation,
+        deleted: await hasTombstone('reservation_requests', reservation.id),
+      }))
+    );
+    const existingReservations = tombstoneChecks
+      .filter((entry) => !entry.deleted)
+      .map((entry) => entry.reservation);
 
     const matchingRecent = existingReservations
       .filter((r) => Number(r.authoritativeTotal) === pricingResult.authoritativeTotal)
@@ -442,6 +452,13 @@ router.get('/guest/:token', async (req, res: Response) => {
         error: 'TOKEN_EXPIRED',
         message: 'This reservation access link has expired.',
       });
+      return;
+    }
+
+    // Check before mutating the token so deleted reservations stay unavailable.
+    // This lookup fails closed if Firestore cannot verify the tombstone.
+    if (await hasTombstone('reservation_requests', tokenRecord.reservationRequestId)) {
+      res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
       return;
     }
 

@@ -8,6 +8,7 @@ export interface AuthenticatedStaffRequest extends Request {
     email: string;
     name: string;
     role: string;
+    isActive: boolean;
   };
 }
 
@@ -291,6 +292,7 @@ export async function requireCoordinatorAuth(
       email: staff.email,
       name: staff.name,
       role: staff.role,
+      isActive: Boolean(staff.isActive),
     };
 
     next();

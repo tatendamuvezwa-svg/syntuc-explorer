@@ -281,6 +281,18 @@ export const api = {
     return res.json();
   },
 
+  async deleteReservation(id: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/reservations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: getStaffHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to delete reservation');
+    }
+    return res.json();
+  },
+
   async updateReservationStatus(id: string, status: string, internalNote?: string): Promise<any> {
     const res = await fetch(`${API_BASE}/coordinator/reservations/${id}/status`, {
       method: 'PATCH',
