@@ -66,7 +66,7 @@ export const SchoolTripPlannerModal: React.FC = () => {
     return () => { cancelled = true; };
   }, [isSchoolPlannerOpen]);
 
-  const mediaFor = (terms: string[]) => {
+  const mediaFor = (terms: readonly string[]) => {
     const normalizedTerms = terms.map(term => term.toLowerCase());
     return catalogProducts.find(product =>
       product.productType === 'activity' &&
