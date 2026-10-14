@@ -477,17 +477,24 @@ export const CONFIRMED_PRODUCT_VARIANTS: Record<string, AuthoritativeVariant[]> 
 };
 
 /**
- * Retrieves all authoritative variants for a product.
- * Checks Firestore `product_variants` first. If custom variants exist in Firestore,
- * returns them; otherwise returns the confirmed catalog variants.
+ * Retrieves ALL variants for a product for Coordinator management (including inactive ones).
+ * Merges confirmed catalog baseline variants with custom or overridden variants from Firestore `product_variants`.
  */
-export async function getAuthoritativeVariantsForProduct(productId: string): Promise<AuthoritativeVariant[]> {
+export async function getAllCoordinatorVariantsForProduct(productId: string): Promise<AuthoritativeVariant[]> {
+  const baseline = CONFIRMED_PRODUCT_VARIANTS[productId] || [];
   try {
     const firestoreVariants = await getCollectionDocs<any>('product_variants');
-    const matched = firestoreVariants.filter((v) => v.productId === productId && v.isActive !== false);
+    const matched = firestoreVariants.filter((v) => v.productId === productId);
 
-    if (matched.length > 0) {
-      return matched.map((v) => ({
+    const variantMap = new Map<string, AuthoritativeVariant>();
+    // 1. Seed baseline confirmed catalog variants
+    for (const b of baseline) {
+      variantMap.set(b.id, { ...b });
+    }
+
+    // 2. Overlay Firestore documents (custom additions or modified baselines)
+    for (const v of matched) {
+      variantMap.set(v.id, {
         id: v.id,
         productId: v.productId,
         name: v.name,
@@ -503,17 +510,192 @@ export async function getAuthoritativeVariantsForProduct(productId: string): Pro
         duration: v.duration || null,
         compulsoryFees: v.compulsoryFees || [],
         childRate: v.childRate ? Number(v.childRate) : undefined,
-        isActive: Boolean(v.isActive),
+        isActive: v.isActive !== false,
         evidenceStatus: v.evidenceStatus || 'SUPPORTED',
         supplierNote: v.supplierNote,
-      }));
+      });
     }
+
+    return Array.from(variantMap.values());
   } catch (err) {
-    console.warn(`[Variants] Could not read product_variants from Firestore for ${productId}:`, err);
+    console.warn(`[Variants] Could not read product_variants from Firestore for coordinator (${productId}):`, err);
+    return baseline;
+  }
+}
+
+/**
+ * Retrieves all active authoritative variants for a product for guest display and booking.
+ */
+export async function getAuthoritativeVariantsForProduct(productId: string): Promise<AuthoritativeVariant[]> {
+  const allVariants = await getAllCoordinatorVariantsForProduct(productId);
+  return allVariants.filter((v) => v.isActive !== false);
+}
+
+/**
+ * Creates a new coordinator variant in Firestore.
+ * Enforces non-negative price, non-empty name, and duplicate name prevention.
+ */
+export async function createCoordinatorVariant(
+  productId: string,
+  variantData: {
+    id?: string;
+    name: string;
+    description?: string;
+    price: number;
+    currency?: string;
+    priceBasis?: PricingBasisType;
+    category?: string;
+    duration?: string;
+    compulsoryFees?: CompulsoryFee[];
+    childRate?: number;
+    supplierNote?: string;
+    isActive?: boolean;
+  }
+): Promise<AuthoritativeVariant> {
+  const cleanName = (variantData.name || '').trim();
+  if (!cleanName) {
+    throw new Error('VARIANT_NAME_REQUIRED: Variant name is required and cannot be empty.');
   }
 
-  // Fallback to confirmed baseline variants
-  return CONFIRMED_PRODUCT_VARIANTS[productId] || [];
+  const numPrice = Number(variantData.price);
+  if (isNaN(numPrice) || numPrice < 0) {
+    throw new Error('INVALID_VARIANT_PRICE: Variant price must be a valid non-negative number.');
+  }
+
+  // Duplicate detection against existing variants for this product
+  const existingVariants = await getAllCoordinatorVariantsForProduct(productId);
+  const duplicate = existingVariants.find(
+    (v) => v.name.toLowerCase() === cleanName.toLowerCase()
+  );
+  if (duplicate) {
+    throw new Error(`DUPLICATE_VARIANT_NAME: A variant with name "${cleanName}" already exists for this product.`);
+  }
+
+  const id = variantData.id?.trim() || `var_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const nowIso = new Date().toISOString();
+
+  const newVariant: any = {
+    id,
+    productId,
+    name: cleanName,
+    description: variantData.description?.trim() || null,
+    price: numPrice,
+    priceDelta: '0',
+    currency: variantData.currency || 'USD',
+    priceBasis: variantData.priceBasis || 'per_person',
+    duration: variantData.duration?.trim() || null,
+    compulsoryFees: variantData.compulsoryFees || [],
+    isActive: variantData.isActive !== false,
+    evidenceStatus: 'SUPPORTED',
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  if (variantData.category?.trim()) {
+    newVariant.category = variantData.category.trim();
+  }
+  if (variantData.childRate !== undefined && !isNaN(Number(variantData.childRate))) {
+    newVariant.childRate = Number(variantData.childRate);
+  }
+  if (variantData.supplierNote?.trim()) {
+    newVariant.supplierNote = variantData.supplierNote.trim();
+  }
+
+  await setDocById('product_variants', id, newVariant);
+  return newVariant as AuthoritativeVariant;
+}
+
+/**
+ * Updates an existing coordinator variant in Firestore.
+ * If the variant was only defined in baseline memory, materializes it in Firestore with updates.
+ */
+export async function updateCoordinatorVariant(
+  productId: string,
+  variantId: string,
+  updates: Partial<AuthoritativeVariant>
+): Promise<AuthoritativeVariant> {
+  if (!variantId) {
+    throw new Error('VARIANT_ID_REQUIRED: Variant ID is required for update.');
+  }
+
+  // Check if variant exists in Firestore
+  let existing: any = await getDocById<any>('product_variants', variantId);
+
+  // If not found in Firestore, check baseline
+  if (!existing) {
+    const baseline = (CONFIRMED_PRODUCT_VARIANTS[productId] || []).find((v) => v.id === variantId);
+    if (!baseline) {
+      throw new Error(`VARIANT_NOT_FOUND: Variant ${variantId} does not exist for product ${productId}.`);
+    }
+    existing = { ...baseline, createdAt: new Date().toISOString() };
+  }
+
+  if (existing.productId !== productId) {
+    throw new Error(`SECURITY_VIOLATION: Variant ${variantId} does not belong to product ${productId}.`);
+  }
+
+  if (updates.name !== undefined) {
+    const cleanName = updates.name.trim();
+    if (!cleanName) {
+      throw new Error('VARIANT_NAME_REQUIRED: Variant name cannot be empty.');
+    }
+    // Check duplicates
+    const allVars = await getAllCoordinatorVariantsForProduct(productId);
+    const dup = allVars.find((v) => v.id !== variantId && v.name.toLowerCase() === cleanName.toLowerCase());
+    if (dup) {
+      throw new Error(`DUPLICATE_VARIANT_NAME: Another variant with name "${cleanName}" already exists for this product.`);
+    }
+    existing.name = cleanName;
+  }
+
+  if (updates.price !== undefined) {
+    const numPrice = Number(updates.price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      throw new Error('INVALID_VARIANT_PRICE: Variant price must be a valid non-negative number.');
+    }
+    existing.price = numPrice;
+  }
+
+  if (updates.description !== undefined) existing.description = updates.description?.trim() || null;
+  if (updates.currency !== undefined) existing.currency = updates.currency;
+  if (updates.priceBasis !== undefined) existing.priceBasis = updates.priceBasis;
+  if (updates.category !== undefined) existing.category = updates.category?.trim() || null;
+  if (updates.duration !== undefined) existing.duration = updates.duration?.trim() || null;
+  if (updates.compulsoryFees !== undefined) existing.compulsoryFees = updates.compulsoryFees;
+  if (updates.childRate !== undefined) existing.childRate = Number(updates.childRate);
+  if (updates.supplierNote !== undefined) existing.supplierNote = updates.supplierNote?.trim() || null;
+  if (updates.isActive !== undefined) existing.isActive = Boolean(updates.isActive);
+
+  existing.updatedAt = new Date().toISOString();
+
+  // Strip any undefined keys before sending to Firestore
+  const cleanDoc: any = {};
+  for (const [k, v] of Object.entries(existing)) {
+    if (v !== undefined) {
+      cleanDoc[k] = v;
+    }
+  }
+
+  await setDocById('product_variants', variantId, cleanDoc);
+  return cleanDoc as AuthoritativeVariant;
+}
+
+/**
+ * Safely toggles or deactivates a variant in Firestore.
+ */
+export async function toggleVariantActiveState(
+  productId: string,
+  variantId: string,
+  targetActiveState?: boolean
+): Promise<AuthoritativeVariant> {
+  const existing = await getAllCoordinatorVariantsForProduct(productId);
+  const found = existing.find((v) => v.id === variantId);
+  if (!found) {
+    throw new Error(`VARIANT_NOT_FOUND: Variant ${variantId} does not exist for product ${productId}.`);
+  }
+
+  const newState = targetActiveState !== undefined ? Boolean(targetActiveState) : !found.isActive;
+  return updateCoordinatorVariant(productId, variantId, { isActive: newState });
 }
 
 /**
@@ -560,7 +742,7 @@ export async function resolveAuthoritativeVariant(
       };
     }
   } catch (err: any) {
-    if (err.message && err.message.includes('Security violation')) {
+    if (err.message && (err.message.includes('Security violation') || err.message.includes('currently marked inactive'))) {
       throw err;
     }
   }

@@ -9,6 +9,7 @@ import {
   KnowledgeSource,
   AssistantResponse,
   MediaAsset,
+  ProductVariant,
 } from '../types/index.ts';
 import { getAttributionHeaders } from './analytics.ts';
 
@@ -362,6 +363,69 @@ export const api = {
       body: JSON.stringify({ isPublished }),
     });
     if (!res.ok) throw new Error('Failed to toggle product publication state');
+    return res.json();
+  },
+
+  // --- Coordinator Product Variant Management ---
+  async getCoordinatorProductVariants(productId: string): Promise<ProductVariant[]> {
+    const res = await fetch(`${API_BASE}/coordinator/products/${encodeURIComponent(productId)}/variants`, {
+      headers: getStaffHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to load coordinator product variants');
+    }
+    return res.json();
+  },
+
+  async createCoordinatorProductVariant(productId: string, data: Partial<ProductVariant>): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/products/${encodeURIComponent(productId)}/variants`, {
+      method: 'POST',
+      headers: getStaffHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to create product variant');
+    }
+    return res.json();
+  },
+
+  async updateCoordinatorProductVariant(productId: string, variantId: string, data: Partial<ProductVariant>): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`, {
+      method: 'PUT',
+      headers: getStaffHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to update product variant');
+    }
+    return res.json();
+  },
+
+  async toggleCoordinatorProductVariantActive(productId: string, variantId: string, isActive?: boolean): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}/toggle-active`, {
+      method: 'PATCH',
+      headers: getStaffHeaders(),
+      body: JSON.stringify({ isActive }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to toggle product variant active state');
+    }
+    return res.json();
+  },
+
+  async deleteCoordinatorProductVariant(productId: string, variantId: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`, {
+      method: 'DELETE',
+      headers: getStaffHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to deactivate product variant');
+    }
     return res.json();
   },
 

@@ -90,18 +90,25 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
           }
         }
       } else {
+        const firstFee = variant?.compulsoryFees && variant.compulsoryFees.length > 0 ? variant.compulsoryFees[0] : null;
+        const feePerPerson = firstFee ? Number(firstFee.amount || 0) : 0;
+
         if (basis === 'per_group') {
           subtotal = unitPrice;
           displayBasis = `US$${unitPrice} (per group/tour)`;
+        } else if (feePerPerson > 0) {
+          const totalPerPerson = unitPrice + feePerPerson;
+          subtotal = totalPerPerson * participants;
+          displayBasis = `Base: US$${unitPrice} + ${firstFee?.name}: US$${feePerPerson} = US$${totalPerPerson}/person (${participants} guests = US$${subtotal})`;
         } else {
           subtotal = unitPrice * participants;
           displayBasis = `${participants} guests × US$${unitPrice}`;
         }
 
-        // Compulsory fees (e.g. $12 National Parks conservation fee)
-        if (variant?.compulsoryFees && variant.compulsoryFees.length > 0) {
-          for (const fee of variant.compulsoryFees) {
-            subtotal += Number(fee.amount || 0) * participants;
+        // Compulsory fees for multi-fee variants
+        if (variant?.compulsoryFees && variant.compulsoryFees.length > 1) {
+          for (let fIdx = 1; fIdx < variant.compulsoryFees.length; fIdx++) {
+            subtotal += Number(variant.compulsoryFees[fIdx].amount || 0) * participants;
           }
         }
 
@@ -122,6 +129,9 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
 
       total += subtotal;
 
+      const firstFee = variant?.compulsoryFees && variant.compulsoryFees.length > 0 ? variant.compulsoryFees[0] : null;
+      const feePerPerson = firstFee ? Number(firstFee.amount || 0) : 0;
+
       return {
         id: it.id,
         name: it.product?.name || 'Selected Experience',
@@ -129,6 +139,9 @@ export const ReservationRequestModal: React.FC<ReservationRequestModalProps> = (
         productType: it.product?.productType,
         roomName: it.room?.name,
         unitPrice,
+        feeName: firstFee?.name || null,
+        feePerPerson,
+        totalPerPerson: unitPrice + feePerPerson,
         displayBasis,
         subtotal: Math.round(subtotal * 100) / 100,
       };

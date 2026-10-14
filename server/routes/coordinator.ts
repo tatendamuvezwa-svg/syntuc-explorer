@@ -24,6 +24,12 @@ import {
   getTombstones,
   recordTombstone,
 } from '../lib/firestore.ts';
+import {
+  getAllCoordinatorVariantsForProduct,
+  createCoordinatorVariant,
+  updateCoordinatorVariant,
+  toggleVariantActiveState,
+} from '../services/variantCatalog.ts';
 
 const router = Router();
 
@@ -666,6 +672,214 @@ router.delete('/products/:id', requireCoordinatorAuth, async (req: Authenticated
   } catch (error: any) {
     console.error('Error deleting product from Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_DELETE_PRODUCT', message: error.message });
+  }
+});
+
+// ==========================================
+// COORDINATOR PRODUCT VARIANT MANAGEMENT
+// ==========================================
+
+// GET /api/coordinator/products/:productId/variants - Get all variants for coordinator editor
+router.get('/products/:productId/variants', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const product = await getDocById<any>('products', productId);
+    if (!product) {
+      res.status(404).json({ error: 'PRODUCT_NOT_FOUND', message: `Product ${productId} does not exist.` });
+      return;
+    }
+
+    const variants = await getAllCoordinatorVariantsForProduct(productId);
+    res.json(variants);
+  } catch (error: any) {
+    console.error(`Error loading coordinator variants for ${req.params.productId}:`, error);
+    res.status(500).json({ error: 'FAILED_TO_LOAD_VARIANTS', message: error.message });
+  }
+});
+
+// POST /api/coordinator/products/:productId/variants - Create new variant with strict validation
+router.post('/products/:productId/variants', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const product = await getDocById<any>('products', productId);
+    if (!product) {
+      res.status(404).json({ error: 'PRODUCT_NOT_FOUND', message: `Product ${productId} does not exist.` });
+      return;
+    }
+
+    const {
+      name,
+      description,
+      price,
+      currency = 'USD',
+      priceBasis = 'per_person',
+      category,
+      duration,
+      compulsoryFees,
+      childRate,
+      supplierNote,
+      isActive = true,
+    } = req.body;
+
+    const createdVariant = await createCoordinatorVariant(productId, {
+      name,
+      description,
+      price,
+      currency,
+      priceBasis,
+      category,
+      duration,
+      compulsoryFees,
+      childRate,
+      supplierNote,
+      isActive,
+    });
+
+    // Record revision in product_revisions for audit tracking
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId,
+      productId,
+      modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: null,
+      changeSummary: `Variant "${createdVariant.name}" (${createdVariant.id}) created by ${req.staffUser!.name}`,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json({
+      success: true,
+      variant: createdVariant,
+      message: 'Product variant successfully created in Firestore.',
+    });
+  } catch (error: any) {
+    console.error('Error creating product variant:', error);
+    const statusCode = error.message?.includes('DUPLICATE_VARIANT_NAME') ||
+      error.message?.includes('INVALID_VARIANT_PRICE') ||
+      error.message?.includes('VARIANT_NAME_REQUIRED') ? 400 : 500;
+    res.status(statusCode).json({ error: 'FAILED_TO_CREATE_VARIANT', message: error.message });
+  }
+});
+
+// PUT /api/coordinator/products/:productId/variants/:variantId - Edit variant without altering product defaults
+router.put('/products/:productId/variants/:variantId', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  try {
+    const { productId, variantId } = req.params;
+    const product = await getDocById<any>('products', productId);
+    if (!product) {
+      res.status(404).json({ error: 'PRODUCT_NOT_FOUND', message: `Product ${productId} does not exist.` });
+      return;
+    }
+
+    const {
+      name,
+      description,
+      price,
+      currency,
+      priceBasis,
+      category,
+      duration,
+      compulsoryFees,
+      childRate,
+      supplierNote,
+      isActive,
+    } = req.body;
+
+    const updatedVariant = await updateCoordinatorVariant(productId, variantId, {
+      name,
+      description,
+      price,
+      currency,
+      priceBasis,
+      category,
+      duration,
+      compulsoryFees,
+      childRate,
+      supplierNote,
+      isActive,
+    });
+
+    // Record revision in product_revisions for audit tracking
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId,
+      productId,
+      modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: null,
+      changeSummary: `Variant "${updatedVariant.name}" (${variantId}) updated by ${req.staffUser!.name}`,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.json({
+      success: true,
+      variant: updatedVariant,
+      message: 'Product variant updated successfully in Firestore.',
+    });
+  } catch (error: any) {
+    console.error('Error updating product variant:', error);
+    const statusCode = error.message?.includes('DUPLICATE_VARIANT_NAME') ||
+      error.message?.includes('INVALID_VARIANT_PRICE') ||
+      error.message?.includes('VARIANT_NAME_REQUIRED') ? 400 :
+      error.message?.includes('SECURITY_VIOLATION') ? 403 :
+      error.message?.includes('VARIANT_NOT_FOUND') ? 404 : 500;
+    res.status(statusCode).json({ error: 'FAILED_TO_UPDATE_VARIANT', message: error.message });
+  }
+});
+
+// PATCH /api/coordinator/products/:productId/variants/:variantId/toggle-active - Toggle active/inactive
+router.patch('/products/:productId/variants/:variantId/toggle-active', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  try {
+    const { productId, variantId } = req.params;
+    const { isActive } = req.body;
+
+    const updatedVariant = await toggleVariantActiveState(productId, variantId, isActive);
+
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId,
+      productId,
+      modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: null,
+      changeSummary: `Variant "${updatedVariant.name}" (${variantId}) ${updatedVariant.isActive ? 'ACTIVATED' : 'DEACTIVATED'} by ${req.staffUser!.name}`,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.json({
+      success: true,
+      variant: updatedVariant,
+      message: `Variant is now ${updatedVariant.isActive ? 'ACTIVE' : 'INACTIVE'}.`,
+    });
+  } catch (error: any) {
+    console.error('Error toggling variant state:', error);
+    res.status(500).json({ error: 'FAILED_TO_TOGGLE_VARIANT', message: error.message });
+  }
+});
+
+// DELETE /api/coordinator/products/:productId/variants/:variantId - Safe deactivation to preserve reservation history
+router.delete('/products/:productId/variants/:variantId', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  try {
+    const { productId, variantId } = req.params;
+
+    // Soft-deactivate variant to ensure integrity of existing reservation snapshots
+    const deactivated = await toggleVariantActiveState(productId, variantId, false);
+
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId,
+      productId,
+      modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: null,
+      changeSummary: `Variant "${deactivated.name}" (${variantId}) safely deactivated by ${req.staffUser!.name}`,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.json({
+      success: true,
+      variant: deactivated,
+      message: `Variant "${deactivated.name}" safely deactivated. Historical references preserved.`,
+    });
+  } catch (error: any) {
+    console.error('Error deactivating variant:', error);
+    res.status(500).json({ error: 'FAILED_TO_DEACTIVATE_VARIANT', message: error.message });
   }
 });
 

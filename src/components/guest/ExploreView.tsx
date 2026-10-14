@@ -329,7 +329,7 @@ export const ExploreView: React.FC = () => {
                   {/* Price Banner */}
                   <div className="absolute bottom-3 left-3 right-3 bg-stone-950/75 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex justify-between items-center text-xs">
                     <div className="flex items-baseline space-x-1">
-                      <span className="text-[10px] text-stone-300 font-medium">From</span>
+                      <span className="text-[10px] text-stone-300 font-medium">Starting from</span>
                       <span className="text-base font-bold text-amber-400">
                         US${product.basePrice}
                       </span>

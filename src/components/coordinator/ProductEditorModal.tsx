@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../services/api.ts';
-import { Product, MediaAsset } from '../../types/index.ts';
+import { Product, MediaAsset, ProductVariant } from '../../types/index.ts';
 import {
   X,
   Upload,
@@ -19,6 +19,10 @@ import {
   Clock,
   MapPin,
   Tag,
+  Layers,
+  Plus,
+  Edit3,
+  Power,
 } from 'lucide-react';
 
 interface ProductEditorModalProps {
@@ -43,7 +47,7 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
   const isEditing = Boolean(product && product.id);
 
   // Form tab state
-  const [activeTab, setActiveTab] = useState<'info' | 'media' | 'video' | 'details'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'variants' | 'media' | 'video' | 'details'>('info');
 
   // Form fields
   const [name, setName] = useState<string>('');
@@ -77,6 +81,27 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
   const [externalUrl, setExternalUrl] = useState<string>('');
   const [isRegisteringUrl, setIsRegisteringUrl] = useState<boolean>(false);
 
+  // Variants state
+  const [variantsList, setVariantsList] = useState<ProductVariant[]>([]);
+  const [loadingVariants, setLoadingVariants] = useState<boolean>(false);
+  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
+  const [showVariantForm, setShowVariantForm] = useState<boolean>(false);
+  const [variantForm, setVariantForm] = useState({
+    name: '',
+    category: '',
+    price: '',
+    currency: 'USD',
+    priceBasis: 'per_person' as 'per_person' | 'per_room_night' | 'per_group',
+    duration: '',
+    feeName: 'National Parks River Conservation Fee',
+    feeAmount: '12',
+    supplierNote: '',
+    description: '',
+    isActive: true,
+  });
+  const [variantError, setVariantError] = useState<string | null>(null);
+  const [isSavingVariant, setIsSavingVariant] = useState<boolean>(false);
+
   // Status message
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -104,8 +129,10 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
       setAvailabilityNote(product.availabilityNote || 'Subject to partner confirmation');
       if (product.id) {
         loadProductMedia(product.id);
+        loadProductVariants(product.id);
       } else {
         setMediaList([]);
+        setVariantsList([]);
       }
     } else {
       // Defaults for new product
@@ -127,10 +154,13 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
       setIsPublished(false); // New products start as DRAFT
       setAvailabilityNote('Subject to partner confirmation');
       setMediaList([]);
+      setVariantsList([]);
     }
     setStatusMessage(null);
     setUploadFile(null);
     setUploadPreview(null);
+    setShowVariantForm(false);
+    setEditingVariantId(null);
   }, [product, isOpen]);
 
   const loadProductMedia = async (productId: string) => {
@@ -142,6 +172,157 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
       console.error('Failed to load product media:', err);
     } finally {
       setLoadingMedia(false);
+    }
+  };
+
+  const loadProductVariants = async (productId: string) => {
+    setLoadingVariants(true);
+    try {
+      const data = await api.getCoordinatorProductVariants(productId);
+      setVariantsList(data);
+    } catch (err) {
+      console.error('Failed to load product variants:', err);
+    } finally {
+      setLoadingVariants(false);
+    }
+  };
+
+  const handleOpenNewVariant = () => {
+    setEditingVariantId(null);
+    setVariantForm({
+      name: '',
+      category: productType === 'activity' ? 'Luxury Deck' : '',
+      price: '',
+      currency: currency || 'USD',
+      priceBasis: priceBasis || 'per_person',
+      duration: duration || '',
+      feeName: 'National Parks River Conservation Fee',
+      feeAmount: '12',
+      supplierNote: '',
+      description: '',
+      isActive: true,
+    });
+    setVariantError(null);
+    setShowVariantForm(true);
+  };
+
+  const handleOpenEditVariant = (v: ProductVariant) => {
+    setEditingVariantId(v.id);
+    const firstFee = v.compulsoryFees && v.compulsoryFees.length > 0 ? v.compulsoryFees[0] : null;
+    setVariantForm({
+      name: v.name || '',
+      category: v.category || '',
+      price: String(v.price !== undefined ? v.price : (product?.basePrice ?? '0')),
+      currency: v.currency || currency || 'USD',
+      priceBasis: (v.priceBasis as any) || priceBasis || 'per_person',
+      duration: v.duration || '',
+      feeName: firstFee ? firstFee.name : '',
+      feeAmount: firstFee ? String(firstFee.amount) : '',
+      supplierNote: v.supplierNote || '',
+      description: v.description || '',
+      isActive: v.isActive !== false,
+    });
+    setVariantError(null);
+    setShowVariantForm(true);
+  };
+
+  const handleSaveVariant = async () => {
+    if (!product?.id) {
+      setVariantError('Please save the product first before adding variants.');
+      return;
+    }
+    const cleanName = variantForm.name.trim();
+    if (!cleanName) {
+      setVariantError('Variant name is required.');
+      return;
+    }
+    const numPrice = Number(variantForm.price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      setVariantError('Price must be a valid non-negative number.');
+      return;
+    }
+
+    // Client-side duplicate name check
+    const duplicate = variantsList.find(
+      (v) => v.id !== editingVariantId && v.name.toLowerCase() === cleanName.toLowerCase()
+    );
+    if (duplicate) {
+      setVariantError(`A variant named "${cleanName}" already exists for this product.`);
+      return;
+    }
+
+    setIsSavingVariant(true);
+    setVariantError(null);
+    try {
+      const compulsoryFees = variantForm.feeName.trim() && !isNaN(Number(variantForm.feeAmount)) && Number(variantForm.feeAmount) > 0
+        ? [
+            {
+              name: variantForm.feeName.trim(),
+              amount: Number(variantForm.feeAmount),
+              currency: variantForm.currency || 'USD',
+              basis: 'per_person' as const,
+            },
+          ]
+        : [];
+
+      const payload: any = {
+        name: cleanName,
+        category: variantForm.category.trim() || undefined,
+        price: numPrice,
+        currency: variantForm.currency || 'USD',
+        priceBasis: variantForm.priceBasis,
+        duration: variantForm.duration.trim() || undefined,
+        compulsoryFees,
+        supplierNote: variantForm.supplierNote.trim() || undefined,
+        description: variantForm.description.trim() || undefined,
+        isActive: variantForm.isActive,
+      };
+
+      if (editingVariantId) {
+        await api.updateCoordinatorProductVariant(product.id, editingVariantId, payload);
+        setStatusMessage({ type: 'success', text: `Variant "${cleanName}" updated successfully in Firestore.` });
+      } else {
+        await api.createCoordinatorProductVariant(product.id, payload);
+        setStatusMessage({ type: 'success', text: `Variant "${cleanName}" created successfully in Firestore.` });
+      }
+      setShowVariantForm(false);
+      setEditingVariantId(null);
+      await loadProductVariants(product.id);
+    } catch (err: any) {
+      setVariantError(err.message || 'Failed to save variant');
+    } finally {
+      setIsSavingVariant(false);
+    }
+  };
+
+  const handleToggleVariant = async (v: ProductVariant) => {
+    if (!product?.id) return;
+    try {
+      const res = await api.toggleCoordinatorProductVariantActive(product.id, v.id, !v.isActive);
+      setStatusMessage({
+        type: 'success',
+        text: `Variant "${v.name}" is now ${res.variant.isActive ? 'ACTIVE' : 'INACTIVE'}.`,
+      });
+      await loadProductVariants(product.id);
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to toggle variant' });
+    }
+  };
+
+  const handleDeactivateVariant = async (v: ProductVariant) => {
+    if (!product?.id) return;
+    if (!confirm(`Are you sure you want to deactivate variant "${v.name}"? Historical reservations will be preserved.`)) {
+      return;
+    }
+    try {
+      await api.deleteCoordinatorProductVariant(product.id, v.id);
+      setStatusMessage({
+        type: 'success',
+        text: `Variant "${v.name}" safely deactivated.`,
+      });
+      await loadProductVariants(product.id);
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to deactivate variant' });
     }
   };
 
@@ -390,6 +571,18 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
             <Tag className="w-3.5 h-3.5 mr-1.5" />
             General & Pricing
           </button>
+          {isEditing && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('variants')}
+              className={`py-3 border-b-2 transition flex items-center ${
+                activeTab === 'variants' ? 'border-amber-600 text-amber-800' : 'border-transparent hover:text-stone-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 mr-1.5" />
+              Variants & Decks ({variantsList.length})
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('details')}
             className={`py-3 border-b-2 transition flex items-center ${
@@ -578,6 +771,317 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
                   </span>
                 </label>
               </div>
+            </div>
+          )}
+
+          {/* TAB: Variants & Decks Management */}
+          {activeTab === 'variants' && (
+            <div className="space-y-6">
+              {!isEditing ? (
+                <div className="p-6 bg-stone-50 rounded-2xl border border-stone-200 text-center">
+                  <Layers className="w-8 h-8 text-stone-400 mx-auto mb-2" />
+                  <p className="text-xs text-stone-600 font-semibold">
+                    Please save the product first before adding or managing variant tariffs.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Top Bar with Add Button and Guidance */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80">
+                    <div>
+                      <h3 className="text-sm font-bold text-amber-950 font-display flex items-center">
+                        <Layers className="w-4 h-4 mr-1.5 text-amber-700" />
+                        Deck & Tariff Variants ({variantsList.length})
+                      </h3>
+                      <p className="text-[11px] text-stone-600 mt-0.5">
+                        Manage tier pricing, deck options, and compulsory park fees. Changes to variants are isolated and preserve default product base rates.
+                      </p>
+                    </div>
+                    {!showVariantForm && (
+                      <button
+                        type="button"
+                        onClick={handleOpenNewVariant}
+                        className="px-3.5 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-semibold flex items-center shrink-0 cursor-pointer shadow-xs transition"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1.5" />
+                        Add Variant / Tier
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Inline Variant Form (Add / Edit) */}
+                  {showVariantForm && (
+                    <div className="p-5 bg-white rounded-2xl border-2 border-amber-500 shadow-md space-y-4 animate-fadeIn">
+                      <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-900 flex items-center">
+                          {editingVariantId ? <Edit3 className="w-3.5 h-3.5 mr-1.5" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
+                          {editingVariantId ? 'Edit Variant Option' : 'Create New Variant / Deck'}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => { setShowVariantForm(false); setEditingVariantId(null); }}
+                          className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {variantError && (
+                        <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-medium flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-2 shrink-0 text-rose-500" />
+                          <span>{variantError}</span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Variant / Deck Name *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={variantForm.name}
+                            onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
+                            placeholder="e.g. Luxury Deck (Lower & Mid Decks)"
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Category / Tier (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={variantForm.category}
+                            onChange={(e) => setVariantForm({ ...variantForm, category: e.target.value })}
+                            placeholder="e.g. Luxury Deck, Signature Deck"
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Base Fare Rate (USD) *
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-stone-400 text-xs">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              required
+                              value={variantForm.price}
+                              onChange={(e) => setVariantForm({ ...variantForm, price: e.target.value })}
+                              placeholder="e.g. 69 or 110"
+                              className="w-full pl-7 pr-3 py-2 rounded-xl border border-stone-200 text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Price Basis
+                          </label>
+                          <select
+                            value={variantForm.priceBasis}
+                            onChange={(e) => setVariantForm({ ...variantForm, priceBasis: e.target.value as any })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs bg-white"
+                          >
+                            <option value="per_person">Per Person</option>
+                            <option value="per_room_night">Per Room / Night</option>
+                            <option value="per_group">Per Group</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Compulsory Fee Name
+                          </label>
+                          <input
+                            type="text"
+                            value={variantForm.feeName}
+                            onChange={(e) => setVariantForm({ ...variantForm, feeName: e.target.value })}
+                            placeholder="e.g. National Parks River Conservation Fee"
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Compulsory Fee Amount (USD)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-stone-400 text-xs">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={variantForm.feeAmount}
+                              onChange={(e) => setVariantForm({ ...variantForm, feeAmount: e.target.value })}
+                              placeholder="12"
+                              className="w-full pl-7 pr-3 py-2 rounded-xl border border-stone-200 text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Deck / Variant Description
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={variantForm.description}
+                            onChange={(e) => setVariantForm({ ...variantForm, description: e.target.value })}
+                            placeholder="e.g. Expansive open-air deck with lounge seating, all-inclusive house bar and handcrafted canapés."
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-stone-700 mb-1">
+                            Supplier / Authoritative Note
+                          </label>
+                          <input
+                            type="text"
+                            value={variantForm.supplierNote}
+                            onChange={(e) => setVariantForm({ ...variantForm, supplierNote: e.target.value })}
+                            placeholder="e.g. Pure Africa contracted rate: US$69 adult base fare + US$12 National Parks fee (US$81 total)."
+                            className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+                        <label className="inline-flex items-center text-xs font-semibold text-stone-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={variantForm.isActive}
+                            onChange={(e) => setVariantForm({ ...variantForm, isActive: e.target.checked })}
+                            className="rounded border-stone-300 text-amber-600 focus:ring-amber-500 mr-2"
+                          />
+                          Active for Guest Bookings
+                        </label>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => { setShowVariantForm(false); setEditingVariantId(null); }}
+                            className="px-3 py-1.5 rounded-xl border border-stone-200 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSavingVariant}
+                            onClick={handleSaveVariant}
+                            className="px-4 py-1.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold shadow-xs transition disabled:opacity-50 cursor-pointer"
+                          >
+                            {isSavingVariant ? 'Saving...' : editingVariantId ? 'Update Variant' : 'Create Variant'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Variants List */}
+                  {loadingVariants ? (
+                    <div className="py-8 text-center text-xs text-stone-500">Loading variant catalog...</div>
+                  ) : variantsList.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-stone-400 bg-stone-50 rounded-2xl border border-stone-200">
+                      No variants configured for this product yet. Click "Add Variant / Tier" above to create one.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {variantsList.map((v) => {
+                        const price = Number(v.price !== undefined ? v.price : product?.basePrice || 0);
+                        const firstFee = v.compulsoryFees && v.compulsoryFees.length > 0 ? v.compulsoryFees[0] : null;
+                        const feeAmt = firstFee ? Number(firstFee.amount || 0) : 0;
+                        const total = price + feeAmt;
+
+                        return (
+                          <div
+                            key={v.id}
+                            className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                              v.isActive !== false
+                                ? 'bg-white border-stone-200 hover:border-amber-300 shadow-xs'
+                                : 'bg-stone-100/70 border-stone-300 opacity-70'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <h4 className="text-sm font-bold text-stone-900">{v.name}</h4>
+                                {v.category && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stone-100 text-stone-700">
+                                    {v.category}
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                                    v.isActive !== false ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                  }`}
+                                >
+                                  {v.isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+                                </span>
+                              </div>
+
+                              {v.description && (
+                                <p className="text-xs text-stone-500 mt-1 line-clamp-2">{v.description}</p>
+                              )}
+
+                              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-stone-600 font-medium">
+                                <span className="text-amber-900 font-bold">
+                                  Base Fare: US${price}
+                                </span>
+                                {feeAmt > 0 && (
+                                  <span className="text-stone-500">
+                                    + {firstFee?.name}: US${feeAmt}
+                                  </span>
+                                )}
+                                {feeAmt > 0 && (
+                                  <span className="text-emerald-700 font-extrabold">
+                                    = Effective Total: US${total} / person
+                                  </span>
+                                )}
+                              </div>
+
+                              {v.supplierNote && (
+                                <div className="mt-1 text-[11px] text-stone-400 italic">
+                                  Note: {v.supplierNote}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center space-x-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditVariant(v)}
+                                className="px-3 py-1.5 rounded-xl border border-stone-200 hover:border-stone-300 text-stone-700 text-xs font-semibold flex items-center bg-white cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 mr-1 text-amber-700" />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleVariant(v)}
+                                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center cursor-pointer transition ${
+                                  v.isActive !== false
+                                    ? 'border-stone-200 text-stone-600 hover:bg-stone-50'
+                                    : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                }`}
+                              >
+                                <Power className="w-3.5 h-3.5 mr-1" />
+                                {v.isActive !== false ? 'Deactivate' : 'Activate'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
