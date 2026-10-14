@@ -82,8 +82,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('packages')}
               className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
                 activeTab === 'packages'
-                  ? 'text-amber-800 bg-amber-50 border border-amber-200/60 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                  ? 'text-[#263B30] bg-[#EAF0E8] border border-[#DCE6D9]'
+                  : 'text-stone-600 hover:text-[#263B30] hover:bg-[#F0F1EC]'
               }`}
             >
               Curated Packages
@@ -141,6 +141,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
       </div>
+      {!isCoordinatorView && (
+        <nav aria-label="Mobile primary navigation" className="flex md:hidden items-center gap-2 overflow-x-auto border-t border-[#E8E5DE] px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button onClick={() => setActiveTab('explore')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${activeTab === 'explore' ? 'bg-[#263B30] text-white' : 'bg-[#F0F1EC] text-[#46564A]'}`}>Explore</button>
+          <button onClick={() => setActiveTab('packages')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${activeTab === 'packages' ? 'bg-[#263B30] text-white' : 'bg-[#F0F1EC] text-[#46564A]'}`}>Curated packages</button>
+          <button onClick={openSchoolPlanner} className="shrink-0 rounded-full border border-[#D8E3D5] bg-[#EAF0E8] px-4 py-2 text-xs font-semibold text-[#365D43]">School trips</button>
+        </nav>
+      )}
     </header>
   );
 };
