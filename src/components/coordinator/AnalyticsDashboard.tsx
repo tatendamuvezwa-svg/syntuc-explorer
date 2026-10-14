@@ -217,10 +217,10 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
       )}
 
+      {subView === 'studio' && <MarketingStudio />}
+
       {data && (
         <>
-          {subView === 'studio' && <MarketingStudio />}
-
           {/* ======================================================== */}
           {/* VIEW 1: OVERVIEW & FUNNEL */}
           {/* ======================================================== */}
