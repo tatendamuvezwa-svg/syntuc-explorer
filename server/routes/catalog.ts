@@ -371,7 +371,7 @@ router.get('/products', async (req: Request, res: Response) => {
     const allProducts = await getCollectionDocs<any>('products');
     const visibleFirestoreProducts = allProducts
       .filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
-    const pureAfricaIds = new Set(PURE_AFRICA_FALLBACK_PRODUCTS.map((p) => p.id));
+    const pureAfricaIds = new Set([...PURE_AFRICA_FALLBACK_PRODUCTS.map((p) => p.id), 'prod_potjie_dining']);
     const canonicalPureAfricaProducts = PURE_AFRICA_FALLBACK_PRODUCTS
       .filter((p) => !tombstones.has(`products_${p.id}`))
       .map((canonical) => {
