@@ -17,7 +17,7 @@ const upload = multer({
 });
 const now = () => new Date().toISOString();
 const PUBLIC_APP_URL = process.env.PUBLIC_APP_URL || 'https://syntuc.com/';
-const PUBLIC_APP_HOST = new URL(PUBLIC_APP_URL).hostname;
+const PUBLIC_APP_ORIGIN = new URL(PUBLIC_APP_URL).origin;
 const safeText = (value: unknown, max = 2000) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const staffId = (req: AuthenticatedStaffRequest) => req.staffUser?.id || 'unknown';
 
@@ -98,7 +98,7 @@ router.post('/campaigns', requireCoordinatorAuth, async (req: AuthenticatedStaff
     if (!title || !destination || !caption) { res.status(400).json({ error: 'TITLE_DESTINATION_CAPTION_REQUIRED' }); return; }
     let target: URL;
     try { target = new URL(destination); } catch { res.status(400).json({ error: 'INVALID_DESTINATION_URL' }); return; }
-    if (target.protocol !== 'https:' || target.hostname !== PUBLIC_APP_HOST) {
+    if (target.protocol !== 'https:' || target.origin !== PUBLIC_APP_ORIGIN) {
       res.status(400).json({ error: 'DESTINATION_NOT_ALLOWED', message: 'Use the verified Syntuc Explorer public URL only.' }); return;
     }
     const utmCampaign = safeText(req.body?.utmCampaign, 100) || id;
