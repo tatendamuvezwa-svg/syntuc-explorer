@@ -31,6 +31,8 @@ assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Shearwater
 assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Pure Africa'));
 assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Pure Africa' && item.name === 'Zambezi Explorer Luxury Sunset Cruise' && item.basePrice === 69 && item.authoritativeOverride));
 assert.ok(operatorCatalogImport.some((item) => item.productType === 'package'));
+assert.ok(operatorCatalogImport.some((item) => item.productType === 'transfer'), 'catalogue must preserve explicit transfer source types');
+assert.ok(operatorCatalogImport.some((item) => item.productType === 'fee'), 'catalogue must preserve explicit fee source types');
 console.log(`Operator catalog import data passed validation: ${operatorCatalogImport.length} records.`);
 
 
