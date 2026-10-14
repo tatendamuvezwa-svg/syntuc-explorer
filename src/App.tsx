@@ -72,11 +72,11 @@ function MainAppContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-stone-900 selection:bg-amber-100 selection:text-amber-900 font-sans">
+    <div className="min-h-screen flex flex-col bg-[#FBFAF7] text-[#29342D] selection:bg-[#DCE7D8] selection:text-[#20372B] font-sans">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-stone-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-stone-800 flex items-center space-x-2 text-xs font-medium animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div role="status" aria-live="polite" className="fixed left-4 right-4 top-24 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-[#D8E3D5] bg-white px-4 py-3 text-sm font-medium text-[#263B30] shadow-[0_12px_36px_rgba(38,59,48,0.14)] sm:left-auto sm:right-6">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-[#54775A]" />
           <span>{toastMessage}</span>
         </div>
       )}

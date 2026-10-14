@@ -16,29 +16,29 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { activeTab, setActiveTab, cartCount, openMyTrip, openSchoolPlanner } = useSession();
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200 transition-all">
+    <header className="sticky top-0 z-40 border-b border-[#E8E5DE] bg-[#FBFAF7]/95 backdrop-blur-xl">
       {/* Top micro-bar: SAINTECH product signature and trust indicator */}
-      <div className="bg-stone-900 text-stone-300 text-xs px-4 py-1.5 flex justify-between items-center tracking-wide">
+      <div className="bg-[#20372B] text-white/75 text-[11px] px-4 py-2 flex justify-between items-center tracking-wide">
         <div className="flex items-center space-x-2">
-          <span className="font-semibold text-amber-400">SAINTECH</span>
-          <span className="text-stone-400 hidden sm:inline">| Smart Artificial Intelligence Native Technologies</span>
+          <span className="font-semibold text-[#E2BE8C]">SAINTECH</span>
+          <span className="text-white/55 hidden sm:inline">| Smart Artificial Intelligence Native Technologies</span>
         </div>
         <div className="flex items-center space-x-4 text-[11px]">
-          <span className="flex items-center text-stone-300">
+          <span className="hidden sm:flex items-center text-white/75">
             <MapPin className="w-3 h-3 text-amber-400 mr-1" /> Victoria Falls, Zimbabwe
           </span>
           <button
             onClick={isCoordinatorView ? onExitCoordinator : onOpenCoordinator}
-            className="text-stone-400 hover:text-white transition flex items-center font-medium cursor-pointer"
+            className="text-white/65 hover:text-white transition flex items-center font-medium cursor-pointer"
           >
-            <UserCheck className="w-3 h-3 mr-1 text-emerald-400" />
-            {isCoordinatorView ? 'Exit Desk View' : 'Reservations Desk'}
+            <UserCheck className="w-3 h-3 mr-1 text-[#C5D8B8]" />
+            {isCoordinatorView ? 'Exit Desk View' : <><span className="hidden sm:inline">Reservations Desk</span><span className="sm:hidden">Desk</span></>}
           </button>
         </div>
       </div>
 
       {/* Main navigation */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-12 min-h-[76px] flex items-center justify-between gap-4">
         {/* Brand identity */}
         <div
           onClick={() => {
@@ -47,19 +47,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           }}
           className="flex items-center space-x-3 cursor-pointer group"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center text-white shadow-md shadow-amber-600/20 group-hover:scale-105 transition-transform">
-            <Compass className="w-6 h-6 animate-pulse" />
+          <div className="w-10 h-10 rounded-2xl bg-[#263B30] flex items-center justify-center text-white transition-colors group-hover:bg-[#34513F]">
+            <Compass className="w-5 h-5" strokeWidth={1.7} />
           </div>
           <div>
             <div className="flex items-baseline space-x-1.5">
-              <span className="text-xl font-bold tracking-tight text-stone-900 font-display">
+              <span className="text-lg sm:text-xl font-semibold tracking-[-0.035em] text-[#24382E] font-display">
                 Syntuc Explorer
               </span>
-              <span className="text-[10px] uppercase font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+              <span className="hidden sm:inline text-[9px] uppercase font-bold tracking-[0.12em] text-[#5A705F] bg-[#EEF1E9] px-2 py-1 rounded-full border border-[#DCE4D8]">
                 Victoria Falls
               </span>
             </div>
-            <p className="text-[11px] text-stone-500 font-medium">
+            <p className="text-[11px] text-stone-500 font-medium tracking-wide">
               Explore. Plan. Experience.
             </p>
           </div>
@@ -72,8 +72,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('explore')}
               className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
                 activeTab === 'explore'
-                  ? 'text-amber-800 bg-amber-50 border border-amber-200/60 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                  ? 'text-[#263B30] bg-[#EAF0E8] border border-[#DCE6D9]'
+                  : 'text-stone-600 hover:text-[#263B30] hover:bg-[#F0F1EC]'
               }`}
             >
               Explore
@@ -82,15 +82,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setActiveTab('packages')}
               className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
                 activeTab === 'packages'
-                  ? 'text-amber-800 bg-amber-50 border border-amber-200/60 shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                  ? 'text-[#263B30] bg-[#EAF0E8] border border-[#DCE6D9]'
+                  : 'text-stone-600 hover:text-[#263B30] hover:bg-[#F0F1EC]'
               }`}
             >
               Curated Packages
             </button>
             <button
               onClick={openSchoolPlanner}
-              className="px-3.5 py-2 rounded-lg text-sm font-semibold text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/60 transition flex items-center shadow-xs"
+              className="px-3.5 py-2 rounded-lg text-sm font-semibold text-[#365D43] bg-[#EAF0E8] hover:bg-[#DFE9DC] border border-[#D8E3D5] transition flex items-center"
             >
               <GraduationCap className="w-4 h-4 mr-1.5 text-emerald-700" />
               School Trips
@@ -104,12 +104,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <>
               <button
                 onClick={openMyTrip}
-                className="relative flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200/80 text-stone-800 text-sm font-semibold transition shadow-xs cursor-pointer"
+                className="relative flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-[#F0F0EA] hover:bg-[#E6E8E0] text-[#263B30] text-sm font-semibold transition cursor-pointer"
               >
-                <ShoppingBag className="w-4 h-4 text-amber-700" />
+                <ShoppingBag className="w-4 h-4 text-[#967044]" />
                 <span className="hidden sm:inline">My Trip</span>
                 {cartCount > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-xs font-bold flex items-center justify-center animate-bounce">
+                  <span className="w-5 h-5 rounded-full bg-[#263B30] text-white text-xs font-bold flex items-center justify-center">
                     {cartCount}
                   </span>
                 )}
@@ -120,15 +120,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                   const assistantTrigger = document.getElementById('syntuc-assistant-trigger');
                   if (assistantTrigger) assistantTrigger.click();
                 }}
-                className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-sm font-semibold shadow-md shadow-amber-700/20 hover:shadow-lg transition cursor-pointer"
+                aria-label="Talk to Syntuc" className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-full bg-[#263B30] hover:bg-[#34513F] text-white text-sm font-semibold transition cursor-pointer"
               >
-                <Sparkles className="w-4 h-4 text-amber-200" />
-                <span>Talk to Syntuc</span>
+                <Sparkles className="w-4 h-4 text-[#E2BE8C]" />
+                <span className="hidden sm:inline">Talk to Syntuc</span>
               </button>
             </>
           ) : (
             <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold uppercase text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 flex items-center">
+              <span className="text-xs font-semibold uppercase text-[#365D43] bg-[#EAF0E8] px-2.5 py-1 rounded-md border border-[#D8E3D5] flex items-center">
                 <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Coordinator Desk Active
               </span>
               <button
@@ -141,6 +141,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
       </div>
+      {!isCoordinatorView && (
+        <nav aria-label="Mobile primary navigation" className="flex md:hidden items-center gap-2 overflow-x-auto border-t border-[#E8E5DE] px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button onClick={() => setActiveTab('explore')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${activeTab === 'explore' ? 'bg-[#263B30] text-white' : 'bg-[#F0F1EC] text-[#46564A]'}`}>Explore</button>
+          <button onClick={() => setActiveTab('packages')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${activeTab === 'packages' ? 'bg-[#263B30] text-white' : 'bg-[#F0F1EC] text-[#46564A]'}`}>Curated packages</button>
+          <button onClick={openSchoolPlanner} className="shrink-0 rounded-full border border-[#D8E3D5] bg-[#EAF0E8] px-4 py-2 text-xs font-semibold text-[#365D43]">School trips</button>
+        </nav>
+      )}
     </header>
   );
 };

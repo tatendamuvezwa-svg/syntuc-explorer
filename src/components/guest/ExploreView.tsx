@@ -65,106 +65,88 @@ export const ExploreView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-stone-950 py-16 sm:py-24 text-white">
-        {/* Authoritative Victoria Falls Hero Image */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
+      {/* Hero Section — modern editorial destination experience */}
+      <section className="syntuc-hero relative isolate min-h-[620px] overflow-hidden bg-[#15241D] text-white sm:min-h-[680px] lg:min-h-[720px]">
+        <div className="absolute inset-0 -z-20">
           <img
             src="/hero.jpg"
-            alt="Victoria Falls, Zimbabwe - The Smoke That Thunders"
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-center opacity-70 filter brightness-95 contrast-105"
+            alt="Panoramic Victoria Falls, Zimbabwe, known as the Smoke That Thunders"
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-cover object-center"
             onError={(e) => {
-              // Fallback to secondary asset if /hero.jpg fails
               const target = e.target as HTMLImageElement;
-              if (!target.src.includes('unsplash')) {
-                target.src = 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=2000&q=80';
-              }
+              target.style.display = 'none';
             }}
           />
-          {/* Gradients ensuring high text readability while vividly showcasing the Victoria Falls photograph */}
-          <div className="absolute inset-0 bg-stone-950/40" />
-          <div className="absolute inset-0 bg-gradient-to-r from-stone-950/90 via-stone-950/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-transparent to-stone-950/40" />
         </div>
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#101D17]/95 via-[#14231B]/72 to-[#14231B]/20" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#101D17]/85 via-transparent to-[#101D17]/15" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_76%_40%,rgba(197,151,94,0.15),transparent_38%)]" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold uppercase tracking-wider mb-4">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Syntuc Explorer • Victoria Falls, Zimbabwe</span>
+        <div className="mx-auto flex min-h-[620px] max-w-[1440px] flex-col justify-center px-5 pb-14 pt-16 sm:min-h-[680px] sm:px-8 sm:pb-16 lg:min-h-[720px] lg:px-14 xl:px-20">
+          <div className="max-w-4xl">
+            <div className="syntuc-hero-reveal mb-7 inline-flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E3C49A] sm:text-xs">
+              <span className="h-px w-8 bg-[#C4975E]" />
+              Victoria Falls · Zimbabwe
+            </div>
+
+            <h1 className="syntuc-hero-reveal syntuc-hero-delay-1 max-w-4xl font-display text-[clamp(3.25rem,8.1vw,7.25rem)] font-medium leading-[0.96] tracking-[-0.055em] text-white">
+              Find your way<br className="hidden sm:block" /> to the extraordinary.
+            </h1>
+
+            <p className="syntuc-hero-reveal syntuc-hero-delay-2 mt-7 max-w-2xl text-base leading-7 text-white/85 sm:mt-8 sm:text-lg sm:leading-8">
+              Discover remarkable places to stay, unforgettable experiences and local insight — with an intelligent guide to help you plan your Victoria Falls journey.
+            </p>
+
+            <div className="syntuc-hero-reveal syntuc-hero-delay-3 mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <button
+                onClick={() => {
+                  const el = document.getElementById('catalog-section');
+                  if (el) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                }}
+                className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-[#D2A66D] px-7 py-3.5 text-sm font-semibold text-[#17251D] shadow-[0_8px_28px_rgba(0,0,0,0.16)] transition duration-200 hover:bg-[#E1BB87] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#17251D]"
+              >
+                Explore experiences
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+              </button>
+
+              <button
+                onClick={() => {
+                  const el = document.getElementById('syntuc-assistant-trigger');
+                  if (el) el.click();
+                }}
+                className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full border border-white/45 bg-white/[0.07] px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition duration-200 hover:border-white/70 hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <Sparkles className="h-4 w-4 text-[#E3C49A]" />
+                Talk to Syntuc
+              </button>
+
+              <button
+                onClick={openSchoolPlanner}
+                className="inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                Planning a school trip?
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white font-display max-w-3xl leading-tight">
-            Explore. Plan. Experience.
-          </h1>
-
-          <p className="mt-4 text-lg sm:text-xl text-stone-200 max-w-2xl font-normal leading-relaxed drop-shadow-xs">
-            Discover verified luxury river lodges, scenic helicopter flights over the Falls, peaceful Zambezi sunset cruises, and authentic African safaris coordinated with local operators.
-          </p>
-
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => {
-                const el = document.getElementById('catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm transition shadow-lg shadow-amber-600/30 cursor-pointer flex items-center"
-            >
-              <span>Explore Verified Experiences</span>
-              <ChevronRight className="w-4 h-4 ml-1.5" />
-            </button>
-
-            <button
-              onClick={() => {
-                const el = document.getElementById('syntuc-assistant-trigger');
-                if (el) el.click();
-              }}
-              className="px-5 py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-semibold text-sm transition backdrop-blur-xs cursor-pointer flex items-center"
-            >
-              <Sparkles className="w-4 h-4 mr-2 text-amber-300" />
-              <span>Talk to Syntuc</span>
-            </button>
-
-            <button
-              onClick={openSchoolPlanner}
-              className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 font-semibold text-sm transition backdrop-blur-xs cursor-pointer flex items-center"
-            >
-              <span>School Trip Commercial Planner</span>
-              <span className="ml-2 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded font-bold">
-                From $15
-              </span>
-            </button>
-          </div>
-
-          {/* Quick trust metrics */}
-          <div className="mt-12 pt-8 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-6 text-stone-300 text-xs">
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">100% Verified</div>
-              <div className="text-stone-400 mt-0.5">Contracted local operators</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">No Payment</div>
-              <div className="text-stone-400 mt-0.5">Required to submit requests</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">Historic Bridge</div>
-              <div className="text-stone-400 mt-0.5">$0 incentive on 2N + 2 activities</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">Desk Review</div>
-              <div className="text-stone-400 mt-0.5">Personal coordinator support</div>
-            </div>
+          <div className="syntuc-hero-reveal syntuc-hero-delay-3 mt-14 flex flex-wrap gap-x-7 gap-y-3 border-t border-white/20 pt-5 text-xs font-medium tracking-wide text-white/75 sm:mt-16 sm:gap-x-10 sm:pt-6 sm:text-sm">
+            <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#D2A66D]" /> Curated local experiences</span>
+            <span className="inline-flex items-center gap-2"><Calendar className="h-4 w-4 text-[#D2A66D]" /> Request-first reservations</span>
+            <span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4 text-[#D2A66D]" /> Human coordinator review</span>
           </div>
         </div>
       </section>
 
       {/* Main Catalog Section */}
-      <section id="catalog-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <section id="catalog-section" className="mx-auto max-w-[1440px] px-4 py-16 sm:px-6 lg:px-12 lg:py-20">
         {/* Filter Navigation Bar */}
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-stone-200/80 mb-10">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-[0_10px_40px_rgba(38,59,48,0.045)] border border-[#E8E5DE] mb-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Primary Category Switcher (All / Places to Stay / Activities) */}
-            <div className="flex items-center space-x-1.5 p-1 bg-stone-100 rounded-xl">
+            <div className="flex items-center space-x-1.5 p-1 bg-[#F0F1EC] rounded-xl">
               <button
                 onClick={() => {
                   setActiveFilter('all');
@@ -172,7 +154,7 @@ export const ExploreView: React.FC = () => {
                 }}
                 className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
                   activeFilter === 'all'
-                    ? 'bg-white text-stone-900 shadow-xs'
+                    ? 'bg-white text-[#263B30] shadow-sm'
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
@@ -185,7 +167,7 @@ export const ExploreView: React.FC = () => {
                 }}
                 className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
                   activeFilter === 'accommodation'
-                    ? 'bg-white text-amber-900 shadow-xs'
+                    ? 'bg-white text-[#263B30] shadow-xs'
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
@@ -199,7 +181,7 @@ export const ExploreView: React.FC = () => {
                 }}
                 className={`flex items-center space-x-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition ${
                   activeFilter === 'activity'
-                    ? 'bg-white text-amber-900 shadow-xs'
+                    ? 'bg-white text-[#263B30] shadow-xs'
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
@@ -294,7 +276,7 @@ export const ExploreView: React.FC = () => {
             {filteredProducts.map(product => (
               <div
                 key={product.id}
-                className="group bg-white rounded-2xl border border-stone-200/90 hover:border-amber-400/60 overflow-hidden shadow-xs hover:shadow-xl hover:shadow-stone-900/5 transition-all duration-300 flex flex-col justify-between"
+                className="group bg-white rounded-2xl border border-[#E8E5DE] hover:border-[#C9D6C7] overflow-hidden shadow-[0_4px_24px_rgba(38,59,48,0.035)] hover:shadow-[0_16px_44px_rgba(38,59,48,0.09)] transition-all duration-300 flex flex-col justify-between"
               >
                 {/* Image & Badges */}
                 <div
@@ -304,7 +286,7 @@ export const ExploreView: React.FC = () => {
                   <img
                     src={product.primaryImageUrl || 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=800&q=80'}
                     alt={product.primaryImageAlt || product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-[1.025] transition-transform duration-500"
                     loading="lazy"
                   />
 
@@ -313,8 +295,8 @@ export const ExploreView: React.FC = () => {
                     <span
                       className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg backdrop-blur-md shadow-xs ${
                         product.productType === 'accommodation'
-                          ? 'bg-amber-950/80 text-amber-200 border border-amber-400/30'
-                          : 'bg-stone-950/80 text-emerald-200 border border-emerald-400/30'
+                          ? 'bg-[#20372B]/90 text-[#E2BE8C] border border-white/15'
+                          : 'bg-[#20372B]/90 text-[#D6E2D1] border border-white/15'
                       }`}
                     >
                       {product.productType === 'accommodation' ? 'Lodge & Hotel' : 'Activity & Tour'}
@@ -323,14 +305,14 @@ export const ExploreView: React.FC = () => {
 
                   {/* Verified Partner Badge */}
                   <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center shadow-xs">
-                    <ShieldCheck className="w-3 h-3 text-emerald-600 mr-1" /> Verified
+                    <ShieldCheck className="w-3 h-3 text-[#54775A] mr-1" /> Verified
                   </div>
 
                   {/* Price Banner */}
-                  <div className="absolute bottom-3 left-3 right-3 bg-stone-950/75 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex justify-between items-center text-xs">
+                  <div className="absolute bottom-3 left-3 right-3 bg-[#17251D]/88 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex justify-between items-center text-xs">
                     <div className="flex items-baseline space-x-1">
                       <span className="text-[10px] text-stone-300 font-medium">Starting from</span>
-                      <span className="text-base font-bold text-amber-400">
+                      <span className="text-base font-bold text-[#E2BE8C]">
                         US${product.basePrice}
                       </span>
                     </div>
@@ -345,7 +327,7 @@ export const ExploreView: React.FC = () => {
                   <div>
                     {/* Operator & Location */}
                     <div className="flex items-center justify-between text-xs text-stone-500 mb-1.5">
-                      <span className="font-semibold text-amber-800 truncate">
+                      <span className="font-semibold text-[#365D43] truncate">
                         {product.operatorName || 'Verified Partner'}
                       </span>
                       {product.duration && (
@@ -359,7 +341,7 @@ export const ExploreView: React.FC = () => {
                     {/* Title */}
                     <h3
                       onClick={() => openProductDetail(product.id)}
-                      className="text-lg font-bold text-stone-900 group-hover:text-amber-800 transition font-display line-clamp-1 cursor-pointer"
+                      className="text-xl font-medium tracking-[-0.02em] text-[#263B30] group-hover:text-[#54775A] transition font-display line-clamp-1 cursor-pointer"
                     >
                       {product.name}
                     </h3>
@@ -377,7 +359,7 @@ export const ExploreView: React.FC = () => {
                             key={i}
                             className="inline-flex items-center text-[10px] text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md"
                           >
-                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 mr-1 shrink-0" />
+                            <CheckCircle2 className="w-2.5 h-2.5 text-[#54775A] mr-1 shrink-0" />
                             <span className="truncate max-w-[140px]">{inc}</span>
                           </span>
                         ))}
@@ -398,7 +380,7 @@ export const ExploreView: React.FC = () => {
                     <div className="flex items-center space-x-1.5">
                       <button
                         onClick={() => addToTrip({ productId: product.id })}
-                        className="px-3 py-1.5 text-xs font-semibold bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg transition flex items-center cursor-pointer"
+                        className="px-3 py-1.5 text-xs font-semibold bg-[#F0F1EC] hover:bg-[#E5E9E1] text-[#263B30] rounded-full transition flex items-center cursor-pointer"
                       >
                         <Plus className="w-3 h-3 mr-1 text-amber-700" />
                         <span>Add to Trip</span>
@@ -409,7 +391,7 @@ export const ExploreView: React.FC = () => {
                           addToTrip({ productId: product.id });
                           openReservationModal();
                         }}
-                        className="px-3.5 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-xs transition cursor-pointer"
+                        className="px-3.5 py-1.5 text-xs font-semibold bg-[#263B30] hover:bg-[#34513F] text-white rounded-lg shadow-xs transition cursor-pointer"
                       >
                         Reserve
                       </button>
