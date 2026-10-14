@@ -12,7 +12,7 @@ const upload = multer({
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = ['video/mp4', 'video/webm', 'video/quicktime'];
-    cb(null, allowed.includes(file.mimetype));
+    cb(allowed.includes(file.mimetype) ? null : new Error('Only MP4, WebM, or MOV video files are supported'), allowed.includes(file.mimetype));
   },
 });
 const now = () => new Date().toISOString();
