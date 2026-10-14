@@ -75,6 +75,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [runningR2, setRunningR2] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(false);
   const [isImportingOperatorCatalog, setIsImportingOperatorCatalog] = useState<boolean>(false);
+  const [isOperatorImportConfirmationOpen, setIsOperatorImportConfirmationOpen] = useState<boolean>(false);
 
   // Catalogue Management Modals & Filters
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
@@ -265,13 +266,15 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     }
   };
 
-  const handleImportOperatorCatalogs = async () => {
+  const handleImportOperatorCatalogs = () => {
     if (staffUser?.role !== 'admin' || isImportingOperatorCatalog) return;
-    const confirmed = window.confirm(
-      'Import the supplied Wild Horizons, Shearwater and Pure Africa price-list records as unpublished drafts? Existing same-name records will not be overwritten. Missing or duplicate operator mappings will be reported; affected drafts remain unpublished.'
-    );
-    if (!confirmed) return;
+    // Use an in-app dialog: window.confirm can be suppressed in embedded previews/webviews.
+    setIsOperatorImportConfirmationOpen(true);
+  };
 
+  const confirmImportOperatorCatalogs = async () => {
+    if (staffUser?.role !== 'admin' || isImportingOperatorCatalog) return;
+    setIsOperatorImportConfirmationOpen(false);
     setIsImportingOperatorCatalog(true);
     try {
       const result = await api.importOperatorCatalogs();
@@ -840,7 +843,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                     onClick={handleImportOperatorCatalogs}
                     disabled={isImportingOperatorCatalog}
                     className="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 disabled:opacity-50 text-sky-900 border border-sky-200 font-semibold text-xs transition flex items-center cursor-pointer"
-                    title="Import Wild Horizons and Shearwater as unpublished draft records; requires exact operator mapping."
+                    title="Import operator price-list records as unpublished drafts; review and verify before publishing."
                   >
                     <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isImportingOperatorCatalog ? 'animate-spin' : ''}`} />
                     <span>{isImportingOperatorCatalog ? 'Importing…' : 'Import Operator Price Lists'}</span>
@@ -1542,6 +1545,54 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
           }`}
         >
           {portalNotice.text}
+        </div>
+      )}
+
+      {/* In-app operator catalogue import confirmation; independent of browser popup support */}
+      {isOperatorImportConfirmationOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/60 p-4"
+          role="presentation"
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="operator-import-title"
+            aria-describedby="operator-import-description"
+            className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl"
+          >
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-800">
+                <RefreshCw className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 id="operator-import-title" className="text-base font-bold text-stone-900">
+                  Import operator price lists?
+                </h3>
+                <p className="mt-0.5 text-xs text-stone-500">Administrator action · draft-only import</p>
+              </div>
+            </div>
+            <p id="operator-import-description" className="text-sm leading-6 text-stone-700">
+              Import the supplied Wild Horizons, Shearwater and Pure Africa catalogue records into the catalogue as unpublished drafts. Existing same-name records will not be overwritten. Missing or duplicate operator mappings will be reported for review. Nothing will be published automatically.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setIsOperatorImportConfirmationOpen(false)}
+                className="rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmImportOperatorCatalogs}
+                disabled={isImportingOperatorCatalog}
+                className="rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Confirm import
+              </button>
+            </div>
+          </section>
         </div>
       )}
 
