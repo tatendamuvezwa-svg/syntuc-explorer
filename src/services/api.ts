@@ -330,6 +330,19 @@ export const api = {
     return res.json();
   },
 
+  async importOperatorCatalogs(): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordinator/catalog/import-operator-pricelists`, {
+      method: 'POST',
+      headers: getStaffHeaders(),
+      body: JSON.stringify({}),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok && res.status !== 207) {
+      throw new Error(payload.message || payload.error || 'Failed to import operator catalog');
+    }
+    return payload;
+  },
+
   async createProduct(data: any): Promise<any> {
     const res = await fetch(`${API_BASE}/coordinator/products`, {
       method: 'POST',
