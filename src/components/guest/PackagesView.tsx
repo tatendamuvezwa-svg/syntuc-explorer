@@ -65,15 +65,14 @@ export const PackagesView: React.FC = () => {
                     />
                     <div className="absolute top-3 left-3 bg-stone-950/80 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-lg flex items-center">
                       <Clock className="w-3.5 h-3.5 mr-1 text-amber-400" />
-                      {pkg.durationDays} Days / {pkg.durationNights} Nights
+                      {pkg.durationDays > 0 ? `${pkg.durationDays} Days${pkg.durationNights > 0 ? ` / ${pkg.durationNights} Nights` : ''}` : 'Tailored itinerary'}
                     </div>
 
                     <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-stone-900 px-3 py-1 rounded-xl shadow-md text-right">
-                      <div className="text-[10px] text-stone-500 uppercase font-semibold">From</div>
-                      <div className="text-lg font-extrabold text-amber-800 font-display leading-tight">
-                        US${pkg.pricePerPerson}
+                      <div className="text-[10px] text-stone-500 uppercase font-semibold">Package pricing</div>
+                      <div className="text-sm font-extrabold text-amber-800 font-display leading-tight">
+                        {pkg.pricePerPerson === "Price available on inquiry" ? pkg.pricePerPerson : `US${pkg.pricePerPerson}`}
                       </div>
-                      <div className="text-[10px] text-stone-400">per person</div>
                     </div>
                   </div>
 
@@ -102,7 +101,14 @@ export const PackagesView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Footer action */}
+                {/* Quote and itinerary notes */}
+                  <div className="px-6 pb-4">
+                    {pkg.inclusions?.length > 0 && <div className="mb-3"><h4 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">Included</h4><ul className="space-y-1 text-xs text-stone-600">{pkg.inclusions.map((item, i) => <li key={i}>• {item}</li>)}</ul></div>}
+                    {pkg.exclusions?.length > 0 && <div className="mb-3"><h4 className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-2">Not included / confirm in quote</h4><ul className="space-y-1 text-xs text-stone-500">{pkg.exclusions.map((item, i) => <li key={i}>• {item}</li>)}</ul></div>}
+                    {(pkg as any).itineraryNote && <p className="text-xs text-stone-500 leading-relaxed">{(pkg as any).itineraryNote}</p>}
+                  </div>
+
+                  {/* Footer action */}
                 <div className="p-6 pt-0">
                   <button
                     onClick={async () => {
