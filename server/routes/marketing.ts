@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
 import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware/auth.ts';
 import { getDocById, setDocById, updateDocById, getCollectionDocs } from '../lib/firestore.ts';
