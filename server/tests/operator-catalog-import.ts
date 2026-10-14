@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { operatorCatalogImport } from '../data/operatorCatalogImport.ts';
+import { operatorCatalogImport, resolveOperatorMappings } from '../data/operatorCatalogImport.ts';
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -32,3 +32,23 @@ assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Pure Afric
 assert.ok(operatorCatalogImport.some((item) => item.operatorName === 'Pure Africa' && item.name === 'Zambezi Explorer Luxury Sunset Cruise' && item.basePrice === 69 && item.authoritativeOverride));
 assert.ok(operatorCatalogImport.some((item) => item.productType === 'package'));
 console.log(`Operator catalog import data passed validation: ${operatorCatalogImport.length} records.`);
+
+
+const missingMappings = resolveOperatorMappings([]);
+assert.deepEqual(missingMappings.operatorIds, { 'Wild Horizons': null, 'Shearwater': null, 'Pure Africa': null });
+assert.equal(missingMappings.issues.length, 3);
+
+const duplicateMappings = resolveOperatorMappings([
+  { id: 'wh-1', name: 'Wild Horizons' }, { id: 'wh-2', name: 'Wild Horizons Safaris' },
+  { id: 'sh-1', name: 'Shearwater Victoria Falls' }, { id: 'pa-1', name: 'Pure Africa Experiences' },
+]);
+assert.equal(duplicateMappings.operatorIds['Wild Horizons'], null);
+assert.equal(duplicateMappings.issues.length, 1);
+assert.equal(duplicateMappings.issues[0].operator, 'Wild Horizons');
+
+const validMappings = resolveOperatorMappings([
+  { id: 'wh-1', name: 'Wild Horizons' }, { id: 'sh-1', name: 'Shearwater Victoria Falls' },
+  { id: 'pa-1', name: 'Pure Africa Experiences' },
+]);
+assert.deepEqual(validMappings.operatorIds, { 'Wild Horizons': 'wh-1', 'Shearwater': 'sh-1', 'Pure Africa': 'pa-1' });
+assert.equal(validMappings.issues.length, 0);
