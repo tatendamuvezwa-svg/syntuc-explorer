@@ -209,3 +209,32 @@ export const operatorCatalogImport: OperatorCatalogImportItem[] = [
     verificationNotes: ['The supplied catalog summary contains a $156 cruise-and-dinner combination; confirm exact cruise, meal, inclusions and rate basis before publication.'],
   }),
 ];
+
+
+export type OperatorMappingIssue = {
+  operator: 'Wild Horizons' | 'Shearwater' | 'Pure Africa';
+  found: number;
+  matches: Array<{ id: string | null; name: string }>;
+};
+
+export function resolveOperatorMappings(
+  operators: Array<{ id?: string | null; name?: string | null }>
+): { operatorIds: Record<'Wild Horizons' | 'Shearwater' | 'Pure Africa', string | null>; issues: OperatorMappingIssue[] } {
+  const normalizeName = (value: unknown) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const aliases: Record<'Wild Horizons' | 'Shearwater' | 'Pure Africa', string[]> = {
+    'Wild Horizons': ['wild horizons', 'wild horizons victoria falls', 'wild horizons zimbabwe', 'wild horizons safaris'],
+    'Shearwater': ['shearwater', 'shearwater victoria falls'],
+    'Pure Africa': ['pure africa', 'pure africa experiences'],
+  };
+  const operatorIds: Record<'Wild Horizons' | 'Shearwater' | 'Pure Africa', string | null> = {
+    'Wild Horizons': null, 'Shearwater': null, 'Pure Africa': null,
+  };
+  const issues: OperatorMappingIssue[] = [];
+  for (const canonicalName of Object.keys(aliases) as Array<keyof typeof aliases>) {
+    const accepted = new Set(aliases[canonicalName].map(normalizeName));
+    const matches = operators.filter((operator) => accepted.has(normalizeName(operator.name)));
+    if (matches.length === 1 && matches[0].id) operatorIds[canonicalName] = matches[0].id;
+    else issues.push({ operator: canonicalName, found: matches.length, matches: matches.map((operator) => ({ id: operator.id || null, name: String(operator.name || '(unnamed operator)') })) });
+  }
+  return { operatorIds, issues };
+}
