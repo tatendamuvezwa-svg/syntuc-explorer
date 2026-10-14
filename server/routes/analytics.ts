@@ -185,10 +185,11 @@ router.get('/dashboard', requireCoordinatorAuth, async (req: AuthenticatedStaffR
     filteredVisitors.forEach((v) => uniqueVisitorIds.add(v.visitorId));
 
     const totalVisitors = uniqueVisitorIds.size;
-    const newVisitorsCount = filteredVisitors.filter((v) => {
+    const newVisitorIds = new Set(filteredVisitors.filter((v) => {
       if (!timeFilterStart) return true;
       return v.firstSeenAt >= timeFilterStart;
-    }).length;
+    }).map((v) => v.visitorId));
+    const newVisitorsCount = [...newVisitorIds].filter((visitorId) => uniqueVisitorIds.has(visitorId)).length;
     const returningVisitorsCount = Math.max(0, totalVisitors - newVisitorsCount);
     const totalSessionsCount = filteredSessions.length;
 
@@ -227,39 +228,84 @@ router.get('/dashboard', requireCoordinatorAuth, async (req: AuthenticatedStaffR
       }
     });
 
-    // --- FUNNEL ANALYSIS (Unique visitors per milestone) ---
-    const funnelVisitors = new Set(filteredSessions.map((s) => s.visitorId));
-    filteredEvents.forEach((e) => funnelVisitors.add(e.visitorId));
+    // --- FUNNEL ANALYSIS (unique visitors per observed milestone) ---
+    // Include visitor IDs from persisted reservations so the denominator contains
+    // any identifiable visitor who reached a commercial conversion milestone.
+    const funnelVisitors = new Set<string>();
+    filteredSessions.forEach((s) => {
+      if (s.visitorId && s.visitorId !== 'vis_guest') funnelVisitors.add(s.visitorId);
+    });
+    filteredEvents.forEach((e) => {
+      if (e.visitorId && e.visitorId !== 'vis_guest') funnelVisitors.add(e.visitorId);
+    });
+    filteredReservations.forEach((r) => {
+      if (r.visitorId && r.visitorId !== 'vis_guest') funnelVisitors.add(r.visitorId);
+    });
 
     const funnelExplorers = new Set(
-      filteredEvents.filter((e) => ['PRODUCT_VIEWED', 'PACKAGE_VIEWED'].includes(e.eventType)).map((e) => e.visitorId)
+      filteredEvents
+        .filter((e) => ['PRODUCT_VIEWED', 'PACKAGE_VIEWED'].includes(e.eventType) && e.visitorId && e.visitorId !== 'vis_guest')
+        .map((e) => e.visitorId)
     );
 
     const funnelSyntuc = new Set(
-      filteredEvents.filter((e) => ['SYNTUC_CHAT_OPENED', 'SYNTUC_MESSAGE_SENT'].includes(e.eventType)).map((e) => e.visitorId)
+      filteredEvents
+        .filter((e) => ['SYNTUC_CHAT_OPENED', 'SYNTUC_MESSAGE_SENT'].includes(e.eventType) && e.visitorId && e.visitorId !== 'vis_guest')
+        .map((e) => e.visitorId)
     );
 
     const funnelTrip = new Set(
-      filteredEvents.filter((e) => ['TRIP_CREATED', 'TRIP_ITEM_ADDED'].includes(e.eventType)).map((e) => e.visitorId)
+      filteredEvents
+        .filter((e) => ['TRIP_CREATED', 'TRIP_ITEM_ADDED'].includes(e.eventType) && e.visitorId && e.visitorId !== 'vis_guest')
+        .map((e) => e.visitorId)
     );
 
     const funnelBookingStarted = new Set(
-      filteredEvents.filter((e) => e.eventType === 'BOOKING_STARTED').map((e) => e.visitorId)
+      filteredEvents
+        .filter((e) => e.eventType === 'BOOKING_STARTED' && e.visitorId && e.visitorId !== 'vis_guest')
+        .map((e) => e.visitorId)
     );
+
+    // Reservation submissions must correspond to a reservation record that still
+    // exists in the authoritative collection. Old analytics events for deleted
+    // or otherwise absent reservation records must not inflate this milestone.
+    const persistedReservationIds = new Set(filteredReservations.map((r) => r.id).filter(Boolean));
+    const submittedEventsByReservation = new Map<string, Set<string>>();
+    filteredEvents
+      .filter((e) =>
+        e.eventType === 'RESERVATION_REQUEST_SUBMITTED' &&
+        e.reservationId &&
+        persistedReservationIds.has(e.reservationId) &&
+        e.visitorId &&
+        e.visitorId !== 'vis_guest'
+      )
+      .forEach((e) => {
+        const visitors = submittedEventsByReservation.get(e.reservationId) || new Set<string>();
+        visitors.add(e.visitorId);
+        submittedEventsByReservation.set(e.reservationId, visitors);
+      });
 
     const funnelReservationSubmitted = new Set<string>();
     filteredReservations.forEach((r) => {
-      if (r.visitorId) funnelReservationSubmitted.add(r.visitorId);
+      if (r.visitorId && r.visitorId !== 'vis_guest') {
+        funnelReservationSubmitted.add(r.visitorId);
+        return;
+      }
+      (submittedEventsByReservation.get(r.id) || new Set<string>()).forEach((visitorId) => {
+        funnelReservationSubmitted.add(visitorId);
+      });
     });
-    filteredEvents
-      .filter((e) => e.eventType === 'RESERVATION_REQUEST_SUBMITTED')
-      .forEach((e) => funnelReservationSubmitted.add(e.visitorId));
 
     const funnelConfirmed = new Set<string>();
     filteredReservations
       .filter((r) => r.status === 'CONFIRMED')
       .forEach((r) => {
-        if (r.visitorId) funnelConfirmed.add(r.visitorId);
+        if (r.visitorId && r.visitorId !== 'vis_guest') funnelConfirmed.add(r.visitorId);
+        else {
+          (submittedEventsByReservation.get(r.id) || new Set<string>()).forEach((visitorId) => {
+            funnelConfirmed.add(visitorId);
+          });
+        }
       });
 
     const funnelSteps = [
