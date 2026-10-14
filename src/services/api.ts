@@ -630,4 +630,27 @@ export const api = {
     }
     return res.json();
   },
+  async getMarketingCampaigns(): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/campaigns`, { headers: getStaffHeaders() });
+    if (!res.ok) throw new Error('Failed to load marketing campaigns');
+    return res.json();
+  },
+  async generateMarketingDraft(input: { topic: string; audience?: string; tone?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/generate`, { method: 'POST', headers: getStaffHeaders(), body: JSON.stringify(input) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'AI copy generation failed');
+    return data;
+  },
+  async saveMarketingCampaign(input: any): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/campaigns`, { method: 'POST', headers: getStaffHeaders(), body: JSON.stringify(input) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || 'Campaign save failed');
+    return data;
+  },
+  async recordMarketingPublished(id: string, input: { publishedUrl?: string; postId?: string }): Promise<any> {
+    const res = await fetch(`${API_BASE}/marketing/campaigns/${encodeURIComponent(id)}/published`, { method: 'POST', headers: getStaffHeaders(), body: JSON.stringify(input) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || 'Could not record publication');
+    return data;
+  },
 };
