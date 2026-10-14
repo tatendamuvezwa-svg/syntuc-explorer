@@ -264,15 +264,15 @@ router.get('/packages', async (req: Request, res: Response) => {
   try {
     const tombstones = await getTombstones();
     const allPackages = await getCollectionDocs<any>('packages');
-    const packages = allPackages.filter(
-      (p) => p.isPublished && !tombstones.has(`packages_${p.id}`)
+    const approvedIds = new Set(FOUNDER_APPROVED_PACKAGES.map((p) => p.id));
+    const approvedFirestorePackages = allPackages.filter(
+      (p) => approvedIds.has(p.id) && p.isPublished && !tombstones.has(`packages_${p.id}`)
     );
-    if (packages.length > 0) {
-      res.json(packages);
-      return;
-    }
-    // Read-only fallback: never seed or overwrite live Firestore records.
-    res.json(FOUNDER_APPROVED_PACKAGES);
+    const firestoreById = new Map(approvedFirestorePackages.map((p) => [p.id, p]));
+    // Exactly the 12 founder-approved packages are exposed. Existing approved Firestore
+    // records win; missing approved entries use read-only defaults. Unapproved/generated
+    // packages are not exposed, and this endpoint never writes or deletes Firestore data.
+    res.json(FOUNDER_APPROVED_PACKAGES.map((fallback) => firestoreById.get(fallback.id) || fallback));
   } catch (error) {
     console.error('Error fetching packages from Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_PACKAGES' });
