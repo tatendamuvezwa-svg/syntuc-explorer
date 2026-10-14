@@ -16,6 +16,8 @@ const upload = multer({
   },
 });
 const now = () => new Date().toISOString();
+const PUBLIC_APP_URL = process.env.PUBLIC_APP_URL || 'https://syntuc.com/';
+const PUBLIC_APP_HOST = new URL(PUBLIC_APP_URL).hostname;
 const safeText = (value: unknown, max = 2000) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const staffId = (req: AuthenticatedStaffRequest) => req.staffUser?.id || 'unknown';
 
@@ -29,7 +31,12 @@ async function resolveGeminiKey(): Promise<string | undefined> {
 }
 
 // Coordinator-only campaign workspace. Public click redirects are intentionally isolated below.
-router.get('/creatives', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {\n  try { const creatives = await getCollectionDocs<any>('marketing_creatives'); creatives.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); res.json({ creatives }); }\n  catch (error) { console.error('[Marketing] Creative load failed:', error); res.status(500).json({ error: 'CREATIVES_LOAD_FAILED' }); }\n});\n\nrouter.get('/campaigns', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
+router.get('/creatives', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
+  try { const creatives = await getCollectionDocs<any>('marketing_creatives'); creatives.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); res.json({ creatives }); }
+  catch (error) { console.error('[Marketing] Creative load failed:', error); res.status(500).json({ error: 'CREATIVES_LOAD_FAILED' }); }
+});
+
+router.get('/campaigns', requireCoordinatorAuth, async (_req: AuthenticatedStaffRequest, res: Response) => {
   try {
     const campaigns = await getCollectionDocs<any>('marketing_campaigns');
     const clicks = await getCollectionDocs<any>('marketing_clicks');
@@ -90,7 +97,7 @@ router.post('/campaigns', requireCoordinatorAuth, async (req: AuthenticatedStaff
     if (!title || !destination || !caption) { res.status(400).json({ error: 'TITLE_DESTINATION_CAPTION_REQUIRED' }); return; }
     let target: URL;
     try { target = new URL(destination); } catch { res.status(400).json({ error: 'INVALID_DESTINATION_URL' }); return; }
-    if (target.protocol !== 'https:' || target.hostname !== 'syntuc-explorer.ai.studio') {
+    if (target.protocol !== 'https:' || target.hostname !== PUBLIC_APP_HOST) {
       res.status(400).json({ error: 'DESTINATION_NOT_ALLOWED', message: 'Use the verified Syntuc Explorer public URL only.' }); return;
     }
     const utmCampaign = safeText(req.body?.utmCampaign, 100) || id;
