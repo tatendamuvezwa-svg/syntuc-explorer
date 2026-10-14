@@ -450,7 +450,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       const isPackage = item.productType === 'package';
       const targetExisting = isPackage ? activeExistingPackages : activeExisting;
       const sameOperatorName = targetExisting.find((p) =>
-        p.operatorId === operatorId && normalize(p.name) === normalize(item.name)
+        (p.operatorId === operatorId || !p.operatorId) && normalize(p.name) === normalize(item.name)
       );
       if (sameOperatorName) {
         results.existingNeedsManualReview++;
@@ -459,6 +459,11 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       }
 
       const productId = (isPackage ? 'imp_pkg_' : 'imp_') + crypto.createHash('sha256').update(importKey).digest('hex').slice(0, 20);
+      const targetCollection = isPackage ? 'packages' : 'products';
+      if (tombstones.has(`${targetCollection}_${productId}`)) {
+        results.errors.push(`Deterministic ID ${productId} is tombstoned; manual review required for ${item.operatorName}: ${item.name}`);
+        continue;
+      }
       if (targetExisting.some((p) => p.id === productId)) {
         results.errors.push(`Deterministic ID collision for ${item.operatorName}: ${item.name}`);
         continue;
