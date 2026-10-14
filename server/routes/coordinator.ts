@@ -411,10 +411,11 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
     const aliases: Record<string, string[]> = {
       'Wild Horizons': ['wild horizons', 'wild horizons victoria falls', 'wild horizons zimbabwe'],
       'Shearwater': ['shearwater', 'shearwater victoria falls'],
+      'Pure Africa': ['pure africa', 'pure africa experiences'],
     };
     const operatorIds: Record<string, string> = {};
 
-    for (const canonicalName of ['Wild Horizons', 'Shearwater']) {
+    for (const canonicalName of ['Wild Horizons', 'Shearwater', 'Pure Africa']) {
       const accepted = new Set((aliases[canonicalName] || []).map(normalize));
       const matches = operators.filter((operator) => accepted.has(normalize(operator.name)));
       if (matches.length !== 1 || !matches[0]?.id) {
@@ -435,7 +436,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
     const activeExisting = existingProducts.filter((p) => !tombstones.has(`products_${p.id}`));
     const activeExistingPackages = existingPackages.filter((p) => !tombstones.has(`packages_${p.id}`));
     const existingKeys = new Set([...activeExisting, ...activeExistingPackages].map((p) => p.catalogImportKey).filter(Boolean));
-    const results = { created: 0, alreadyImported: 0, existingNeedsManualReview: 0, errors: [] as string[], skipped: [] as Array<{ name: string; operator: string; reason: string }> };
+    const results = { created: 0, updatedAuthoritative: 0, alreadyImported: 0, existingNeedsManualReview: 0, errors: [] as string[], skipped: [] as Array<{ name: string; operator: string; reason: string }> };
     const now = new Date().toISOString();
 
     for (const item of operatorCatalogImport) {
@@ -452,6 +453,43 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       const sameOperatorName = targetExisting.find((p) =>
         (p.operatorId === operatorId || !p.operatorId) && normalize(p.name) === normalize(item.name)
       );
+      if (sameOperatorName && item.authoritativeOverride && sameOperatorName.operatorId === operatorId) {
+        // The newest Pure Africa catalog is explicitly authoritative. Preserve the existing
+        // document ID/history and update only source-controlled catalog fields.
+        try {
+          const updates: Record<string, unknown> = {
+            sourceReference: item.sourceReference,
+            catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
+            verificationNotes: item.verificationNotes,
+            catalogSourceAuthority: 'LATEST_SUPPLIED_PURE_AFRICA_CATALOG',
+            catalogSourceUpdatedAt: now,
+            isPublished: false,
+            updatedAt: now,
+          };
+          if (isPackage) {
+            updates.pricePerPerson = String(item.basePrice);
+            updates.inclusions = item.inclusions;
+            updates.exclusions = item.exclusions;
+            updates.mandatoryFees = item.mandatoryFees;
+            await updateDocById('packages', sameOperatorName.id, updates);
+          } else {
+            updates.basePrice = String(item.basePrice);
+            updates.currency = 'USD';
+            updates.priceBasis = item.priceBasis;
+            updates.inclusions = item.inclusions;
+            updates.exclusions = item.exclusions;
+            updates.mandatoryFees = item.mandatoryFees;
+            await updateDocById('products', sameOperatorName.id, updates);
+          }
+          results.updatedAuthoritative = (results as any).updatedAuthoritative || 0;
+          (results as any).updatedAuthoritative++;
+          existingKeys.add(importKey);
+          continue;
+        } catch (error) {
+          results.errors.push(`Failed authoritative update for ${item.operatorName}: ${item.name} (${sameOperatorName.id}): ${String(error)}`);
+          continue;
+        }
+      }
       if (sameOperatorName) {
         results.existingNeedsManualReview++;
         results.skipped.push({ name: item.name, operator: item.operatorName, reason: `Existing ${isPackage ? 'package' : 'product'} ${sameOperatorName.id} requires manual source/rate reconciliation; no overwrite performed.` });
