@@ -426,13 +426,33 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       const mappingIssue = operatorMappingIssues.find((issue) => issue.operator === item.operatorName);
       const verificationNotes = [...item.verificationNotes, ...(mappingIssue ? [`Operator mapping unresolved: ${item.operatorName} has ${mappingIssue.found} matching operator records. Resolve the operator record before verifying or publishing this draft.`] : [])];
       const importKey = `operator-pricelist-v1:${normalize(item.operatorName).replace(/ /g, '-') }:${normalize(item.name).replace(/ /g, '-')}`;
+      // Packages live in the packages collection; activities/transfers stay in products.
+      const isPackage = item.productType === 'package';
       if (existingKeys.has(importKey)) {
+        // A previous import version stored every non-package record as "activity".
+        // Repair only records carrying this exact deterministic import key, and only
+        // when the source type is an explicit transfer/fee. No other catalogue records
+        // or manually edited product types are touched.
+        if (!isPackage && (item.productType === 'transfer' || item.productType === 'fee')) {
+          const importedRecord = activeExisting.find((p) => p.catalogImportKey === importKey);
+          if (importedRecord && importedRecord.productType === 'activity' &&
+              (importedRecord.catalogItemType === 'transfer' || importedRecord.catalogItemType === 'fee')) {
+            try {
+              await updateDocById('products', importedRecord.id, {
+                productType: item.productType,
+                catalogItemType: item.productType,
+                updatedAt: now,
+              });
+              results.updatedAuthoritative++;
+            } catch (error) {
+              results.errors.push(`Failed product-type repair for ${item.operatorName}: ${item.name} (${importedRecord.id}): ${String(error)}`);
+              continue;
+            }
+          }
+        }
         results.alreadyImported++;
         continue;
       }
-
-      // Packages live in the packages collection; activities/transfers stay in products.
-      const isPackage = item.productType === 'package';
       const targetExisting = isPackage ? activeExistingPackages : activeExisting;
       const sameOperatorName = targetExisting.find((p) =>
         (p.operatorId === operatorId || !p.operatorId) && normalize(p.name) === normalize(item.name)
@@ -499,7 +519,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         id: productId,
         slug: `${normalize(item.name).replace(/ /g, '-')}-${productId.slice(-6)}`,
         name: item.name,
-        productType: 'activity',
+        productType: item.productType === 'activity' ? 'activity' : item.productType === 'transfer' ? 'transfer' : 'fee',
         catalogItemType: item.productType,
         categorySlug: item.categorySlug,
         operatorId: operatorId || null,
