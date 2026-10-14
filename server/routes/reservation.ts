@@ -12,6 +12,7 @@ import {
   updateDocById,
   getCollectionDocs,
   where,
+  getTombstones,
 } from '../lib/firestore.ts';
 
 const router = Router();
@@ -130,10 +131,11 @@ const handleReservationSubmit = async (req: GuestSessionRequest, res: Response) 
     }
 
     // Idempotency / Duplicate Submission Protection
-    const existingReservations = await getCollectionDocs<any>(
+    const tombstones = await getTombstones();
+    const existingReservations = (await getCollectionDocs<any>(
       'reservation_requests',
       where('guestSessionId', '==', currentSessionId)
-    );
+    )).filter((r) => !tombstones.has(`reservation_requests_${r.id}`));
 
     const matchingRecent = existingReservations
       .filter((r) => Number(r.authoritativeTotal) === pricingResult.authoritativeTotal)
@@ -448,6 +450,14 @@ router.get('/guest/:token', async (req, res: Response) => {
     await updateDocById('guest_access_tokens', tokenRecord.id, {
       lastAccessedAt: new Date().toISOString(),
     });
+
+    // A deleted reservation must remain unavailable even if a stale token
+    // or external initialization process attempts to restore its document.
+    const tombstones = await getTombstones();
+    if (tombstones.has(`reservation_requests_${tokenRecord.reservationRequestId}`)) {
+      res.status(404).json({ error: 'RESERVATION_NOT_FOUND' });
+      return;
+    }
 
     const reservation = await getDocById<any>(
       'reservation_requests',
