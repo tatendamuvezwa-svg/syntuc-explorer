@@ -822,6 +822,42 @@ router.patch('/products/:id/publish', requireCoordinatorAuth, async (req: Authen
   }
 });
 
+// PATCH /api/coordinator/products/:id/verify - Explicit administrator verification gate for imported drafts
+router.patch('/products/:id/verify', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  if (req.staffUser?.role !== 'admin') {
+    res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Only an administrator can verify imported catalog records.' });
+    return;
+  }
+  try {
+    const { id } = req.params;
+    const current = await getDocById<any>('products', id);
+    if (!current) {
+      res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
+      return;
+    }
+    if (!current.catalogImportKey) {
+      res.status(400).json({ error: 'NOT_AN_IMPORTED_PRODUCT', message: 'This verification action is only for imported price-list records.' });
+      return;
+    }
+    const now = new Date().toISOString();
+    await updateDocById('products', id, {
+      catalogImportStatus: 'VERIFIED',
+      evidenceStatus: 'ESTABLISHED',
+      verifiedAt: now,
+      verifiedByStaffId: req.staffUser!.id,
+      updatedAt: now,
+    });
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId, productId: id, collectionName: 'products', modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: current, changeSummary: `Imported product verified by administrator: ${current.name}`, createdAt: now,
+    });
+    res.json({ success: true, catalogImportStatus: 'VERIFIED' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'FAILED_TO_VERIFY_IMPORTED_PRODUCT', message: error?.message || 'Unknown error' });
+  }
+});
+
 // DELETE /api/coordinator/products/:id - Permanently delete catalog product and record durable tombstone
 router.delete('/products/:id', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   try {
@@ -1200,6 +1236,42 @@ router.put('/packages/:id', requireCoordinatorAuth, async (req: AuthenticatedSta
     res.json({ success: true, package: updated });
   } catch (error) {
     res.status(500).json({ error: 'FAILED_TO_UPDATE_PACKAGE' });
+  }
+});
+
+// PATCH /api/coordinator/packages/:id/verify - Explicit administrator verification gate for imported package drafts
+router.patch('/packages/:id/verify', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  if (req.staffUser?.role !== 'admin') {
+    res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Only an administrator can verify imported catalog records.' });
+    return;
+  }
+  try {
+    const { id } = req.params;
+    const current = await getDocById<any>('packages', id);
+    if (!current) {
+      res.status(404).json({ error: 'PACKAGE_NOT_FOUND' });
+      return;
+    }
+    if (!current.catalogImportKey) {
+      res.status(400).json({ error: 'NOT_AN_IMPORTED_PACKAGE', message: 'This verification action is only for imported price-list records.' });
+      return;
+    }
+    const now = new Date().toISOString();
+    await updateDocById('packages', id, {
+      catalogImportStatus: 'VERIFIED',
+      evidenceStatus: 'ESTABLISHED',
+      verifiedAt: now,
+      verifiedByStaffId: req.staffUser!.id,
+      updatedAt: now,
+    });
+    const revId = 'rev_' + crypto.randomBytes(12).toString('hex');
+    await setDocById('product_revisions', revId, {
+      id: revId, productId: id, collectionName: 'packages', modifiedByStaffId: req.staffUser!.id,
+      previousSnapshot: current, changeSummary: `Imported package verified by administrator: ${current.name}`, createdAt: now,
+    });
+    res.json({ success: true, catalogImportStatus: 'VERIFIED' });
+  } catch (error: any) {
+    res.status(500).json({ error: 'FAILED_TO_VERIFY_IMPORTED_PACKAGE', message: error?.message || 'Unknown error' });
   }
 });
 
