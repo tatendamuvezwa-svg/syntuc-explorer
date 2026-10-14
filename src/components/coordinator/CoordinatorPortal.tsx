@@ -74,6 +74,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [r2Report, setR2Report] = useState<any>(null);
   const [runningR2, setRunningR2] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(false);
+  const [isImportingOperatorCatalog, setIsImportingOperatorCatalog] = useState<boolean>(false);
 
   // Catalogue Management Modals & Filters
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
@@ -237,6 +238,32 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
       await loadAllData();
     } catch (e: any) {
       alert('Failed to update publication state: ' + e.message);
+    }
+  };
+
+  const handleImportOperatorCatalogs = async () => {
+    if (staffUser?.role !== 'admin' || isImportingOperatorCatalog) return;
+    const confirmed = window.confirm(
+      'Import the supplied Wild Horizons and Shearwater price-list records as unpublished drafts? Existing same-name records will not be overwritten, and unresolved operator mappings will stop the import.'
+    );
+    if (!confirmed) return;
+
+    setIsImportingOperatorCatalog(true);
+    try {
+      const result = await api.importOperatorCatalogs();
+      const summary = `Operator catalog import complete: ${result.created} draft records created, ${result.alreadyImported} already imported, ${result.existingNeedsManualReview} existing records flagged for manual review, ${(result.errors || []).length} errors. Nothing was published.`;
+      notify(summary, result.errors?.length ? 'error' : 'success');
+      await loadAllData();
+      if (result.skipped?.length) {
+        console.warn('Catalog import skipped existing records for manual review:', result.skipped);
+      }
+      if (result.errors?.length) {
+        console.error('Catalog import errors:', result.errors);
+      }
+    } catch (e: any) {
+      notify(e.message || 'Operator catalog import failed. No products should be published.', 'error');
+    } finally {
+      setIsImportingOperatorCatalog(false);
     }
   };
 
@@ -778,7 +805,18 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 flex-wrap">
+                {staffUser?.role === 'admin' && (
+                  <button
+                    onClick={handleImportOperatorCatalogs}
+                    disabled={isImportingOperatorCatalog}
+                    className="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 disabled:opacity-50 text-sky-900 border border-sky-200 font-semibold text-xs transition flex items-center cursor-pointer"
+                    title="Import Wild Horizons and Shearwater as unpublished draft records; requires exact operator mapping."
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isImportingOperatorCatalog ? 'animate-spin' : ''}`} />
+                    <span>{isImportingOperatorCatalog ? 'Importing…' : 'Import Operator Price Lists'}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setPackageToEdit(null);
