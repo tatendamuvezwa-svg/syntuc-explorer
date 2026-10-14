@@ -235,3 +235,25 @@ For every new or updated product, confirm:
 - draft/published status and media ownership.
 
 **Publication gate:** No record from this reconciliation should be published until its operator association, source, base price, fee treatment, and material inclusions have been checked. Similar names are not sufficient evidence that two records are the same product.
+
+
+## 8. Implementation added on the working branch
+
+The implementation now includes:
+- `server/data/operatorCatalogImport.ts`: structured Wild Horizons and Shearwater price-list records with separate operator ownership, categories, package/activity type, base prices, fee metadata, source references, and verification notes.
+- `POST /api/coordinator/catalog/import-operator-pricelists`: administrator-only, authenticated, draft-only import endpoint. It requires exactly one recognized canonical operator record for each operator before writing anything.
+- `src/components/coordinator/CoordinatorPortal.tsx`: an **Import Operator Price Lists** action in Catalog Governance, visible to administrators.
+- `src/services/api.ts`: authenticated API client for the import action.
+- Imported **packages** are stored in the `packages` collection; activities and other non-package offers are stored in `products`. Both retain `operatorId`, `catalogImportKey`, source/fee metadata, and verification status.
+- Deterministic IDs and import keys make repeat runs idempotent. Existing same-operator/name records without the import key are skipped for manual reconciliation rather than overwritten.
+- All imported records remain unpublished. The importer does not publish guest-facing inventory.
+
+### How to run after syncing the branch into Google AI Studio
+
+1. Ensure the branch changes have been merged or otherwise brought into the AI Studio project. AI Studio's GitHub settings support syncing changes, but a separate branch will not automatically become the connected project's checked-out source.
+2. Start the app and sign into the Coordinator Desk with an administrator account.
+3. Open **Catalog Governance** and choose **Import Operator Price Lists**.
+4. Review the completion summary. If the canonical operator records do not match the approved exact aliases, the import stops without writing products.
+5. Review drafts and verification notes, reconcile duplicate candidates, and add verified product media before publishing anything.
+
+**Important:** This code change adds the import capability but does not itself write to the live Firestore database. The administrator-triggered import is the step that creates the draft records in the Firestore project configured by the running AI Studio app.
