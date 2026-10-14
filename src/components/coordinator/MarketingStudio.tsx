@@ -4,7 +4,7 @@ import { Check, Copy, ExternalLink, FileVideo, LoaderCircle, Megaphone, Plus, Re
 
 type Campaign = {
   id: string; title: string; platform: string; status: string; destination: string;
-  caption: string; hook?: string; hashtags?: string[]; creativeId?: string | null;
+  caption: string; hook?: string; callToAction?: string; hashtags?: string[]; creativeId?: string | null;
   utmCampaign?: string; clickCount?: number; publishedUrl?: string | null; postId?: string | null;
   publishedAt?: string | null; createdAt?: string;
 };
@@ -74,8 +74,8 @@ export const MarketingStudio: React.FC = () => {
     try {
       const result = await api.saveMarketingCampaign({
         id: activeId || undefined, title: draft.title, destination: draft.destination,
-        caption: [draft.caption.trim(), draft.hashtags.join(' ')].filter(Boolean).join('\n\n'),
-        hook: draft.hook, hashtags: draft.hashtags, creativeId: draft.creativeId || null,
+        caption: draft.caption.trim(),
+        hook: draft.hook, callToAction: draft.callToAction, hashtags: draft.hashtags, creativeId: draft.creativeId || null,
         utmCampaign: draft.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 100),
       });
       setActiveId(result.campaign.id);
@@ -87,7 +87,7 @@ export const MarketingStudio: React.FC = () => {
 
   const selectCampaign = (campaign: Campaign) => {
     setActiveId(campaign.id);
-    setDraft({ ...emptyDraft, title: campaign.title, topic: campaign.hook || campaign.title, hook: campaign.hook || '', caption: campaign.caption.replace(/\n\n#.*$/s, ''), hashtags: campaign.hashtags || [], destination: campaign.destination, creativeId: campaign.creativeId || '' });
+    setDraft({ ...emptyDraft, title: campaign.title, topic: campaign.hook || campaign.title, hook: campaign.hook || '', callToAction: campaign.callToAction || '', caption: campaign.caption, hashtags: campaign.hashtags || [], destination: campaign.destination, creativeId: campaign.creativeId || '' });
     setPublishedUrl(campaign.publishedUrl || ''); setPostId(campaign.postId || ''); setShowPublishForm(false);
     setNotice('Campaign loaded for editing.');
   };
@@ -131,6 +131,7 @@ export const MarketingStudio: React.FC = () => {
         <button disabled={busy} onClick={generate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Sparkles size={16}/>{busy ? 'Working…' : 'Generate TikTok copy'}</button>
         <label className="block text-xs font-semibold text-stone-600">Hook / opening line<textarea value={draft.hook} onChange={e=>updateDraft({hook:e.target.value})} rows={2} className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm font-normal"/></label>
         <label className="block text-xs font-semibold text-stone-600">Caption<textarea value={draft.caption} onChange={e=>updateDraft({caption:e.target.value})} rows={5} placeholder="Edit the AI draft or write your own caption." className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm font-normal"/></label>
+        <label className="block text-xs font-semibold text-stone-600">Call to action<input value={draft.callToAction} onChange={e=>updateDraft({callToAction:e.target.value})} placeholder="Explore verified experiences" className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm font-normal"/></label>
         <label className="block text-xs font-semibold text-stone-600">Hashtags (space separated)<input value={draft.hashtags.join(' ')} onChange={e=>updateDraft({hashtags:e.target.value.split(/\s+/).filter(Boolean).slice(0,10)})} placeholder="#VictoriaFalls #ZimbabweTravel" className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm font-normal"/></label>
         <label className="block text-xs font-semibold text-stone-600">Destination URL<input value={draft.destination} onChange={e=>updateDraft({destination:e.target.value})} className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm font-normal"/></label>
         <label className="block text-xs font-semibold text-stone-600">Video creative<select value={draft.creativeId} onChange={e=>updateDraft({creativeId:e.target.value})} className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2.5 text-sm font-normal"><option value="">No video selected</option>{creatives.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
@@ -150,7 +151,7 @@ export const MarketingStudio: React.FC = () => {
         <div className="rounded-3xl border border-stone-200 bg-white p-5">
           <div className="flex items-center gap-2"><Megaphone className="text-amber-700" size={18}/><h4 className="font-bold text-stone-900">Publishing Desk</h4></div>
           <p className="mt-2 text-xs leading-5 text-stone-500">TikTok direct publishing is not connected here. Open TikTok, upload the selected video, paste your caption and include the tracked link where TikTok permits. Then record the published post.</p>
-          <button onClick={()=>copy([draft.hook,draft.caption,draft.hashtags.join(' ')].filter(Boolean).join('\n\n'))} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold"><Copy size={15}/> Copy caption</button>
+          <button onClick={()=>copy([draft.hook,draft.caption,draft.callToAction,draft.hashtags.join(' ')].filter(Boolean).join('\n\n'))} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold"><Copy size={15}/> Copy caption</button>
           <button onClick={()=>copy(trackedUrl || 'Save the campaign first to generate a tracked link.')} disabled={!activeId} className="ml-2 mt-4 inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold disabled:opacity-40"><Copy size={15}/> Copy tracked link</button>
           <button onClick={openTikTok} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white">Open TikTok upload <ExternalLink size={15}/></button>
           {activeId && <div className="mt-3 break-all rounded-xl bg-stone-50 p-3 text-xs text-stone-700"><div className="mb-1 font-bold">Tracked campaign URL</div>{trackedUrl}</div>}
