@@ -188,7 +188,7 @@ router.get('/c/:id', async (req: Request, res: Response) => {
     const campaign = await getDocById<any>('marketing_campaigns', id);
     if (!campaign || !['DRAFT', 'READY', 'PUBLISHED'].includes(campaign.status)) { res.status(404).send('Campaign link unavailable'); return; }
     const target = new URL(campaign.destination);
-    if (target.protocol !== 'https:' || target.hostname !== PUBLIC_APP_HOST) { res.status(400).send('Invalid campaign destination'); return; }
+    if (target.protocol !== 'https:' || target.origin !== PUBLIC_APP_ORIGIN) { res.status(400).send('Invalid campaign destination'); return; }
     const source = 'tiktok';
     target.searchParams.set('utm_source', source);
     target.searchParams.set('utm_medium', campaign.campaignType === 'paid' ? 'paid_social' : 'organic_social');
