@@ -65,95 +65,77 @@ export const ExploreView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-stone-950 py-16 sm:py-24 text-white">
-        {/* Authoritative Victoria Falls Hero Image */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
+      {/* Hero Section — modern editorial destination experience */}
+      <section className="syntuc-hero relative isolate min-h-[620px] overflow-hidden bg-[#15241D] text-white sm:min-h-[680px] lg:min-h-[720px]">
+        <div className="absolute inset-0 -z-20">
           <img
             src="/hero.jpg"
-            alt="Victoria Falls, Zimbabwe - The Smoke That Thunders"
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-center opacity-70 filter brightness-95 contrast-105"
+            alt="Panoramic Victoria Falls, Zimbabwe, known as the Smoke That Thunders"
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-cover object-center"
             onError={(e) => {
-              // Fallback to secondary asset if /hero.jpg fails
               const target = e.target as HTMLImageElement;
-              if (!target.src.includes('unsplash')) {
-                target.src = 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=2000&q=80';
-              }
+              target.style.display = 'none';
             }}
           />
-          {/* Gradients ensuring high text readability while vividly showcasing the Victoria Falls photograph */}
-          <div className="absolute inset-0 bg-stone-950/40" />
-          <div className="absolute inset-0 bg-gradient-to-r from-stone-950/90 via-stone-950/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-transparent to-stone-950/40" />
         </div>
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#101D17]/95 via-[#14231B]/72 to-[#14231B]/20" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#101D17]/85 via-transparent to-[#101D17]/15" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_76%_40%,rgba(197,151,94,0.15),transparent_38%)]" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center sm:text-left">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold uppercase tracking-wider mb-4">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Syntuc Explorer • Victoria Falls, Zimbabwe</span>
+        <div className="mx-auto flex min-h-[620px] max-w-[1440px] flex-col justify-center px-5 pb-14 pt-16 sm:min-h-[680px] sm:px-8 sm:pb-16 lg:min-h-[720px] lg:px-14 xl:px-20">
+          <div className="max-w-4xl">
+            <div className="syntuc-hero-reveal mb-7 inline-flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#E3C49A] sm:text-xs">
+              <span className="h-px w-8 bg-[#C4975E]" />
+              Victoria Falls · Zimbabwe
+            </div>
+
+            <h1 className="syntuc-hero-reveal syntuc-hero-delay-1 max-w-4xl font-display text-[clamp(3.25rem,8.1vw,7.25rem)] font-medium leading-[0.96] tracking-[-0.055em] text-white">
+              Find your way<br className="hidden sm:block" /> to the extraordinary.
+            </h1>
+
+            <p className="syntuc-hero-reveal syntuc-hero-delay-2 mt-7 max-w-2xl text-base leading-7 text-white/85 sm:mt-8 sm:text-lg sm:leading-8">
+              Discover remarkable places to stay, unforgettable experiences and local insight — with an intelligent guide to help you plan your Victoria Falls journey.
+            </p>
+
+            <div className="syntuc-hero-reveal syntuc-hero-delay-3 mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <button
+                onClick={() => {
+                  const el = document.getElementById('catalog-section');
+                  if (el) el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                }}
+                className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-[#D2A66D] px-7 py-3.5 text-sm font-semibold text-[#17251D] shadow-[0_8px_28px_rgba(0,0,0,0.16)] transition duration-200 hover:bg-[#E1BB87] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#17251D]"
+              >
+                Explore experiences
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+              </button>
+
+              <button
+                onClick={() => {
+                  const el = document.getElementById('syntuc-assistant-trigger');
+                  if (el) el.click();
+                }}
+                className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full border border-white/45 bg-white/[0.07] px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition duration-200 hover:border-white/70 hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <Sparkles className="h-4 w-4 text-[#E3C49A]" />
+                Talk to Syntuc
+              </button>
+
+              <button
+                onClick={openSchoolPlanner}
+                className="inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                Planning a school trip?
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white font-display max-w-3xl leading-tight">
-            Explore. Plan. Experience.
-          </h1>
-
-          <p className="mt-4 text-lg sm:text-xl text-stone-200 max-w-2xl font-normal leading-relaxed drop-shadow-xs">
-            Discover verified luxury river lodges, scenic helicopter flights over the Falls, peaceful Zambezi sunset cruises, and authentic African safaris coordinated with local operators.
-          </p>
-
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => {
-                const el = document.getElementById('catalog-section');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm transition shadow-lg shadow-amber-600/30 cursor-pointer flex items-center"
-            >
-              <span>Explore Verified Experiences</span>
-              <ChevronRight className="w-4 h-4 ml-1.5" />
-            </button>
-
-            <button
-              onClick={() => {
-                const el = document.getElementById('syntuc-assistant-trigger');
-                if (el) el.click();
-              }}
-              className="px-5 py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-semibold text-sm transition backdrop-blur-xs cursor-pointer flex items-center"
-            >
-              <Sparkles className="w-4 h-4 mr-2 text-amber-300" />
-              <span>Talk to Syntuc</span>
-            </button>
-
-            <button
-              onClick={openSchoolPlanner}
-              className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 font-semibold text-sm transition backdrop-blur-xs cursor-pointer flex items-center"
-            >
-              <span>School Trip Commercial Planner</span>
-              <span className="ml-2 text-[10px] bg-emerald-500 text-white px-1.5 py-0.5 rounded font-bold">
-                From $15
-              </span>
-            </button>
-          </div>
-
-          {/* Quick trust metrics */}
-          <div className="mt-12 pt-8 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-6 text-stone-300 text-xs">
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">100% Verified</div>
-              <div className="text-stone-400 mt-0.5">Contracted local operators</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">No Payment</div>
-              <div className="text-stone-400 mt-0.5">Required to submit requests</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">Historic Bridge</div>
-              <div className="text-stone-400 mt-0.5">$0 incentive on 2N + 2 activities</div>
-            </div>
-            <div>
-              <div className="text-xl font-bold text-amber-400 font-display">Desk Review</div>
-              <div className="text-stone-400 mt-0.5">Personal coordinator support</div>
-            </div>
+          <div className="syntuc-hero-reveal syntuc-hero-delay-3 mt-14 flex flex-wrap gap-x-7 gap-y-3 border-t border-white/20 pt-5 text-xs font-medium tracking-wide text-white/75 sm:mt-16 sm:gap-x-10 sm:pt-6 sm:text-sm">
+            <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#D2A66D]" /> Curated local experiences</span>
+            <span className="inline-flex items-center gap-2"><Calendar className="h-4 w-4 text-[#D2A66D]" /> Request-first reservations</span>
+            <span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4 text-[#D2A66D]" /> Human coordinator review</span>
           </div>
         </div>
       </section>
