@@ -634,7 +634,7 @@ router.get('/products', requireCoordinatorAuth, async (req: AuthenticatedStaffRe
 
       return {
         ...p,
-        operatorName: op?.name || 'Syntuc Partner',
+        operatorName: p.operatorName || op?.name || 'Unassigned — review required',
         primaryImageUrl: primaryMedia?.url || null,
         mediaCount: productMedia.length,
       };
