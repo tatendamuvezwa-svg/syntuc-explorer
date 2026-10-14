@@ -257,3 +257,22 @@ The implementation now includes:
 5. Review drafts and verification notes, reconcile duplicate candidates, and add verified product media before publishing anything.
 
 **Important:** This code change adds the import capability but does not itself write to the live Firestore database. The administrator-triggered import is the step that creates the draft records in the Firestore project configured by the running AI Studio app.
+
+
+## 9. Pure Africa — authoritative latest catalog
+
+The latest Pure Africa catalog supplied by the user is authoritative over older Pure Africa prices. Pure Africa is mapped as its own canonical operator; it is never merged into Shearwater or Wild Horizons.
+
+The import dataset now includes the supplied latest rates:
+- Sunrise cruise — $92/person
+- Lunch cruise — $92/person
+- Sunset Luxury cruise — $69/person
+- Sunset Signature cruise — $110/person
+- Dinner cruise — $110/person
+- Classic Dinner — $185/person (rate basis/inclusions to verify)
+- The Eatery Waterfront Potjie Dining — Lunch $43/person; Dinner $49/person
+- Cruise-and-dinner combinations — $110 and $156 (exact variant/inclusions to verify)
+
+For an exact-name match to an existing record belonging to the canonical Pure Africa operator, an authoritative catalog entry updates the existing record in place, preserving its document ID and history while updating the source-controlled rate and metadata. The record is returned to unpublished draft status until reviewed. In particular, the older **Zambezi Explorer Luxury Sunset Cruise — $75** record is to be updated to the latest catalog's **$69** rate if the canonical operator mapping and exact product match are confirmed.
+
+This source summary is not a substitute for the full catalog's precise names, inclusions, validity dates and fee conditions. Imported Pure Africa records remain unpublished until those details are checked against the actual uploaded catalog.
