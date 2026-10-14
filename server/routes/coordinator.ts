@@ -443,6 +443,9 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         try {
           const updates: Record<string, unknown> = {
             sourceReference: item.sourceReference,
+            // Ensure the Coordinator UI exposes verification status and source notes for
+            // an authoritative update to an existing record, not just newly imported IDs.
+            catalogImportKey: importKey,
             catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
             verificationNotes,
             operatorName: item.operatorName,
