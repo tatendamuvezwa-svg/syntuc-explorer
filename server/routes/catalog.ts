@@ -452,9 +452,33 @@ router.get('/products/:id', async (req: Request, res: Response) => {
     const variants = await getAuthoritativeVariantsForProduct(product.id);
 
     const allMedia = await getCollectionDocs<any>('media_assets');
-    const media = allMedia
+    let media = allMedia
       .filter((m) => m.ownerId === product.id && !tombstones.has(`media_assets_${m.id}`))
       .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
+
+    // Fallback catalogue images are committed under data/uploads and served by /uploads.
+    // Expose them through the same detail-gallery shape when no product-owned Firestore
+    // media records exist; this does not write or mutate Firestore.
+    if (media.length === 0 && product._fallbackImageUrl) {
+      const fallbackUrls = [
+        product._fallbackImageUrl,
+        ...(Array.isArray(product.supportingImageUrls) ? product.supportingImageUrls : []),
+      ].filter((url, index, all) => typeof url === 'string' && url.length > 0 && all.indexOf(url) === index);
+      media = fallbackUrls.map((url, index) => ({
+        id: `fallback_${product.id}_${index + 1}`,
+        ownerType: 'product',
+        ownerId: product.id,
+        mediaType: 'IMAGE',
+        url,
+        thumbnailUrl: url,
+        isPrimary: index === 0,
+        displayOrder: index,
+        caption: index === 0 ? product.name : `Supporting image for ${product.name}`,
+        altText: index === 0 ? product.name : `Supporting Pure Africa experience image for ${product.name}`,
+        sourceName: 'Pure Africa 2026 catalogue asset',
+        verificationState: 'ESTABLISHED',
+      }));
+    }
 
     let primaryMedia = product.primaryMediaId
       ? media.find((m) => m.id === product.primaryMediaId)
