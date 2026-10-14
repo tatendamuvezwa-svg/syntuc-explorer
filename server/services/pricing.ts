@@ -1,4 +1,5 @@
 import { getDocById, getCollectionDocs } from '../lib/firestore.ts';
+import { PURE_AFRICA_FALLBACK_PRODUCTS } from '../routes/catalog.ts';
 import {
   calculateNights,
   isValidDateString,
@@ -118,7 +119,7 @@ export async function calculateAuthoritativePricing(
   const productMap = new Map<string, any>();
   for (const item of itemsInput) {
     if (!productMap.has(item.productId)) {
-      const prod = await getDocById<any>('products', item.productId);
+      const prod = await getDocById<any>('products', item.productId) || PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === item.productId);
       if (prod) {
         productMap.set(item.productId, prod);
       }
@@ -152,9 +153,9 @@ export async function calculateAuthoritativePricing(
       throw new Error(`Product not found in catalog: ${raw.productId}`);
     }
 
-    const operatorName = product.operatorId
+    const operatorName = product.operatorName || (product.operatorId
       ? operatorMap.get(product.operatorId) || 'Syntuc Partner'
-      : 'Syntuc Partner';
+      : 'Syntuc Partner');
 
     const guestCount = Math.max(1, raw.guestCount || globalAdults + globalChildren || 1);
 
@@ -204,6 +205,11 @@ export async function calculateAuthoritativePricing(
           selectedVariant = productVariants.find((v) => v.id === 'var_cruise_luxury_deck') || productVariants[0];
         } else if (product.id === 'prod_simunye_theatre') {
           selectedVariant = productVariants.find((v) => v.id === 'var_simunye_adult') || productVariants[0];
+        } else if (product.id.startsWith('prod_pure_africa_')) {
+          // Pure Africa products use catalogue variants for vessel/deck/dining selection
+          // and mandatory fee calculation. If no variant was supplied, use the first
+          // published option as a safe default; guests can explicitly select another.
+          selectedVariant = productVariants[0];
         }
       }
     }
