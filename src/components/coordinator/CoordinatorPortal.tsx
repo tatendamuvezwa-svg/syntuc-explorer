@@ -997,7 +997,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                     <div
                       key={p.id}
                       className={`bg-white p-5 rounded-2xl border shadow-xs flex flex-col justify-between gap-4 transition hover:shadow-md ${
-                        p.isPublished ? 'border-stone-200' : 'border-amber-300 bg-amber-50/20'
+                        p.isPublished ? 'order-1 border-stone-200' : 'order-2 border-amber-300 bg-amber-50/20'
                       }`}
                     >
                       <div className="flex items-start gap-4">
@@ -1124,7 +1124,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                     <div
                       key={pkg.id}
                       className={`bg-white p-5 rounded-2xl border shadow-xs flex flex-col justify-between gap-4 transition hover:shadow-md ${
-                        pkg.isPublished ? 'border-stone-200' : 'border-amber-300 bg-amber-50/20'
+                        pkg.isPublished ? 'order-1 border-stone-200' : 'order-2 border-amber-300 bg-amber-50/20'
                       }`}
                     >
                       <div className="flex items-start gap-4">
