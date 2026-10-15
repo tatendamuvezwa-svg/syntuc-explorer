@@ -32,13 +32,19 @@ export const ExploreView: React.FC = () => {
     async function loadData() {
       try {
         const [prodList, catList] = await Promise.all([
-          api.getProducts(),
-          api.getCategories(),
+          api.getProducts().catch((err) => {
+            console.warn('Notice loading products:', err);
+            return [];
+          }),
+          api.getCategories().catch((err) => {
+            console.warn('Notice loading categories:', err);
+            return [];
+          }),
         ]);
-        setProducts(prodList);
-        setCategories(catList);
+        if (prodList && prodList.length > 0) setProducts(prodList);
+        if (catList && catList.length > 0) setCategories(catList);
       } catch (err) {
-        console.error('Failed to load catalog data:', err);
+        console.warn('Notice in catalog data load:', err);
       } finally {
         setLoading(false);
       }

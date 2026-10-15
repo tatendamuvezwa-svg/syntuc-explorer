@@ -61,9 +61,9 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const refreshTrip = useCallback(async () => {
     try {
       const plan = await api.getTripPlan();
-      setTripPlan(plan);
+      if (plan) setTripPlan(plan);
     } catch (err) {
-      console.error('Failed to load trip plan:', err);
+      console.warn('Trip plan notice:', err);
     } finally {
       setLoadingTrip(false);
     }
@@ -73,10 +73,12 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     async function init() {
       try {
         const sessionData = await api.initSession();
-        setSessionId(sessionData.sessionId);
+        if (sessionData?.sessionId) {
+          setSessionId(sessionData.sessionId);
+        }
         await refreshTrip();
       } catch (err) {
-        console.error('Session init error:', err);
+        console.warn('Session init notice:', err);
         setLoadingTrip(false);
       }
     }

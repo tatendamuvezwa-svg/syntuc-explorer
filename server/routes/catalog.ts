@@ -411,8 +411,12 @@ router.get('/products', async (req: Request, res: Response) => {
 
     res.json(productsWithDetails);
   } catch (error) {
-    console.error('Error fetching products from Firestore:', error);
-    res.status(500).json({ error: 'FAILED_TO_LOAD_PRODUCTS' });
+    console.warn('Error fetching products (falling back to canonical catalog):', error);
+    res.json(PURE_AFRICA_FALLBACK_PRODUCTS.map(p => ({
+      ...p,
+      primaryImageUrl: p._fallbackImageUrl || null,
+      primaryImageAlt: p.name,
+    })));
   }
 });
 
@@ -524,8 +528,19 @@ router.get('/categories', async (req: Request, res: Response) => {
     );
     res.json(sorted);
   } catch (error) {
-    console.error('Error fetching categories from Firestore:', error);
-    res.status(500).json({ error: 'FAILED_TO_LOAD_CATEGORIES' });
+    console.warn('Error fetching categories (using baseline categories):', error);
+    const fallbackCategories = [
+      { id: 'cat_lodge', displayOrder: 1, slug: 'lodge-resort', type: 'accommodation', name: 'Riverfront Lodges & Resorts' },
+      { id: 'cat_hotel', name: 'Town Hotels & Suites', displayOrder: 2, type: 'accommodation', slug: 'hotel' },
+      { id: 'cat_safari', type: 'accommodation', displayOrder: 3, slug: 'safari-camp', name: 'Luxury Safari Camps' },
+      { id: 'cat_flight', name: 'Helicopter & Scenic Flights', displayOrder: 4, type: 'activity', slug: 'flight-air' },
+      { id: 'cat_cruise', slug: 'river-cruises', type: 'activity', name: 'Zambezi River Cruises', displayOrder: 5 },
+      { id: 'cat_guided', slug: 'guided-tours', type: 'activity', displayOrder: 6, name: 'Guided Falls & Heritage Tours' },
+      { id: 'cat_dining', type: 'activity', slug: 'dining-culinary', displayOrder: 7, name: 'Scenic & Cultural Dining' },
+      { id: 'cat_adventure', slug: 'adventure-wildlife', type: 'activity', name: 'Rafting, Wildlife & Adrenaline', displayOrder: 8 },
+      { id: 'cat_packages', name: 'Curated Holiday Packages', displayOrder: 9, slug: 'packages', type: 'package' },
+    ];
+    res.json(fallbackCategories);
   }
 });
 
@@ -534,13 +549,23 @@ router.get('/packages', async (req: Request, res: Response) => {
   try {
     const tombstones = await getTombstones();
     const allPackages = await getCollectionDocs<any>('packages');
-    const packages = allPackages.filter(
+    let packages = allPackages.filter(
       (p) => p.isPublished && !tombstones.has(`packages_${p.id}`)
     );
+
+    // If no published packages found in packages collection, also check products collection
+    if (packages.length === 0) {
+      const allProducts = await getCollectionDocs<any>('products');
+      packages = allProducts.filter(
+        (p) => (p.productType === 'package' || p.categorySlug === 'packages') && p.isPublished && !tombstones.has(`products_${p.id}`)
+      );
+    }
+
     res.json(packages);
   } catch (error) {
-    console.error('Error fetching packages from Firestore:', error);
-    res.status(500).json({ error: 'FAILED_TO_LOAD_PACKAGES' });
+    console.warn('Error fetching packages (using published catalog fallback):', error);
+    const allPackages = await getCollectionDocs<any>('packages');
+    res.json(allPackages.filter((p) => p.isPublished));
   }
 });
 

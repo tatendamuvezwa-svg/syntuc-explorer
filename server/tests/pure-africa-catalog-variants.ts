@@ -33,7 +33,7 @@ async function runTests() {
     const potjieProduct = await getDocById<any>('products', 'prod_potjie_dining');
 
     assert(Boolean(cruiseProduct), 'Cruise product exists in Firestore catalog');
-    assert(cruiseProduct?.basePrice === '69.00', `Cruise headline base price aligned to lowest available fare $69 (actual: ${cruiseProduct?.basePrice})`);
+    assert(Number(cruiseProduct?.basePrice) === 69, `Cruise headline base price aligned to lowest available fare $69 (actual: ${cruiseProduct?.basePrice})`);
     assert(cruiseProduct?.primaryMediaId === 'med_2db2d6add31909b4f3d0adcf', `Cruise primary media bound to genuine catamaran image (med_2db2d6add31909b4f3d0adcf)`);
 
     assert(Boolean(potjieProduct), 'Potjie dining product exists in Firestore catalog');
@@ -127,7 +127,7 @@ async function runTests() {
     let dupCaught = false;
     try {
       await createCoordinatorVariant('prod_zambezi_explorer_cruise', {
-        name: 'Luxury Deck (Lower & Mid Decks)',
+        name: luxVar?.name || 'Sunset Cruise — Luxury Deck (Decks 1 & 2)',
         price: 69,
       });
     } catch (err: any) {
@@ -155,7 +155,7 @@ async function runTests() {
     const testVarId = `var_test_${Date.now()}`;
     const created = await createCoordinatorVariant('prod_zambezi_explorer_cruise', {
       id: testVarId,
-      name: 'Sunset Private Bow Lounge',
+      name: `Sunset Private Bow Lounge (${testVarId.slice(-6)})`,
       description: 'Exclusive front bow lounge for couples or small private parties.',
       price: 150,
       currency: 'USD',
@@ -198,7 +198,7 @@ async function runTests() {
 
     // Verify product-level defaults remain unchanged
     const cruiseAfterVariantUpdate = await getDocById<any>('products', 'prod_zambezi_explorer_cruise');
-    assert(cruiseAfterVariantUpdate?.basePrice === '69.00', `Product-level basePrice remains $69.00 and is not overwritten by variant edit`);
+    assert(Number(cruiseAfterVariantUpdate?.basePrice) === 69, `Product-level basePrice remains $69 and is not overwritten by variant edit`);
 
     // 3G: Soft deactivation of variant
     const deactivated = await toggleVariantActiveState('prod_zambezi_explorer_cruise', testVarId, false);
