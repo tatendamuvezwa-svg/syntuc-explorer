@@ -64,8 +64,13 @@ router.post('/login', async (req, res: Response) => {
       return;
     }
 
-    // Verify password against stored hash in Firestore using secure verification
-    if (!verifyPassword(password, user.passwordHash)) {
+    // Support the current passwordHash field and legacy records that stored the
+    // credential in `password`. Both paths still pass through the same verifier;
+    // no mock token or authentication bypass is accepted.
+    const storedCredential = typeof user.passwordHash === 'string' && user.passwordHash.length > 0
+      ? user.passwordHash
+      : user.password;
+    if (!verifyPassword(password, storedCredential)) {
       res.status(401).json({ error: 'INVALID_CREDENTIALS', message: 'Invalid staff credentials' });
       return;
     }
@@ -84,7 +89,12 @@ router.post('/login', async (req, res: Response) => {
     });
   } catch (error) {
     console.error('Coordinator login error:', error);
-    res.status(500).json({ error: 'LOGIN_FAILED' });
+    // Keep internal details in server logs, but distinguish service failures from
+    // incorrect credentials so the desk UI does not misreport a generic login failure.
+    res.status(500).json({
+      error: 'LOGIN_SERVICE_UNAVAILABLE',
+      message: 'The staff sign-in service could not complete the request. Please try again shortly.',
+    });
   }
 });
 
