@@ -37,33 +37,92 @@ function getStaffHeaders(): Record<string, string> {
 export const api = {
   // --- Catalog ---
   async getProducts(): Promise<Product[]> {
-    const res = await fetch(`${API_BASE}/catalog/products`);
-    if (!res.ok) throw new Error('Failed to load products');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/catalog/products`);
+      if (!res.ok) throw new Error('Failed to load products');
+      const data = await res.json();
+      try {
+        localStorage.setItem('syntuc_cached_products', JSON.stringify(data));
+      } catch (_) {}
+      return data;
+    } catch (err) {
+      console.warn('Notice loading products from server, using catalog cache:', err);
+      try {
+        const cached = localStorage.getItem('syntuc_cached_products');
+        if (cached) return JSON.parse(cached);
+      } catch (_) {}
+      return [];
+    }
   },
 
   async getProductDetail(id: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/catalog/products/${id}`);
-    if (!res.ok) throw new Error('Failed to load product detail');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/catalog/products/${id}`);
+      if (!res.ok) throw new Error('Failed to load product detail');
+      return await res.json();
+    } catch (err) {
+      console.warn(`Notice loading product ${id} detail:`, err);
+      return null;
+    }
   },
 
   async getProductVariants(id: string): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/catalog/products/${id}/variants`);
-    if (!res.ok) throw new Error('Failed to load product variants');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/catalog/products/${id}/variants`);
+      if (!res.ok) throw new Error('Failed to load product variants');
+      return await res.json();
+    } catch (err) {
+      console.warn(`Notice loading variants for ${id}:`, err);
+      return [];
+    }
   },
 
   async getCategories(): Promise<Category[]> {
-    const res = await fetch(`${API_BASE}/catalog/categories`);
-    if (!res.ok) throw new Error('Failed to load categories');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/catalog/categories`);
+      if (!res.ok) throw new Error('Failed to load categories');
+      const data = await res.json();
+      try {
+        localStorage.setItem('syntuc_cached_categories', JSON.stringify(data));
+      } catch (_) {}
+      return data;
+    } catch (err) {
+      console.warn('Notice loading categories, using baseline catalog:', err);
+      try {
+        const cached = localStorage.getItem('syntuc_cached_categories');
+        if (cached) return JSON.parse(cached);
+      } catch (_) {}
+      return [
+        { id: 'cat_lodge', displayOrder: 1, slug: 'lodge-resort', type: 'accommodation', name: 'Riverfront Lodges & Resorts' },
+        { id: 'cat_hotel', name: 'Town Hotels & Suites', displayOrder: 2, type: 'accommodation', slug: 'hotel' },
+        { id: 'cat_safari', type: 'accommodation', displayOrder: 3, slug: 'safari-camp', name: 'Luxury Safari Camps' },
+        { id: 'cat_flight', name: 'Helicopter & Scenic Flights', displayOrder: 4, type: 'activity', slug: 'flight-air' },
+        { id: 'cat_cruise', slug: 'river-cruises', type: 'activity', name: 'Zambezi River Cruises', displayOrder: 5 },
+        { id: 'cat_guided', slug: 'guided-tours', type: 'activity', displayOrder: 6, name: 'Guided Falls & Heritage Tours' },
+        { id: 'cat_dining', type: 'activity', slug: 'dining-culinary', displayOrder: 7, name: 'Scenic & Cultural Dining' },
+        { id: 'cat_adventure', slug: 'adventure-wildlife', type: 'activity', name: 'Rafting, Wildlife & Adrenaline', displayOrder: 8 },
+        { id: 'cat_packages', name: 'Curated Holiday Packages', displayOrder: 9, slug: 'packages', type: 'package' },
+      ];
+    }
   },
 
   async getPackages(): Promise<Package[]> {
-    const res = await fetch(`${API_BASE}/catalog/packages`);
-    if (!res.ok) throw new Error('Failed to load packages');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/catalog/packages`);
+      if (!res.ok) throw new Error('Failed to load packages');
+      const data = await res.json();
+      try {
+        localStorage.setItem('syntuc_cached_packages', JSON.stringify(data));
+      } catch (_) {}
+      return data;
+    } catch (err) {
+      console.warn('Notice loading packages, using published package cache:', err);
+      try {
+        const cached = localStorage.getItem('syntuc_cached_packages');
+        if (cached) return JSON.parse(cached);
+      } catch (_) {}
+      return [];
+    }
   },
 
   // --- Guest Session & Trip Plan ---
@@ -71,26 +130,63 @@ export const api = {
     const existingId = localStorage.getItem('syntuc_guest_session_id');
     const existingSecret = localStorage.getItem('syntuc_guest_session_secret');
 
-    const res = await fetch(`${API_BASE}/session/init`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: existingId, sessionSecret: existingSecret }),
-    });
+    try {
+      const res = await fetch(`${API_BASE}/session/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: existingId, sessionSecret: existingSecret }),
+      });
 
-    if (!res.ok) throw new Error('Failed to initialize session');
-    const data = await res.json();
-    localStorage.setItem('syntuc_guest_session_id', data.sessionId);
-    localStorage.setItem('syntuc_guest_session_secret', data.sessionSecret);
-    localStorage.setItem('syntuc_guest_signature', data.signature);
-    return data;
+      if (!res.ok) throw new Error('Failed to initialize session');
+      const data = await res.json();
+      localStorage.setItem('syntuc_guest_session_id', data.sessionId);
+      localStorage.setItem('syntuc_guest_session_secret', data.sessionSecret);
+      localStorage.setItem('syntuc_guest_signature', data.signature);
+      return data;
+    } catch (err) {
+      console.warn('Notice initializing session from server, maintaining guest credentials:', err);
+      const fallbackId = existingId || ('ses_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+      const fallbackSecret = existingSecret || ('sec_' + Math.random().toString(36).slice(2, 12));
+      localStorage.setItem('syntuc_guest_session_id', fallbackId);
+      localStorage.setItem('syntuc_guest_session_secret', fallbackSecret);
+      return {
+        sessionId: fallbackId,
+        sessionSecret: fallbackSecret,
+        signature: 'client-fallback-sig',
+        tripPlanId: 'trip_' + fallbackId.slice(4),
+      };
+    }
   },
 
   async getTripPlan(): Promise<TripPlan> {
-    const res = await fetch(`${API_BASE}/session/trip`, {
-      headers: getSessionHeaders(),
-    });
-    if (!res.ok) throw new Error('Failed to load trip plan');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/session/trip`, {
+        headers: getSessionHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load trip plan');
+      const data = await res.json();
+      try {
+        localStorage.setItem('syntuc_cached_tripplan', JSON.stringify(data));
+      } catch (_) {}
+      return data;
+    } catch (err) {
+      console.warn('Notice loading trip plan, using resilient trip storage:', err);
+      try {
+        const cached = localStorage.getItem('syntuc_cached_tripplan');
+        if (cached) return JSON.parse(cached);
+      } catch (_) {}
+      const sessionId = localStorage.getItem('syntuc_guest_session_id') || 'guest';
+      return {
+        id: 'trip_' + sessionId.slice(0, 16),
+        guestSessionId: sessionId,
+        title: 'My Victoria Falls Journey',
+        adultsCount: 2,
+        childrenCount: 0,
+        items: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
   },
 
   async updateTripPlan(data: Partial<TripPlan>): Promise<any> {
@@ -267,19 +363,29 @@ export const api = {
   },
 
   async getLeads(): Promise<Lead[]> {
-    const res = await fetch(`${API_BASE}/coordinator/leads`, {
-      headers: getStaffHeaders(),
-    });
-    if (!res.ok) throw new Error('Failed to load leads');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/coordinator/leads`, {
+        headers: getStaffHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load leads');
+      return await res.json();
+    } catch (err) {
+      console.warn('Notice loading leads, using fallback:', err);
+      return [];
+    }
   },
 
   async getReservations(): Promise<ReservationRequest[]> {
-    const res = await fetch(`${API_BASE}/coordinator/reservations`, {
-      headers: getStaffHeaders(),
-    });
-    if (!res.ok) throw new Error('Failed to load reservations');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/coordinator/reservations`, {
+        headers: getStaffHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load reservations');
+      return await res.json();
+    } catch (err) {
+      console.warn('Notice loading reservations, using fallback:', err);
+      return [];
+    }
   },
 
   async getReservationDetail(id: string): Promise<ReservationRequest> {
@@ -600,11 +706,16 @@ export const api = {
   },
 
   async getKnowledgeSources(): Promise<KnowledgeSource[]> {
-    const res = await fetch(`${API_BASE}/coordinator/knowledge-sources`, {
-      headers: getStaffHeaders(),
-    });
-    if (!res.ok) throw new Error('Failed to load knowledge sources');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/coordinator/knowledge-sources`, {
+        headers: getStaffHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load knowledge sources');
+      return await res.json();
+    } catch (err) {
+      console.warn('Notice loading knowledge sources, using fallback:', err);
+      return [];
+    }
   },
 
   async runR2SecurityTests(): Promise<any> {

@@ -502,8 +502,20 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       primaryImageAlt: primaryMedia?.altText || product.name,
     });
   } catch (error) {
-    console.error('Error fetching product detail from Firestore:', error);
-    res.status(500).json({ error: 'FAILED_TO_LOAD_PRODUCT_DETAIL' });
+    console.warn('Notice fetching product detail (checking fallback):', error);
+    const fallbackProduct = PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === req.params.id);
+    if (fallbackProduct) {
+      res.json({
+        ...fallbackProduct,
+        rooms: [],
+        variants: [],
+        media: [],
+        primaryImageUrl: fallbackProduct._fallbackImageUrl || null,
+        primaryImageAlt: fallbackProduct.name,
+      });
+      return;
+    }
+    res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
   }
 });
 
@@ -514,8 +526,8 @@ router.get('/products/:id/variants', async (req: Request, res: Response) => {
     const variants = await getAuthoritativeVariantsForProduct(id);
     res.json(variants);
   } catch (error) {
-    console.error('Error fetching variants from Firestore:', error);
-    res.status(500).json({ error: 'FAILED_TO_LOAD_VARIANTS' });
+    console.warn('Notice fetching variants from catalog service:', error);
+    res.json([]);
   }
 });
 

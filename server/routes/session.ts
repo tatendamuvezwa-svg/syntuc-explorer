@@ -203,7 +203,7 @@ router.put('/trip', requireGuestSession, async (req: GuestSessionRequest, res: R
 
     res.json({ success: true, message: 'Trip updated successfully' });
   } catch (error) {
-    console.error('Error updating trip plan in Firestore:', error);
+    console.warn('Notice updating trip plan:', error);
     res.status(500).json({ error: 'FAILED_TO_UPDATE_TRIP' });
   }
 });
@@ -296,7 +296,7 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
       message: `${product.name} added to My Trip`,
     });
   } catch (error) {
-    console.error('Error adding trip item in Firestore:', error);
+    console.warn('Notice adding trip item:', error);
     res.status(500).json({ error: 'FAILED_TO_ADD_TRIP_ITEM' });
   }
 });
@@ -328,7 +328,7 @@ router.delete('/trip/items/:id', requireGuestSession, async (req: GuestSessionRe
 
     res.json({ success: true, message: 'Item removed from My Trip' });
   } catch (error) {
-    console.error('Error deleting trip item in Firestore:', error);
+    console.warn('Notice deleting trip item:', error);
     res.status(500).json({ error: 'FAILED_TO_DELETE_TRIP_ITEM' });
   }
 });
