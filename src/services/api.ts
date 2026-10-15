@@ -242,8 +242,16 @@ export const api = {
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || 'Coordinator authentication failed');
+      const err = await res.json().catch(() => ({}));
+      const message = err.message || 'Coordinator authentication failed';
+      // Surface the server's safe diagnostic code to the desk UI. This is useful
+      // for infrastructure failures where the generic message alone is ambiguous.
+      const diagnosticCode = typeof err.diagnosticCode === 'string'
+        ? err.diagnosticCode
+        : typeof err.error === 'string' && err.error !== 'INVALID_CREDENTIALS'
+          ? err.error
+          : '';
+      throw new Error(diagnosticCode ? `${message} (Reference: ${diagnosticCode})` : message);
     }
     const data = await res.json();
     localStorage.setItem('syntuc_staff_token', data.token);
