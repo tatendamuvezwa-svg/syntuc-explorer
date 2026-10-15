@@ -1001,7 +1001,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                   .map((p, index, sortedItems) => (
                     <React.Fragment key={p.id}>
                       {(index === 0 || p.isPublished !== sortedItems[index - 1].isPublished || (p.operatorName || 'Unassigned — review required') !== (sortedItems[index - 1].operatorName || 'Unassigned — review required')) && (
-                        <div className="col-span-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-stone-700" style={{ order: p.isPublished ? -1 : -2 }}>
+                        <div className="col-span-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-stone-700" style={{ order: p.isPublished ? -2 : -1 }}>
                           {p.isPublished ? 'Published' : 'Unpublished drafts'} · {p.operatorName || 'Unassigned — review required'}
                         </div>
                       )}
@@ -1142,7 +1142,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                   .map((pkg, index, sortedItems) => (
                     <React.Fragment key={pkg.id}>
                       {(index === 0 || pkg.isPublished !== sortedItems[index - 1].isPublished || ((pkg as any).operatorName || 'Unassigned — review required') !== ((sortedItems[index - 1] as any).operatorName || 'Unassigned — review required')) && (
-                        <div className="col-span-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-stone-700" style={{ order: pkg.isPublished ? -1 : -2 }}>
+                        <div className="col-span-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-stone-700" style={{ order: pkg.isPublished ? -2 : -1 }}>
                           {pkg.isPublished ? 'Published' : 'Unpublished drafts'} · {(pkg as any).operatorName || 'Unassigned — review required'}
                         </div>
                       )}
