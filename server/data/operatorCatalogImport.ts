@@ -138,7 +138,7 @@ const describeImportedProduct = (
   categorySlug: string,
   inclusions: string[] = [],
 ): string => {
-  const curated = curatedDescriptions[name];
+  const curated = operatorSpecificDescriptions[`${operatorName}::${name}`] || curatedDescriptions[name];
   if (curated) return curated;
   const categoryDescriptions: Record<string, string> = {
     'safari': 'A guided wildlife outing in the Victoria Falls region. Confirm the area, timing, inclusions and any additional fees with the operator.',
@@ -157,6 +157,16 @@ const describeImportedProduct = (
   const confirmedInclusions = inclusions.filter((value) => !/unconfirmed|verify|confirm/i.test(value));
   const inclusionText = confirmedInclusions.length ? ` Listed inclusions: ${confirmedInclusions.join(', ')}.` : '';
   return `${name}: ${base}${inclusionText} Offered by ${operatorName}; details remain subject to the operator’s confirmation.`;
+};
+
+const operatorSpecificDescriptions: Record<string, string> = {
+  'Wild Horizons::Boma Dinner': 'Enjoy the Boma Dinner experience listed by Wild Horizons. Transfers are excluded according to the supplied summary; confirm the venue, menu, programme and transport arrangements before booking.',
+  'Shearwater::Boma Dinner': 'A Boma Dinner option listed through Shearwater. The tariff notes a possible transfer fee, but the source does not confirm whether it is compulsory or who supplies the dinner; verify the venue, fee and provider before booking.',
+  'Wild Horizons::Dinner Cruise': 'Enjoy an evening cruise on the Zambezi with dinner, as listed by Wild Horizons. Confirm the vessel, menu, departure time and stated park fee before booking.',
+  'Shearwater::Dinner Cruise': 'A Shearwater-listed dinner cruise on the Zambezi. The source has conflicting park-fee figures, so confirm the current tariff, menu, departure time and compulsory fees before booking.',
+  'Wild Horizons::Victoria Falls Tour': 'Discover Victoria Falls on a guided tour listed by Wild Horizons. The supplied summary indicates entry or park fees are additional; confirm the current fee, route and meeting point.',
+  'Shearwater::Guided Victoria Falls Tour': 'Explore Victoria Falls with the guided tour listed by Shearwater. Confirm the route, meeting point and duration, and whether rainforest entry fees are additional.',
+  'Shearwater::AM/PM Game Drive': 'Choose a morning or afternoon game drive from Shearwater’s listed safari options. Wildlife sightings cannot be guaranteed; confirm the area visited and reconcile the conflicting tariff and park-fee figures.',
 };
 
 const product = (
