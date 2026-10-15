@@ -993,11 +993,22 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                       (p.shortDescription && p.shortDescription.toLowerCase().includes(q))
                     );
                   })
-                  .map(p => (
+                  .sort((a, b) =>
+                    Number(b.isPublished) - Number(a.isPublished) ||
+                    (a.operatorName || 'Unassigned — review required').localeCompare(b.operatorName || 'Unassigned — review required') ||
+                    a.name.localeCompare(b.name)
+                  )
+                  .map((p, index, sortedItems) => (
+                    <React.Fragment key={p.id}>
+                      {(index === 0 || p.isPublished !== sortedItems[index - 1].isPublished || (p.operatorName || 'Unassigned — review required') !== (sortedItems[index - 1].operatorName || 'Unassigned — review required')) && (
+                        <div className="col-span-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-stone-700" style={{ order: p.isPublished ? -1 : -2 }}>
+                          {p.isPublished ? 'Published' : 'Unpublished drafts'} · {p.operatorName || 'Unassigned — review required'}
+                        </div>
+                      )}
                     <div
                       key={p.id}
                       className={`bg-white p-5 rounded-2xl border shadow-xs flex flex-col justify-between gap-4 transition hover:shadow-md ${
-                        p.isPublished ? 'border-stone-200' : 'border-amber-300 bg-amber-50/20'
+                        p.isPublished ? 'order-1 border-stone-200' : 'order-2 border-amber-300 bg-amber-50/20'
                       }`}
                     >
                       <div className="flex items-start gap-4">
@@ -1105,6 +1116,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                         </div>
                       </div>
                     </div>
+                    </React.Fragment>
                   ))}
 
               {/* Filtered Packages */}
@@ -1118,13 +1130,26 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                   .filter(pkg => {
                     if (!catalogSearch.trim()) return true;
                     const q = catalogSearch.toLowerCase();
-                    return pkg.name.toLowerCase().includes(q) || (pkg.tagline && pkg.tagline.toLowerCase().includes(q));
+                    return pkg.name.toLowerCase().includes(q) ||
+                      (pkg.tagline && pkg.tagline.toLowerCase().includes(q)) ||
+                      ((pkg as any).operatorName && (pkg as any).operatorName.toLowerCase().includes(q));
                   })
-                  .map(pkg => (
+                  .sort((a, b) =>
+                    Number(b.isPublished) - Number(a.isPublished) ||
+                    (((a as any).operatorName || 'Unassigned — review required').localeCompare((b as any).operatorName || 'Unassigned — review required')) ||
+                    a.name.localeCompare(b.name)
+                  )
+                  .map((pkg, index, sortedItems) => (
+                    <React.Fragment key={pkg.id}>
+                      {(index === 0 || pkg.isPublished !== sortedItems[index - 1].isPublished || ((pkg as any).operatorName || 'Unassigned — review required') !== ((sortedItems[index - 1] as any).operatorName || 'Unassigned — review required')) && (
+                        <div className="col-span-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2 text-xs font-bold uppercase tracking-wider text-stone-700" style={{ order: pkg.isPublished ? -1 : -2 }}>
+                          {pkg.isPublished ? 'Published' : 'Unpublished drafts'} · {(pkg as any).operatorName || 'Unassigned — review required'}
+                        </div>
+                      )}
                     <div
                       key={pkg.id}
                       className={`bg-white p-5 rounded-2xl border shadow-xs flex flex-col justify-between gap-4 transition hover:shadow-md ${
-                        pkg.isPublished ? 'border-stone-200' : 'border-amber-300 bg-amber-50/20'
+                        pkg.isPublished ? 'order-1 border-stone-200' : 'order-2 border-amber-300 bg-amber-50/20'
                       }`}
                     >
                       <div className="flex items-start gap-4">
@@ -1213,6 +1238,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                         </button>
                       </div>
                     </div>
+                    </React.Fragment>
                   ))}
             </div>
           </div>
