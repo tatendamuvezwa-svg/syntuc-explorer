@@ -74,6 +74,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [r2Report, setR2Report] = useState<any>(null);
   const [runningR2, setRunningR2] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(false);
+  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [isImportingOperatorCatalog, setIsImportingOperatorCatalog] = useState<boolean>(false);
   const [isOperatorImportConfirmationOpen, setIsOperatorImportConfirmationOpen] = useState<boolean>(false);
   const [catalogItemPendingVerification, setCatalogItemPendingVerification] = useState<{ id: string; isPackage: boolean; name: string } | null>(null);
@@ -150,6 +151,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const loadAllData = async (): Promise<boolean> => {
     if (!isAuthenticated) return false;
     setLoadingData(true);
+    setDataLoadError(null);
     try {
       const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.all([
         api.getLeads(),
@@ -180,6 +182,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
       }
     } catch (e) {
       console.error('Coordinator data fetch error:', e);
+      setDataLoadError('Live desk data could not be loaded. Existing data has been retained where available. Check the connection and use Retry.');
       return false;
     } finally {
       setLoadingData(false);
@@ -534,6 +537,17 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
           </button>
         </div>
       </div>
+
+      {dataLoadError && (
+        <div role="alert" className="max-w-7xl mx-auto mt-4 px-4 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-sm text-amber-950">{dataLoadError}</div>
+            <button type="button" onClick={() => { void loadAllData(); }} disabled={loadingData} className="shrink-0 rounded-lg bg-[#263B30] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              {loadingData ? 'Retrying…' : 'Retry desk data'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Workbench Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
