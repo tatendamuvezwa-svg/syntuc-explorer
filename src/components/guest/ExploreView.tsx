@@ -21,6 +21,8 @@ export const ExploreView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
   const [activeFilter, setActiveFilter] = useState<'all' | 'accommodation' | 'activity'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
@@ -29,28 +31,33 @@ export const ExploreView: React.FC = () => {
   const { openProductDetail, addToTrip, openReservationModal, openSchoolPlanner } = useSession();
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
+      setLoading(true);
+      setLoadError(null);
       try {
         const [prodList, catList] = await Promise.all([
-          api.getProducts().catch((err) => {
-            console.warn('Notice loading products:', err);
-            return [];
-          }),
-          api.getCategories().catch((err) => {
-            console.warn('Notice loading categories:', err);
-            return [];
-          }),
+          api.getProducts(),
+          api.getCategories(),
         ]);
-        if (prodList && prodList.length > 0) setProducts(prodList);
-        if (catList && catList.length > 0) setCategories(catList);
+        if (cancelled) return;
+        // Do not replace a previously loaded catalogue with an empty response.
+        if (Array.isArray(prodList)) setProducts(prodList);
+        if (Array.isArray(catList)) setCategories(catList);
       } catch (err) {
-        console.warn('Notice in catalog data load:', err);
+        console.error('Catalogue data load failed:', err);
+        if (!cancelled) {
+          setLoadError('We could not load the live catalogue. Your existing catalogue data has been kept where available. Please retry in a moment.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     loadData();
-  }, []);
+    return () => { cancelled = true; };
+  }, [reloadKey]);
 
   const activityOperators = useMemo(() => {
     return Array.from(new Set(
@@ -301,6 +308,19 @@ export const ExploreView: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        ) : loadError && products.length === 0 ? (
+          <div role="alert" className="text-center py-16 bg-white rounded-2xl border border-amber-200 p-8">
+            <Compass className="w-12 h-12 text-amber-600 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-stone-800 font-display">Catalogue temporarily unavailable</h3>
+            <p className="text-sm text-stone-600 mt-2 max-w-xl mx-auto">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => { setReloadKey((key) => key + 1); }}
+              className="mt-5 px-5 py-2.5 rounded-xl bg-[#263B30] text-white text-sm font-semibold"
+            >
+              Retry catalogue
+            </button>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-stone-200 p-8">
