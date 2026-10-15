@@ -102,22 +102,47 @@ router.post('/login', async (req, res: Response) => {
     if (errorMessage.includes('firebase-applet-config.json not found')) {
       diagnosticCode = 'FIREBASE_CONFIG_MISSING';
       message = 'The staff sign-in service is missing its Firebase configuration. The application configuration must be restored.';
-    } else if (errorCode.includes('permission-denied') || errorMessage.includes('permission denied')) {
+    } else if (
+      errorCode.includes('permission-denied') ||
+      errorMessage.includes('permission denied') ||
+      errorMessage.includes('insufficient permissions') ||
+      errorMessage.includes('missing or insufficient permissions') ||
+      errorMessage.includes('permission_denied')
+    ) {
       diagnosticCode = 'FIRESTORE_ACCESS_DENIED';
-      message = 'The staff sign-in service cannot read the staff directory in Firestore. Check the deployed database access configuration.';
+      message = 'The staff sign-in service cannot read the staff directory in Firestore. Check the deployed database access configuration and Firestore rules.';
     } else if (
       errorCode.includes('not-found') ||
-      errorMessage.includes('database') && errorMessage.includes('not found')
+      errorMessage.includes('database') && errorMessage.includes('not found') ||
+      errorMessage.includes('database does not exist')
     ) {
       diagnosticCode = 'FIRESTORE_DATABASE_NOT_FOUND';
       message = 'The configured Firestore database could not be found. Check the database ID used by this deployment.';
     } else if (
       errorCode.includes('unavailable') ||
       errorCode.includes('deadline-exceeded') ||
-      errorMessage.includes('network')
+      errorCode.includes('network') ||
+      errorMessage.includes('failed to fetch') ||
+      errorMessage.includes('fetch failed') ||
+      errorMessage.includes('econnreset') ||
+      errorMessage.includes('enotfound')
     ) {
       diagnosticCode = 'FIRESTORE_UNAVAILABLE';
       message = 'The staff directory could not be reached in Firestore. Check database availability and connectivity.';
+    } else if (
+      errorCode.includes('failed-precondition') ||
+      errorMessage.includes('failed precondition')
+    ) {
+      diagnosticCode = 'FIRESTORE_FAILED_PRECONDITION';
+      message = 'The staff sign-in database request failed a required configuration or database condition. Check the deployed Firestore database settings.';
+    } else if (
+      errorCode.includes('unauthenticated') ||
+      errorCode.includes('unauthorized') ||
+      errorMessage.includes('api key not valid') ||
+      errorMessage.includes('invalid api key')
+    ) {
+      diagnosticCode = 'FIRESTORE_CLIENT_CONFIG_INVALID';
+      message = 'The staff sign-in service has an invalid or unauthorized Firebase client configuration.';
     }
 
     res.status(500).json({
