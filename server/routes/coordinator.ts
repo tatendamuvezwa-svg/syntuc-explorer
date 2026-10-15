@@ -89,11 +89,41 @@ router.post('/login', async (req, res: Response) => {
     });
   } catch (error) {
     console.error('Coordinator login error:', error);
-    // Keep internal details in server logs, but distinguish service failures from
-    // incorrect credentials so the desk UI does not misreport a generic login failure.
+
+    // Classify infrastructure failures without exposing raw exception details,
+    // credentials, or configuration values to the browser. This helps diagnose
+    // Firestore/database connectivity separately from invalid staff credentials.
+    const err = error as { code?: unknown; message?: unknown; name?: unknown };
+    const errorCode = typeof err?.code === 'string' ? err.code.toLowerCase() : '';
+    const errorMessage = typeof err?.message === 'string' ? err.message.toLowerCase() : '';
+    let diagnosticCode = 'LOGIN_SERVICE_ERROR';
+    let message = 'The staff sign-in service could not complete the request. Please try again shortly.';
+
+    if (errorMessage.includes('firebase-applet-config.json not found')) {
+      diagnosticCode = 'FIREBASE_CONFIG_MISSING';
+      message = 'The staff sign-in service is missing its Firebase configuration. The application configuration must be restored.';
+    } else if (errorCode.includes('permission-denied') || errorMessage.includes('permission denied')) {
+      diagnosticCode = 'FIRESTORE_ACCESS_DENIED';
+      message = 'The staff sign-in service cannot read the staff directory in Firestore. Check the deployed database access configuration.';
+    } else if (
+      errorCode.includes('not-found') ||
+      errorMessage.includes('database') && errorMessage.includes('not found')
+    ) {
+      diagnosticCode = 'FIRESTORE_DATABASE_NOT_FOUND';
+      message = 'The configured Firestore database could not be found. Check the database ID used by this deployment.';
+    } else if (
+      errorCode.includes('unavailable') ||
+      errorCode.includes('deadline-exceeded') ||
+      errorMessage.includes('network')
+    ) {
+      diagnosticCode = 'FIRESTORE_UNAVAILABLE';
+      message = 'The staff directory could not be reached in Firestore. Check database availability and connectivity.';
+    }
+
     res.status(500).json({
       error: 'LOGIN_SERVICE_UNAVAILABLE',
-      message: 'The staff sign-in service could not complete the request. Please try again shortly.',
+      diagnosticCode,
+      message,
     });
   }
 });
