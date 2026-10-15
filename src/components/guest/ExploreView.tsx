@@ -21,6 +21,8 @@ export const ExploreView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [reloadAttempt, setReloadAttempt] = useState<number>(0);
   const [activeFilter, setActiveFilter] = useState<'all' | 'accommodation' | 'activity'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
@@ -29,22 +31,44 @@ export const ExploreView: React.FC = () => {
   const { openProductDetail, addToTrip, openReservationModal, openSchoolPlanner } = useSession();
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
-      try {
-        const [prodList, catList] = await Promise.all([
-          api.getProducts(),
-          api.getCategories(),
-        ]);
-        setProducts(prodList);
-        setCategories(catList);
-      } catch (err) {
-        console.error('Failed to load catalog data:', err);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      setCatalogError(null);
+
+      // Load products independently from category metadata. A category endpoint
+      // failure must never suppress otherwise available published experiences.
+      const productLoad = api.getProducts()
+        .then((prodList) => {
+          if (!cancelled) setProducts(prodList);
+        })
+        .catch((err) => {
+          console.error('Failed to load published catalogue products:', err);
+          if (!cancelled) {
+            setProducts([]);
+            setCatalogError('We could not load the published experiences right now. Please retry in a moment.');
+          }
+        });
+
+      const categoryLoad = api.getCategories()
+        .then((catList) => {
+          if (!cancelled) setCategories(catList);
+        })
+        .catch((err) => {
+          console.error('Failed to load catalogue categories:', err);
+          if (!cancelled) setCategories([]);
+        });
+
+      await Promise.all([productLoad, categoryLoad]);
+      if (!cancelled) setLoading(false);
     }
-    loadData();
-  }, []);
+
+    void loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadAttempt]);
 
   const activityOperators = useMemo(() => {
     return Array.from(new Set(
@@ -295,6 +319,23 @@ export const ExploreView: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        ) : catalogError ? (
+          <div role="alert" className="text-center py-20 bg-white rounded-2xl border border-[#E8E5DE] p-8">
+            <Compass className="w-12 h-12 text-stone-300 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-stone-800 font-display">
+              Experiences are temporarily unavailable
+            </h3>
+            <p className="text-sm text-stone-500 mt-1 max-w-sm mx-auto">
+              {catalogError}
+            </p>
+            <button
+              type="button"
+              onClick={() => setReloadAttempt((attempt) => attempt + 1)}
+              className="mt-4 px-4 py-2 rounded-xl bg-[#263B30] text-white text-xs font-semibold"
+            >
+              Retry loading experiences
+            </button>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-stone-200 p-8">
