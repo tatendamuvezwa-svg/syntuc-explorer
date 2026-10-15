@@ -509,25 +509,32 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
       // Packages live in the packages collection; activities/transfers stay in products.
       const isPackage = item.productType === 'package';
       if (existingKeys.has(importKey)) {
-        // A previous import version stored every non-package record as "activity".
-        // Repair only records carrying this exact deterministic import key, and only
-        // when the source type is an explicit transfer/fee. No other catalogue records
-        // or manually edited product types are touched.
-        if (!isPackage && (item.productType === 'transfer' || item.productType === 'fee')) {
-          const importedRecord = activeExisting.find((p) => p.catalogImportKey === importKey);
-          if (importedRecord && importedRecord.productType === 'activity' &&
-              (importedRecord.catalogItemType === 'transfer' || importedRecord.catalogItemType === 'fee')) {
-            try {
-              await updateDocById('products', importedRecord.id, {
-                productType: item.productType,
-                catalogItemType: item.productType,
-                updatedAt: now,
-              });
-              results.updatedAuthoritative++;
-            } catch (error) {
-              results.errors.push(`Failed product-type repair for ${item.operatorName}: ${item.name} (${importedRecord.id}): ${String(error)}`);
-              continue;
+        // Only records carrying this exact deterministic import key are eligible for
+        // source-description refresh. Published records and manually created records
+        // are never changed by this path; imported drafts remain unpublished.
+        const importedRecord = isPackage
+          ? activeExistingPackages.find((p) => p.catalogImportKey === importKey)
+          : activeExisting.find((p) => p.catalogImportKey === importKey);
+        if (importedRecord && importedRecord.isPublished !== true &&
+            importedRecord.catalogImportStatus === 'DRAFT_NEEDS_VERIFICATION') {
+          try {
+            const descriptionUpdates: Record<string, unknown> = {
+              shortDescription: item.shortDescription,
+              description: item.shortDescription,
+              catalogDescriptionVersion: 'operator-description-v1',
+              updatedAt: now,
+            };
+            if (!isPackage && (item.productType === 'transfer' || item.productType === 'fee') &&
+                importedRecord.productType === 'activity' &&
+                (importedRecord.catalogItemType === 'transfer' || importedRecord.catalogItemType === 'fee')) {
+              descriptionUpdates.productType = item.productType;
+              descriptionUpdates.catalogItemType = item.productType;
             }
+            await updateDocById(isPackage ? 'packages' : 'products', importedRecord.id, descriptionUpdates);
+            results.updatedAuthoritative++;
+          } catch (error) {
+            results.errors.push(`Failed imported-draft description refresh for ${item.operatorName}: ${item.name} (${importedRecord.id}): ${String(error)}`);
+            continue;
           }
         }
         results.alreadyImported++;
@@ -548,6 +555,9 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
             catalogImportKey: importKey,
             catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
             verificationNotes,
+            shortDescription: item.shortDescription,
+            description: item.shortDescription,
+            catalogDescriptionVersion: 'operator-description-v1',
             operatorName: item.operatorName,
             catalogSourceAuthority: 'LATEST_SUPPLIED_PURE_AFRICA_CATALOG',
             catalogSourceUpdatedAt: now,
@@ -607,6 +617,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         propertyId: null,
         shortDescription: item.shortDescription,
         description: item.shortDescription,
+        catalogDescriptionVersion: 'operator-description-v1',
         location: 'Victoria Falls, Zimbabwe',
         duration: null,
         basePrice: String(item.basePrice),
@@ -638,6 +649,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
             name: item.name,
             tagline: `Operator package from ${item.operatorName}`,
             description: item.shortDescription,
+            catalogDescriptionVersion: 'operator-description-v1',
             durationDays: 1,
             durationNights: 0,
             pricePerPerson: String(item.basePrice),
