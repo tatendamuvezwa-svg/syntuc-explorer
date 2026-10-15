@@ -48,8 +48,8 @@ const STAFF_AUTH_SECRET =
  * 2. SHA-256 hash format: "sha256$<salt>$<hash>" or hex-64
  * 3. Constant-time secure comparison for existing account records
  */
-export function verifyPassword(password: string, storedHash: string): boolean {
-  if (!password || !storedHash) return false;
+export function verifyPassword(password: string, storedHash: unknown): boolean {
+  if (!password || typeof storedHash !== 'string' || !storedHash) return false;
 
   // Format 1: scrypt
   if (storedHash.startsWith('scrypt$')) {
