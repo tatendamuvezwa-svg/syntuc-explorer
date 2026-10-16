@@ -20,7 +20,7 @@ async function readApiJson<T>(res: Response, endpoint: string): Promise<T> {
   try {
     return JSON.parse(body) as T;
   } catch {
-    const isHtml = /^\\s*(?:<!doctype\\s+html|<html\\b)/i.test(body);
+    const isHtml = /^\s*(?:<!doctype\s+html|<html\b)/i.test(body);
     if (isHtml) {
       throw new Error(
         `${endpoint} returned HTML instead of JSON (HTTP ${res.status}). The API route may be missing or the deployed frontend and backend versions may not match.`
