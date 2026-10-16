@@ -430,21 +430,12 @@ router.get('/products', async (req: Request, res: Response) => {
   try {
     const tombstones = await getTombstones();
     const allProducts = await getCollectionDocs<any>('products');
-    const visibleFirestoreProducts = allProducts
-      .filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
-    const pureAfricaIds = new Set([...PURE_AFRICA_FALLBACK_PRODUCTS.map((p) => p.id), 'prod_potjie_dining']);
-    const canonicalPureAfricaProducts = PURE_AFRICA_FALLBACK_PRODUCTS
-      .filter((p) => !tombstones.has(`products_${p.id}`))
-      .map((canonical) => {
-        const existing = visibleFirestoreProducts.find((p) => p.id === canonical.id);
-        return existing
-          ? { ...existing, ...canonical, primaryMediaId: existing.primaryMediaId || canonical.primaryMediaId }
-          : canonical;
-      });
-    const products = [
-      ...visibleFirestoreProducts.filter((p) => !pureAfricaIds.has(p.id)),
-      ...canonicalPureAfricaProducts,
-    ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // The live Firestore catalogue is the sole source of guest-visible products.
+    // Do not merge in hard-coded Pure Africa baseline records: doing so can resurrect
+    // missing/unpublished records and overwrite supplier-edited descriptions or prices.
+    const products = allProducts
+      .filter((p) => p.isPublished === true && !tombstones.has(`products_${p.id}`))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     const operators = await getCollectionDocs<any>('operators');
     const operatorMap = new Map(operators.map((o) => [o.id, o]));
@@ -473,14 +464,13 @@ router.get('/products', async (req: Request, res: Response) => {
     const guestEligibleProducts = productsWithDetails.filter(meetsGuestPublicationRequirements);
 
     res.json(guestEligibleProducts);
-  } catch (error) {
-    console.warn('Error fetching products (falling back to canonical catalog):', error);
-    const fallbackWithDetails = PURE_AFRICA_FALLBACK_PRODUCTS.map(p => ({
-      ...p,
-      primaryImageUrl: p._fallbackImageUrl || null,
-      primaryImageAlt: p.name,
-    }));
-    res.json(fallbackWithDetails.filter(meetsGuestPublicationRequirements));
+  } catch (error: any) {
+    console.error('[Guest Catalog API] Failed to read the authoritative published catalogue:', error);
+    res.status(503).json({
+      error: 'CATALOGUE_UNAVAILABLE',
+      message: 'The live catalogue could not be read. No baseline products were returned, and no partial catalogue was sent to the browser cache.',
+      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
+    });
   }
 });
 
@@ -494,11 +484,7 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const firestoreProduct = await getDocById<any>('products', id);
-    const canonicalProduct = PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === id) || null;
-    const product = canonicalProduct
-      ? { ...(firestoreProduct || {}), ...canonicalProduct, primaryMediaId: firestoreProduct?.primaryMediaId || canonicalProduct.primaryMediaId }
-      : firestoreProduct || null;
+    const product = await getDocById<any>('products', id);
     if (!product || tombstones.has(`products_${id}`)) {
       res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
       return;
@@ -573,21 +559,13 @@ router.get('/products/:id', async (req: Request, res: Response) => {
     }
 
     res.json(finalDetail);
-  } catch (error) {
-    console.warn('Notice fetching product detail (checking fallback):', error);
-    const fallbackProduct = PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === req.params.id);
-    if (fallbackProduct && meetsGuestPublicationRequirements(fallbackProduct)) {
-      res.json({
-        ...fallbackProduct,
-        rooms: [],
-        variants: [],
-        media: [],
-        primaryImageUrl: fallbackProduct._fallbackImageUrl || null,
-        primaryImageAlt: fallbackProduct.name,
-      });
-      return;
-    }
-    res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
+  } catch (error: any) {
+    console.error('[Guest Catalog API] Failed to read product detail from Firestore:', error);
+    res.status(503).json({
+      error: 'CATALOGUE_UNAVAILABLE',
+      message: 'The product details could not be loaded from the live catalogue.',
+      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
+    });
   }
 });
 
@@ -638,10 +616,13 @@ router.get('/packages', async (req: Request, res: Response) => {
     );
 
     res.json(validPackages);
-  } catch (error) {
-    console.warn('Error fetching packages (using published catalog fallback):', error);
-    const allPackages = await getCollectionDocs<any>('packages');
-    res.json(allPackages.filter((p) => p.isPublished && p.primaryImageUrl));
+  } catch (error: any) {
+    console.error('[Guest Catalog API] Failed to read the authoritative package catalogue:', error);
+    res.status(503).json({
+      error: 'CATALOGUE_UNAVAILABLE',
+      message: 'The live package catalogue could not be read. No baseline package list was returned.',
+      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
+    });
   }
 });
 
