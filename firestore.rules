@@ -66,9 +66,8 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Default fallback
-    match /{document=**} {
-      allow read, write: if true;
-    }
+    // No client rule is granted for heritage_feedback_responses.
+    // The feedback API uses the Firebase Admin SDK and enforces server-side authorization.
+    // Do not add a permissive catch-all rule: Firestore allow rules are additive.
   }
 }
