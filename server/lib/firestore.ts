@@ -75,104 +75,7 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
     { id: 'usr_coord_1', passwordHash: 'syntuc2026!secure', isActive: true, role: 'reservations_coordinator', email: 'reservations@syntuc.com', name: 'Victoria Falls Reservations Desk' },
     { id: 'usr_user_email', email: 'tatenda.muvezwa@gmail.com', name: 'Tatenda Muvezwa', isActive: true, role: 'admin', passwordHash: 'admin2026!' },
   ],
-  packages: [
-    {
-      id: 'pkg_essential_vf',
-      name: 'Victoria Falls Essential Journey',
-      tagline: 'The iconic 4-day introduction to Victoria Falls: rainforest, flight of angels & sunset cruise.',
-      description: 'A seamlessly coordinated 4-day, 3-night holiday combining town accommodation at Shearwater Explorers Village with the three must-do experiences: a guided rainforest walking tour of the Falls, the world-famous 12-minute Flight of Angels helicopter flight, and a pure luxury sunset catamaran cruise on the Zambezi.',
-      durationDays: 4,
-      durationNights: 3,
-      pricePerPerson: '680',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        '3 nights accommodation with daily breakfast',
-        'All 3 signature activities as listed',
-        'Return Victoria Falls International Airport transfers',
-        'Dedicated Syntuc Explorer trip coordination',
-      ],
-      exclusions: [
-        'Rainforest National Park entry fee ($50)',
-        'Helicopter aviation levy ($15)',
-        'River usage fee ($12)',
-      ],
-      highlights: [
-        '3 nights at Shearwater Explorers Village with breakfast',
-        '12-minute Flight of Angels scenic helicopter flight',
-        'Zambezi Explorer luxury sunset cruise with canapés & open bar',
-        'Victoria Falls Rainforest guided walking tour with poncho',
-        'All airport and scheduled activity transfers included',
-      ],
-    },
-    {
-      id: 'pkg_luxury_zambezi',
-      name: 'Zambezi Luxury Safari & River Retreat',
-      tagline: 'All-inclusive 5-star riverfront canvas sanctuary, wildlife safaris & extended gorge helicopter flight.',
-      description: 'Designed for the discerning traveler seeking complete wilderness immersion with unmatched luxury. Stay 3 nights at Old Drift Lodge in Zambezi National Park with private plunge pool, indulge in daily river boat safaris and game drives, fly on the 25-minute extended helicopter flight over Batoka Gorge, and dine suspended over the gorge at The Lookout Café.',
-      durationDays: 4,
-      durationNights: 3,
-      pricePerPerson: '2450',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        'All luxury accommodations, all meals and premium open bar',
-        'All guided safari drives and river cruises inside Zambezi National Park',
-        '25-minute extended helicopter tour',
-        'Executive VIP airport transfers',
-      ],
-      exclusions: [
-        'Park conservation fees ($15/day)',
-        'Helicopter park levy ($15)',
-      ],
-      highlights: [
-        '3 nights all-inclusive luxury at Old Drift Lodge in Zambezi National Park',
-        '25-minute Zambezi Gorge & Falls extended helicopter flight',
-        'Private Zambezi Explorer sunset cruise with gourmet dinner',
-        'The Lookout Café cliffside dining voucher',
-        'Unlimited morning and evening wildlife game drives and river boat safaris',
-      ],
-    },
-    {
-      id: 'pkg_batoka_adventure',
-      name: 'Batoka Adventure & Wilderness Duo',
-      tagline: 'High-adrenaline white-water rafting, Chobe Botswana safari, and panoramic hotel stay.',
-      description: "The definitive adventure package for active travelers. Base yourself for 2 nights at the Victoria Falls Rainbow Hotel overlooking the Falls spray. Conquer the world's greatest Grade 5 rapids on the Zambezi River with full-day rafting, and embark on a full-day cross-border safari to Botswana's Chobe National Park to witness hundreds of elephants along the Chobe River.",
-      durationDays: 3,
-      durationNights: 2,
-      pricePerPerson: '590',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        '2 nights accommodation with breakfast',
-        'Full day white-water rafting with gear and guide',
-        'Full day Chobe safari trip with border transfers and lunch',
-        'Simunye theatre admission',
-      ],
-      exclusions: [
-        'Parks river levy ($10)',
-        'Botswana park fee ($15)',
-      ],
-      highlights: [
-        '2 nights at Victoria Falls Rainbow Hotel with breakfast',
-        'Full-day Grade 5 Batoka Gorge White Water Rafting with gorge buffet lunch',
-        'Full-day Chobe National Park Safari in Botswana (boat safari + 4x4 game drive + lodge buffet)',
-        'Simunye African theatrical evening performance ticket',
-      ],
-    },
-  ],
+
 };
 
 // Seed baseline entries into memory
@@ -240,7 +143,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     if (!snap.exists()) {
       // Product records are authoritative in Firestore. Never resurrect a deleted/missing
       // product from the process memory store, which may contain startup baseline data.
-      if (collectionName === 'products') return null;
+      if (collectionName === 'products' || collectionName === 'packages') return null;
       if (memDoc) return memDoc as T;
       return null;
     }
@@ -248,7 +151,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     memCol.set(id, data);
     return data;
   } catch (err: any) {
-    if (collectionName === 'products') {
+    if (collectionName === 'products' || collectionName === 'packages') {
       console.error(`[Firestore] Authoritative product read failed for ${id}; refusing memory fallback.`, err);
       throw err;
     }
@@ -387,7 +290,7 @@ export async function getCollectionDocs<T = DocumentData>(
 
       // Product catalogue reads must not fall back to startup baseline records:
       // those records are not the live supplier catalogue and can hide Firestore failures.
-      if (collectionName === 'products') throw err;
+      if (collectionName === 'products' || collectionName === 'packages') throw err;
 
       // 2. Non-catalogue collections may use process-local resilience fallbacks.
       const memDocs = Array.from(memCol.values());
