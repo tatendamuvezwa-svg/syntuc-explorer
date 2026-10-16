@@ -17,6 +17,10 @@ const RATING_FIELDS = [
   'captainInformation',
 ] as const;
 
+export function isFeedbackAdministrator(role: unknown): boolean {
+  return role === 'admin';
+}
+
 function cleanText(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
@@ -146,7 +150,7 @@ router.post('/', async (req: Request, res: Response) => {
 
 // Staff management endpoint: admin only.
 router.get('/responses', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
-  if (req.staffUser?.role !== 'admin') {
+  if (!isFeedbackAdministrator(req.staffUser?.role)) {
     res.status(403).json({ error: 'FEEDBACK_ADMIN_REQUIRED', message: 'Administrator access is required to view feedback.' });
     return;
   }
