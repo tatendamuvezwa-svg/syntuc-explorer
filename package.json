@@ -15,7 +15,8 @@
     "test:pure-africa": "tsx server/tests/pure-africa-catalog.ts",
     "test:operator-catalog-import": "tsx server/tests/operator-catalog-import.ts",
     "test:feedback-validation": "tsx server/tests/feedback-validation.ts",
-    "diagnose:firebase-admin": "tsx server/tests/firebase-admin-diagnostic.ts"
+    "diagnose:firebase-admin": "tsx server/tests/firebase-admin-diagnostic.ts",
+    "test:staff-auth-secret": "tsx server/tests/staff-auth-secret.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
