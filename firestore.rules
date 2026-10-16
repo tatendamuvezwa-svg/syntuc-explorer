@@ -51,6 +51,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // QR guest feedback is written/read only through the server-side Firebase Admin SDK.
+    // Client SDK access must remain denied for this collection.
+    match /heritage_feedback_responses/{responseId} {
+      allow read, write: if false;
+    }
+
     // Guests
     match /guests/{guestId} {
       allow read, write: if true;
@@ -64,11 +70,5 @@ service cloud.firestore {
     // Guest messages
     match /guest_messages/{messageId} {
       allow read, write: if true;
-    }
-
-    // Default fallback
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
+    }}
 }
