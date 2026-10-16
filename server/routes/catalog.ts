@@ -616,10 +616,13 @@ router.get('/packages', async (req: Request, res: Response) => {
     );
 
     res.json(validPackages);
-  } catch (error) {
-    console.warn('Error fetching packages (using published catalog fallback):', error);
-    const allPackages = await getCollectionDocs<any>('packages');
-    res.json(allPackages.filter((p) => p.isPublished && p.primaryImageUrl));
+  } catch (error: any) {
+    console.error('[Guest Catalog API] Failed to read the authoritative package catalogue:', error);
+    res.status(503).json({
+      error: 'CATALOGUE_UNAVAILABLE',
+      message: 'The live package catalogue could not be read. No baseline package list was returned.',
+      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
+    });
   }
 });
 
