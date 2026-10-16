@@ -289,7 +289,7 @@ export const FeedbackAdminPage: React.FC<{ onBackToExplorer: () => void }> = ({ 
     const escapeCell = (value: unknown) => {
       const raw = String(value ?? '');
       // Prevent spreadsheet formula execution when guests' free-text is opened in Excel/Sheets.
-      const safe = /^[\\s]*[=+\\-@]/.test(raw) ? `'${raw}` : raw;
+      const safe = /^[\s]*(=|\+|-|@)/.test(raw) ? `'${raw}` : raw;
       return `"${safe.replace(/"/g, '""')}"`;
     };
     const csv = [headers, ...rows].map((row) => row.map(escapeCell).join(',')).join('\r\n');
