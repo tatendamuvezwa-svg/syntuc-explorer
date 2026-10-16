@@ -58,3 +58,12 @@ Repository inspection cannot prove that the deployed runtime has Application Def
 - Do not simply change all existing `allow read, write: if true` rules to `false` before server migration and regression tests. Existing server routes currently use the client SDK and would likely fail.
 - Do not enable real guest feedback collection until deployed Admin credentials/IAM and feedback authorization/persistence have been tested.
 - Do not treat a successful TypeScript build as proof of database connectivity or security.
+
+## Additional authentication finding
+
+The staff-token signing secret previously had a predictable hard-coded fallback. The feature branch now fails closed in production when neither `STAFF_AUTH_SECRET` nor `SESSION_SECRET` is configured: token creation throws, and verification rejects tokens. A unit test verifies that the former predictable fallback signature is rejected. Before deploying, configure a strong random `STAFF_AUTH_SECRET` in the server environment and verify that existing staff login/token issuance uses the same configured secret. Rotating this secret invalidates previously issued tokens; coordinate rollout accordingly.
+
+## Current implementation boundary
+
+This branch adds the audit, a read-only Firebase Admin connectivity diagnostic, and a production auth-secret guard. It does **not** yet migrate all server data-access helpers/routes to the Admin SDK, and it does not yet tighten the public rules for other collections. Those changes must be implemented and tested before the rules can safely be locked down. The diagnostic has not been run in the target deployed runtime from this workspace.
+
