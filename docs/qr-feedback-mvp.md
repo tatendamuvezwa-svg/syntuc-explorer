@@ -68,3 +68,15 @@ The broad catch-all Firestore allow rule has now been removed on this feature br
 
 The repository has not been deployed from this branch. GitHub Actions build/typecheck checks for the latest rules commit must complete successfully, and live Firestore behavior must be verified in a safe preview environment before merge. The server runtime must have Application Default Credentials and IAM access to the configured Firestore database.
 
+## Additional input/export hardening — 16 October 2026
+
+- The feedback API validates the optional experience date as a real calendar date and rejects future dates. Invalid dates are rejected server-side rather than relying only on the browser date input.
+- CSV export prefixes formula-leading guest text with an apostrophe before quoting the cell, reducing spreadsheet formula-injection risk when feedback is opened in spreadsheet software.
+- Latest GitHub Actions typecheck/build run is pending for these commits; do not treat earlier successful runs as validation of the latest changes.
+
+### Remaining launch blockers
+
+- The rules file still contains permissive client read/write access for multiple non-feedback collections. This PR only isolates the new feedback collection; it is not a full application-wide Firestore security fix.
+- Existing server routes use the Firebase client SDK helper for many collections, so tightening those rules without migrating and testing their access paths may break application workflows. A separate repository-wide access inventory and staged migration are required.
+- Live Firebase Admin SDK credentials/IAM, persistence, QR scanning, coordinator authorization, and full regression tests have not been verified in a deployed preview.
+
