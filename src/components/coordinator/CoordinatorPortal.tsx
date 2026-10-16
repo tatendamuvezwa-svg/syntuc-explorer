@@ -39,6 +39,7 @@ import { ProductEditorModal } from './ProductEditorModal.tsx';
 import { PackageEditorModal } from './PackageEditorModal.tsx';
 import { ReservationDetailModal } from './ReservationDetailModal.tsx';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
+import { FeedbackAdminPage } from '../feedback/FeedbackPages.tsx';
 
 interface CoordinatorPortalProps {
   onBackToExplorer: () => void;
@@ -58,7 +59,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
 
   // Active workbench tab
   const [activeTab, setActiveTab] = useState<
-    'leads' | 'reservations' | 'analytics' | 'products' | 'media' | 'sources' | 'security' | 'staff'
+    'leads' | 'reservations' | 'analytics' | 'products' | 'media' | 'sources' | 'security' | 'staff' | 'feedback'
   >('reservations');
 
   // Operational data
@@ -662,6 +663,19 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
           </button>
           {staffUser?.role === 'admin' && (
             <button
+              onClick={() => setActiveTab('feedback')}
+              className={`px-4 py-2 rounded-xl transition flex items-center ${
+                activeTab === 'feedback'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-stone-600 hover:bg-stone-100'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 mr-1" />
+              Guest Feedback
+            </button>
+          )}
+          {staffUser?.role === 'admin' && (
+            <button
               onClick={() => setActiveTab('staff')}
               className={`px-4 py-2 rounded-xl transition flex items-center ${
                 activeTab === 'staff'
@@ -674,6 +688,13 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
             </button>
           )}
         </div>
+
+        {/* Tab: Guest Feedback — administrator-only pilot workspace */}
+        {activeTab === 'feedback' && staffUser?.role === 'admin' && (
+          <div className="mt-6">
+            <FeedbackAdminPage onBackToExplorer={onBackToExplorer} />
+          </div>
+        )}
 
         {/* Tab: Analytics */}
         {activeTab === 'analytics' && (
