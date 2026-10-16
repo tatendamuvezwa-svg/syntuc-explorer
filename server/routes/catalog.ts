@@ -371,19 +371,11 @@ router.get('/products', async (req: Request, res: Response) => {
     const allProducts = await getCollectionDocs<any>('products');
     const visibleFirestoreProducts = allProducts
       .filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
-    const pureAfricaIds = new Set([...PURE_AFRICA_FALLBACK_PRODUCTS.map((p) => p.id), 'prod_potjie_dining']);
-    const canonicalPureAfricaProducts = PURE_AFRICA_FALLBACK_PRODUCTS
-      .filter((p) => !tombstones.has(`products_${p.id}`))
-      .map((canonical) => {
-        const existing = visibleFirestoreProducts.find((p) => p.id === canonical.id);
-        return existing
-          ? { ...existing, ...canonical, primaryMediaId: existing.primaryMediaId || canonical.primaryMediaId }
-          : canonical;
-      });
-    const products = [
-      ...visibleFirestoreProducts.filter((p) => !pureAfricaIds.has(p.id)),
-      ...canonicalPureAfricaProducts,
-    ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // The guest catalogue must reflect published Firestore records only. Never merge a
+    // small hard-coded fallback list into this response: the browser treats HTTP 200 data
+    // as authoritative and caches it, which can overwrite a previously complete catalogue.
+    const products = visibleFirestoreProducts
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     const operators = await getCollectionDocs<any>('operators');
     const operatorMap = new Map(operators.map((o) => [o.id, o]));
@@ -410,13 +402,13 @@ router.get('/products', async (req: Request, res: Response) => {
     });
 
     res.json(productsWithDetails);
-  } catch (error) {
-    console.warn('Error fetching products (falling back to canonical catalog):', error);
-    res.json(PURE_AFRICA_FALLBACK_PRODUCTS.map(p => ({
-      ...p,
-      primaryImageUrl: p._fallbackImageUrl || null,
-      primaryImageAlt: p.name,
-    })));
+  } catch (error: any) {
+    console.error('[Guest Catalog API] Failed to read the authoritative published catalogue:', error);
+    res.status(503).json({
+      error: 'CATALOGUE_UNAVAILABLE',
+      message: 'The live catalogue could not be read. No partial fallback list was returned, so cached catalogue data is not overwritten.',
+      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
+    });
   }
 });
 
