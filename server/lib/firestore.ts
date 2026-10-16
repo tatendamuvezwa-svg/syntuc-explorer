@@ -1,22 +1,14 @@
-import { initializeApp, getApps } from 'firebase/app';
+import { applicationDefault, initializeApp, getApps } from 'firebase-admin/app';
 import {
   getFirestore,
-  Firestore,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-  writeBatch,
+  type Firestore,
   type DocumentData,
-  type QueryConstraint,
-} from 'firebase/firestore';
+  type Query,
+  type QueryDocumentSnapshot,
+  type CollectionReference,
+  type DocumentReference,
+  type SetOptions,
+} from 'firebase-admin/firestore';
 import fs from 'fs';
 import path from 'path';
 
@@ -117,19 +109,67 @@ export function getFirestoreDb(): Firestore {
   if (firestoreInstance) return firestoreInstance;
 
   const cfg = getFirebaseConfig();
-  const app = getApps().length > 0
-    ? getApps()[0]
-    : initializeApp({
+  const appName = 'syntuc-server-admin';
+  const app = getApps().find((candidate) => candidate.name === appName)
+    || initializeApp(
+      {
+        credential: applicationDefault(),
         projectId: cfg.projectId,
-        apiKey: cfg.apiKey,
-        authDomain: cfg.authDomain,
-        appId: cfg.appId,
-        storageBucket: cfg.storageBucket,
-      });
+      },
+      appName,
+    );
 
   firestoreInstance = getFirestore(app, cfg.firestoreDatabaseId || '(default)');
-  console.log('[Firestore] Authoritative database initialized:', cfg.firestoreDatabaseId);
+  console.log('[Firestore Admin] Authoritative database initialized:', cfg.firestoreDatabaseId || '(default)');
   return firestoreInstance;
+}
+
+// Server-only compatibility adapters. These deliberately use Firebase Admin SDK,
+// which bypasses client Firestore rules; every API route must enforce authorization.
+type Constraint =
+  | { kind: 'where'; field: string; op: FirebaseFirestore.WhereFilterOp; value: unknown }
+  | { kind: 'orderBy'; field: string; direction: 'asc' | 'desc' }
+  | { kind: 'limit'; count: number };
+
+export function doc(db: Firestore, collectionName: string, id: string): DocumentReference {
+  return db.collection(collectionName).doc(id);
+}
+export function collection(db: Firestore, name: string): CollectionReference {
+  return db.collection(name);
+}
+export async function getDoc(ref: DocumentReference) {
+  return ref.get();
+}
+export async function setDoc(ref: DocumentReference, data: DocumentData, options?: SetOptions) {
+  return ref.set(data, options);
+}
+export async function updateDoc(ref: DocumentReference, data: DocumentData) {
+  return ref.update(data);
+}
+export async function deleteDoc(ref: DocumentReference) {
+  return ref.delete();
+}
+export async function getDocs(ref: Query | CollectionReference) {
+  return ref.get();
+}
+export function where(field: string, op: FirebaseFirestore.WhereFilterOp, value: unknown): Constraint {
+  return { kind: 'where', field, op, value };
+}
+export function orderBy(field: string, direction: 'asc' | 'desc' = 'asc'): Constraint {
+  return { kind: 'orderBy', field, direction };
+}
+export function limit(count: number): Constraint {
+  return { kind: 'limit', count };
+}
+export function query(ref: Query | CollectionReference, ...constraints: Constraint[]): Query {
+  return constraints.reduce((current, constraint) => {
+    if (constraint.kind === 'where') return current.where(constraint.field, constraint.op, constraint.value);
+    if (constraint.kind === 'orderBy') return current.orderBy(constraint.field, constraint.direction);
+    return current.limit(constraint.count);
+  }, ref as Query);
+}
+export function writeBatch(db: Firestore) {
+  return db.batch();
 }
 
 export async function getDocById<T = DocumentData>(collectionName: string, id: string): Promise<T | null> {
