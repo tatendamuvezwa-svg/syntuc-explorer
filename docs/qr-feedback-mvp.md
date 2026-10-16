@@ -46,3 +46,17 @@ Additional pilot limitations:
 8. Confirm existing catalogue, reservation, and coordinator workflows still work.
 
 No automated build or integration tests have been executed as part of authoring this branch; run the repository's normal build and test commands in the target environment before considering merge or deployment.
+
+## Security review follow-up — 16 October 2026
+
+The repository-wide Firestore rules currently include explicit permissive rules for several collections and a permissive catch-all for all remaining documents. Firestore allow rules are additive: adding a deny rule for `heritage_feedback_responses` would not override the catch-all allow. The existing server helper in `server/lib/firestore.ts` uses the Firebase client SDK, so the new API cannot bypass Firestore rules using the current helper.
+
+Do not try to secure this one collection by adding a deny-only match while leaving the catch-all in place. The safe next engineering step is a repository-wide data-access inventory and a planned rules migration, with regression tests for every collection currently used by the guest, coordinator, catalogue, reservation, analytics, and media flows. Another viable architecture is to use a server-only Admin SDK for feedback and remove all client-access paths to this collection, but that alone is not enough while the catch-all client permission remains active.
+
+### Validation status
+
+- Repository files and PR branch were inspected through GitHub.
+- The available Actions runs associated with the original PR commit are for reservation-deletion and marketing validation; they do not establish that this feature builds or passes its tests.
+- No feedback-specific automated test, TypeScript lint, or production build result has been verified for this branch.
+- Keep PR #32 as draft until security design is resolved and build/manual checks are completed.
+
