@@ -12,6 +12,7 @@ import schoolTripRoutes from './server/routes/schoolTrips.ts';
 import assistantRoutes from './server/routes/assistant.ts';
 import analyticsRoutes from './server/routes/analytics.ts';
 import marketingRoutes from './server/routes/marketing.ts';
+import feedbackRoutes from './server/routes/feedback.ts';
 import { getFirestoreDb } from './server/lib/firestore.ts';
 
 dotenv.config();
@@ -84,6 +85,7 @@ app.use('/api/school-trips', schoolTripRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/marketing', marketingRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Keep unmatched API requests in the JSON API layer. Without this guard, Vite's SPA
 // fallback can answer an unknown /api/* URL with index.html, causing clients to fail
