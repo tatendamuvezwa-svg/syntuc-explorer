@@ -7,6 +7,7 @@ import {
   type CollectionReference,
   type DocumentReference,
   type SetOptions,
+  type WhereFilterOp,
 } from 'firebase-admin/firestore';
 import fs from 'fs';
 import path from 'path';
@@ -29,6 +30,7 @@ interface CacheEntry<T> {
 
 const collectionCache = new Map<string, CacheEntry<any[]>>();
 const memoryStore = new Map<string, Map<string, any>>();
+const CACHEABLE_COLLECTIONS = new Set(['categories', 'operators', 'products', 'packages', 'properties', 'rooms', 'media_assets']);
 let tombstonesCache: CacheEntry<Set<string>> | null = null;
 
 function getMemoryCollection(name: string): Map<string, any> {
@@ -60,11 +62,6 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
     { id: 'op_cresta', description: "Operators of A'Zambezi River Lodge on the banks of the Zambezi.", verified: true, location: 'Victoria Falls, Zimbabwe', name: 'Cresta Hotels Zimbabwe', contactEmail: 'azambezi@cresta.co.zw', contactPhone: '+263 83 284 4561' },
     { id: 'op_machaba', contactEmail: 'enquiries@machabasafaris.com', contactPhone: '+27 82 579 5249', location: 'Zambezi National Park, Zimbabwe', verified: true, description: 'Luxury classic safari camps including Old Drift Lodge.', name: 'Machaba Safaris' },
     { id: 'op_rtg', name: 'Rainbow Tourism Group (RTG)', contactPhone: '+263 83 284 4583', contactEmail: 'reservations@rtg.co.zw', verified: true, location: 'Victoria Falls, Zimbabwe', description: 'Leading hospitality group operating the Victoria Falls Rainbow Hotel.' },
-  ],
-  users: [
-    { id: 'usr_admin_1', name: 'SAINTECH System Admin', passwordHash: 'saintech2026!admin', email: 'admin@saintech.io', role: 'admin', isActive: true },
-    { id: 'usr_coord_1', passwordHash: 'syntuc2026!secure', isActive: true, role: 'reservations_coordinator', email: 'reservations@syntuc.com', name: 'Victoria Falls Reservations Desk' },
-    { id: 'usr_user_email', email: 'tatenda.muvezwa@gmail.com', name: 'Tatenda Muvezwa', isActive: true, role: 'admin', passwordHash: 'admin2026!' },
   ],
 
 };
@@ -126,7 +123,7 @@ export function getFirestoreDb(): Firestore {
 // Server-only compatibility adapters. These deliberately use Firebase Admin SDK,
 // which bypasses client Firestore rules; every API route must enforce authorization.
 type Constraint =
-  | { kind: 'where'; field: string; op: import('firebase-admin/firestore').WhereFilterOp; value: unknown }
+  | { kind: 'where'; field: string; op: WhereFilterOp; value: unknown }
   | { kind: 'orderBy'; field: string; direction: 'asc' | 'desc' }
   | { kind: 'limit'; count: number };
 
@@ -151,7 +148,7 @@ export async function deleteDoc(ref: DocumentReference) {
 export async function getDocs(ref: Query | CollectionReference) {
   return ref.get();
 }
-export function where(field: string, op: import('firebase-admin/firestore').WhereFilterOp, value: unknown): Constraint {
+export function where(field: string, op: WhereFilterOp, value: unknown): Constraint {
   return { kind: 'where', field, op, value };
 }
 export function orderBy(field: string, direction: 'asc' | 'desc' = 'asc'): Constraint {
@@ -173,35 +170,18 @@ export function writeBatch(db: Firestore) {
 
 export async function getDocById<T = DocumentData>(collectionName: string, id: string): Promise<T | null> {
   const memCol = getMemoryCollection(collectionName);
-  const memDoc = memCol.get(id);
 
   try {
     const fdb = getFirestoreDb();
     const ref = doc(fdb, collectionName, id);
     const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      // Product records are authoritative in Firestore. Never resurrect a deleted/missing
-      // product from the process memory store, which may contain startup baseline data.
-      if (collectionName === 'products' || collectionName === 'packages') return null;
-      if (memDoc) return memDoc as T;
-      return null;
-    }
+    if (!snap.exists()) return null;
     const data = { id: snap.id, ...snap.data() } as T;
     memCol.set(id, data);
     return data;
   } catch (err: any) {
-    if (collectionName === 'products' || collectionName === 'packages') {
-      console.error(`[Firestore] Authoritative product read failed for ${id}; refusing memory fallback.`, err);
-      throw err;
-    }
-    if (isQuotaOrNetworkError(err)) {
-      console.warn(`[Firestore] Quota/network issue reading ${collectionName}/${id}; using memory store.`);
-      if (memDoc) return memDoc as T;
-      return null;
-    }
-    console.warn(`[Firestore] Read error on ${collectionName}/${id}:`, err?.message || err);
-    if (memDoc) return memDoc as T;
-    return null;
+    console.error(`[Firestore Admin] Read failed for ${collectionName}/${id}; refusing memory fallback.`, err);
+    throw err;
   }
 }
 
@@ -285,13 +265,13 @@ export async function deleteDocById(collectionName: string, id: string): Promise
 
 export async function getCollectionDocs<T = DocumentData>(
   collectionName: string,
-  ...constraints: QueryConstraint[]
+  ...constraints: Constraint[]
 ): Promise<T[]> {
   const hasConstraints = constraints.length > 0;
   const now = Date.now();
 
   // If no constraints, check collection cache
-  if (!hasConstraints) {
+  if (!hasConstraints && CACHEABLE_COLLECTIONS.has(collectionName)) {
     const cached = collectionCache.get(collectionName);
     if (cached && now - cached.timestamp < CACHE_TTL_MS) {
       return [...cached.data] as T[];
@@ -312,45 +292,14 @@ export async function getCollectionDocs<T = DocumentData>(
       memCol.set(d.id, docData);
     });
 
-    if (!hasConstraints) {
+    if (!hasConstraints && CACHEABLE_COLLECTIONS.has(collectionName)) {
       collectionCache.set(collectionName, { timestamp: now, data: docs });
     }
 
     return docs;
   } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      console.warn(`[Firestore] Quota exceeded or network error fetching ${collectionName}; falling back to cache/memory.`);
-
-      // 1. Try stale collection cache
-      const cached = collectionCache.get(collectionName);
-      if (cached && cached.data.length > 0) {
-        return [...cached.data] as T[];
-      }
-
-      // Product catalogue reads must not fall back to startup baseline records:
-      // those records are not the live supplier catalogue and can hide Firestore failures.
-      if (collectionName === 'products' || collectionName === 'packages') throw err;
-
-      // 2. Non-catalogue collections may use process-local resilience fallbacks.
-      const memDocs = Array.from(memCol.values());
-      if (memDocs.length > 0) {
-        return [...memDocs] as T[];
-      }
-
-      // 3. Baseline fallbacks for non-authoritative support collections.
-      if (BASELINE_COLLECTIONS[collectionName]) {
-        return [...BASELINE_COLLECTIONS[collectionName]] as T[];
-      }
-
-      return [];
-    }
-
-    console.error(`[Firestore] Error fetching collection ${collectionName}:`, err);
-    if (collectionName === 'products') throw err;
-    const memDocs = Array.from(memCol.values());
-    if (memDocs.length > 0) return [...memDocs] as T[];
-    if (BASELINE_COLLECTIONS[collectionName]) return [...BASELINE_COLLECTIONS[collectionName]] as T[];
-    return [];
+    console.error(`[Firestore Admin] Query failed for ${collectionName}; refusing stale/private memory fallback.`, err);
+    throw err;
   }
 }
 
@@ -378,10 +327,11 @@ export async function recordTombstone(collectionName: string, recordId: string):
     });
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
-      console.warn(`[Firestore] Quota exceeded recording tombstone ${tombstoneId}; kept in memory.`);
-      return;
+      console.error(`[Firestore Admin] Could not persist tombstone ${tombstoneId}; refusing to report deletion as durable.`);
+      throw err;
     }
-    console.error(`[Firestore] Error recording tombstone:`, err);
+    console.error(`[Firestore Admin] Error recording tombstone:`, err);
+    throw err;
   }
 }
 
@@ -396,10 +346,8 @@ export async function hasTombstone(collectionName: string, recordId: string): Pr
     const snap = await getDoc(doc(fdb, 'deleted_records', tombstoneId));
     return snap.exists();
   } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      return tombstonesCache ? (tombstonesCache.data.has(tombstoneId) || tombstonesCache.data.has(recordId)) : false;
-    }
-    return false;
+    console.error('[Firestore Admin] Tombstone verification failed; refusing to assume the record is active.', err);
+    throw err;
   }
 }
 
@@ -423,11 +371,8 @@ export async function getTombstones(): Promise<Set<string>> {
     });
     tombstonesCache = { timestamp: now, data: set };
   } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      console.warn('[Firestore] Quota exceeded loading tombstones; serving from in-memory set.');
-    } else {
-      console.warn('[Firestore] Error loading tombstones:', err);
-    }
+    console.error('[Firestore Admin] Tombstone query failed; refusing incomplete deletion filtering.', err);
+    throw err;
   }
 
   return set;
