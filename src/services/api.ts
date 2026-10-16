@@ -15,6 +15,21 @@ import { getAttributionHeaders } from './analytics.ts';
 
 const API_BASE = '/api';
 
+async function readApiJson<T>(res: Response, endpoint: string): Promise<T> {
+  const body = await res.text();
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    const isHtml = /^\s*(?:<!doctype\s+html|<html\b)/i.test(body);
+    if (isHtml) {
+      throw new Error(
+        `${endpoint} returned HTML instead of JSON (HTTP ${res.status}). The API route may be missing or the deployed frontend and backend versions may not match.`
+      );
+    }
+    throw new Error(`${endpoint} returned an invalid JSON response (HTTP ${res.status}).`);
+  }
+}
+
 async function getApiErrorMessage(res: Response, fallback: string): Promise<string> {
   const payload = await res.json().catch(() => ({} as Record<string, unknown>));
   const message = typeof payload.message === 'string' ? payload.message : '';
@@ -421,7 +436,7 @@ export const api = {
       headers: getStaffHeaders(),
     });
     if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load leads'));
-    return res.json();
+    return readApiJson<Lead[]>(res, '/api/coordinator/leads');
   },
 
   async getReservations(): Promise<ReservationRequest[]> {
@@ -429,7 +444,7 @@ export const api = {
       headers: getStaffHeaders(),
     });
     if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load reservations'));
-    return res.json();
+    return readApiJson<ReservationRequest[]>(res, '/api/coordinator/reservations');
   },
 
   async getReservationDetail(id: string): Promise<ReservationRequest> {
@@ -485,7 +500,7 @@ export const api = {
       headers: getStaffHeaders(),
     });
     if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load coordinator products'));
-    return res.json();
+    return readApiJson<Product[]>(res, '/api/coordinator/products');
   },
 
   async importOperatorCatalogs(): Promise<any> {
@@ -627,7 +642,7 @@ export const api = {
       headers: getStaffHeaders(),
     });
     if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load operators'));
-    return res.json();
+    return readApiJson<any[]>(res, '/api/coordinator/operators');
   },
 
   async getStaffUsers(): Promise<any[]> {
@@ -652,7 +667,7 @@ export const api = {
       headers: getStaffHeaders(),
     });
     if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load properties'));
-    return res.json();
+    return readApiJson<any[]>(res, '/api/coordinator/properties');
   },
 
   async getCoordinatorPackages(): Promise<any[]> {
@@ -660,7 +675,7 @@ export const api = {
       headers: getStaffHeaders(),
     });
     if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load coordinator packages'));
-    return res.json();
+    return readApiJson<any[]>(res, '/api/coordinator/packages');
   },
 
   async createPackage(data: any): Promise<any> {
@@ -754,7 +769,7 @@ export const api = {
       headers: getStaffHeaders(),
     });
     if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load knowledge sources'));
-    return res.json();
+    return readApiJson<KnowledgeSource[]>(res, '/api/coordinator/knowledge-sources');
   },
 
   async runR2SecurityTests(): Promise<any> {

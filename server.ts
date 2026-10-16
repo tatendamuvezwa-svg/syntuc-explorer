@@ -75,6 +75,18 @@ app.use('/api/assistant', assistantRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/marketing', marketingRoutes);
 
+// Keep unmatched API requests in the JSON API layer. Without this guard, Vite's SPA
+// fallback can answer an unknown /api/* URL with index.html, causing clients to fail
+// with the misleading "Unexpected token '<'" JSON parsing error.
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'API_ROUTE_NOT_FOUND',
+    message: 'No API route matched this request.',
+    method: req.method,
+    path: req.originalUrl,
+  });
+});
+
 // Server startup with direct authoritative Cloud Firestore
 async function startServer() {
   try {
