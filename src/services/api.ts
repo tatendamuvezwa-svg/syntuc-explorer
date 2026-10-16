@@ -49,20 +49,58 @@ function getStaffHeaders(): Record<string, string> {
 export const api = {
   // --- Catalog ---
   async getProducts(): Promise<Product[]> {
+    const fallbackOnlyIds = new Set([
+      'prod_pure_africa_sunrise_cruise',
+      'prod_pure_africa_lunch_cruise',
+      'prod_zambezi_explorer_cruise',
+      'prod_pure_africa_dinner_cruise',
+      'prod_pure_africa_classic_dinner_cruise',
+      'prod_pure_africa_eatery_lunch',
+      'prod_pure_africa_eatery_dinner',
+      'prod_pure_africa_eatery_dinner_sunset_combo',
+      'prod_pure_africa_eatery_potjie_sunset_combo',
+    ]);
+    const isLegacyPartialCatalogue = (value: unknown): value is Product[] =>
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.length <= fallbackOnlyIds.size &&
+      value.every((item) => Boolean(item && typeof item === 'object' && fallbackOnlyIds.has((item as Product).id)));
+
+    let cachedProducts: Product[] | null = null;
+    try {
+      const cached = localStorage.getItem('syntuc_cached_products');
+      if (cached) {
+        const parsed: unknown = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0 && !isLegacyPartialCatalogue(parsed)) {
+          cachedProducts = parsed as Product[];
+        }
+      }
+    } catch (_) {
+      // Ignore malformed cache and request the authoritative catalogue.
+    }
+
     try {
       const res = await fetch(`${API_BASE}/catalog/products`);
-      if (!res.ok) throw new Error('Failed to load products');
-      const data = await res.json();
+      if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load products'));
+      const data: unknown = await res.json();
+      if (!Array.isArray(data)) throw new Error('The catalogue endpoint returned an invalid response.');
+      if (isLegacyPartialCatalogue(data)) {
+        throw new Error('The server returned a legacy partial catalogue; it was not cached.');
+      }
+      if (data.length === 0 && cachedProducts) {
+        console.warn('Live catalogue returned no products; preserving the existing non-empty cache.');
+        return cachedProducts;
+      }
       try {
         localStorage.setItem('syntuc_cached_products', JSON.stringify(data));
       } catch (_) {}
-      return data;
+      return data as Product[];
     } catch (err) {
-      console.warn('Notice loading products from server, using catalog cache:', err);
-      try {
-        const cached = localStorage.getItem('syntuc_cached_products');
-        if (cached) return JSON.parse(cached);
-      } catch (_) {}
+      if (cachedProducts) {
+        console.warn('Catalogue request failed; preserving the existing full catalogue cache:', err);
+        return cachedProducts;
+      }
+      console.error('Unable to load the live catalogue and no safe cache is available:', err);
       return [];
     }
   },
