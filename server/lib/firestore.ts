@@ -4,7 +4,6 @@ import {
   type Firestore,
   type DocumentData,
   type Query,
-  type QueryDocumentSnapshot,
   type CollectionReference,
   type DocumentReference,
   type SetOptions,
@@ -127,7 +126,7 @@ export function getFirestoreDb(): Firestore {
 // Server-only compatibility adapters. These deliberately use Firebase Admin SDK,
 // which bypasses client Firestore rules; every API route must enforce authorization.
 type Constraint =
-  | { kind: 'where'; field: string; op: FirebaseFirestore.WhereFilterOp; value: unknown }
+  | { kind: 'where'; field: string; op: import('firebase-admin/firestore').WhereFilterOp; value: unknown }
   | { kind: 'orderBy'; field: string; direction: 'asc' | 'desc' }
   | { kind: 'limit'; count: number };
 
@@ -152,7 +151,7 @@ export async function deleteDoc(ref: DocumentReference) {
 export async function getDocs(ref: Query | CollectionReference) {
   return ref.get();
 }
-export function where(field: string, op: FirebaseFirestore.WhereFilterOp, value: unknown): Constraint {
+export function where(field: string, op: import('firebase-admin/firestore').WhereFilterOp, value: unknown): Constraint {
   return { kind: 'where', field, op, value };
 }
 export function orderBy(field: string, direction: 'asc' | 'desc' = 'asc'): Constraint {
