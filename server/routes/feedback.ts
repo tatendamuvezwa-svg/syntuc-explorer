@@ -21,7 +21,7 @@ function cleanText(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
-function validateExperienceDate(value: unknown): string | null {
+export function validateExperienceDate(value: unknown): string | null {
   const date = cleanText(value, 10);
   if (!date) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
