@@ -134,10 +134,17 @@ export function collection(db: Firestore, name: string): CollectionReference {
   return db.collection(name);
 }
 export async function getDoc(ref: DocumentReference) {
-  return ref.get();
+  const snapshot = await ref.get();
+  // Preserve the existing server adapter contract (exists() method) while using Admin SDK.
+  return {
+    id: snapshot.id,
+    exists: () => snapshot.exists,
+    data: () => snapshot.data() as DocumentData,
+    get: (field: string) => snapshot.get(field),
+  };
 }
 export async function setDoc(ref: DocumentReference, data: DocumentData, options?: SetOptions) {
-  return ref.set(data, options);
+  return options ? ref.set(data, options) : ref.set(data);
 }
 export async function updateDoc(ref: DocumentReference, data: DocumentData) {
   return ref.update(data);
@@ -378,17 +385,3 @@ export async function getTombstones(): Promise<Set<string>> {
   return set;
 }
 
-export {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-  writeBatch,
-};
