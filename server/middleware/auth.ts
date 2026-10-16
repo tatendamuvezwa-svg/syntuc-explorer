@@ -36,16 +36,16 @@ export function signSessionId(sessionId: string, secret: string): string {
  * Server-authoritative secret for signing coordinator tokens.
  * Derived from environment or fallback constant with high entropy.
  */
-const STAFF_AUTH_SECRET =
-  process.env.STAFF_AUTH_SECRET ||
-  process.env.SESSION_SECRET ||
-  (process.env.NODE_ENV === 'production' ? '' : crypto.randomBytes(32).toString('hex'));
+const DEVELOPMENT_STAFF_AUTH_SECRET = crypto.randomBytes(32).toString('hex');
 
 function requireStaffAuthSecret(): string {
-  if (!STAFF_AUTH_SECRET) {
+  // Read at call time so dotenv/runtime environment initialization is respected.
+  const configured = process.env.STAFF_AUTH_SECRET || process.env.SESSION_SECRET;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') {
     throw new Error('STAFF_AUTH_SECRET must be configured in production; refusing to use a predictable fallback.');
   }
-  return STAFF_AUTH_SECRET;
+  return DEVELOPMENT_STAFF_AUTH_SECRET;
 }
 
 /**
