@@ -49,21 +49,62 @@ function getStaffHeaders(): Record<string, string> {
 export const api = {
   // --- Catalog ---
   async getProducts(): Promise<Product[]> {
+    // This exact set identifies the small hard-coded fallback catalogue that older server
+    // builds returned with HTTP 200 when Firestore failed. Never save or reuse it as if it
+    // were the complete live catalogue.
+    const fallbackOnlyIds = new Set([
+      'prod_pure_africa_sunrise_cruise',
+      'prod_pure_africa_lunch_cruise',
+      'prod_zambezi_explorer_cruise',
+      'prod_pure_africa_dinner_cruise',
+      'prod_pure_africa_classic_dinner_cruise',
+      'prod_pure_africa_eatery_lunch',
+      'prod_pure_africa_eatery_dinner',
+      'prod_pure_africa_eatery_dinner_sunset_combo',
+      'prod_pure_africa_eatery_potjie_sunset_combo',
+    ]);
+    const isFallbackOnlyCatalogue = (value: unknown): value is Product[] =>
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.length <= fallbackOnlyIds.size &&
+      value.every((product) => Boolean(product && typeof product === 'object' && fallbackOnlyIds.has((product as Product).id)));
+
+    let cachedProducts: Product[] | null = null;
+    try {
+      const cached = localStorage.getItem('syntuc_cached_products');
+      if (cached) {
+        const parsed: unknown = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0 && !isFallbackOnlyCatalogue(parsed)) {
+          cachedProducts = parsed as Product[];
+        }
+      }
+    } catch (_) {
+      // Ignore malformed browser cache and attempt to load the authoritative server response.
+    }
+
     try {
       const res = await fetch(`${API_BASE}/catalog/products`);
-      if (!res.ok) throw new Error('Failed to load products');
-      const data = await res.json();
+      if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load products'));
+      const data: unknown = await res.json();
+      if (!Array.isArray(data)) throw new Error('The catalogue endpoint returned an invalid response.');
+      if (isFallbackOnlyCatalogue(data)) {
+        throw new Error('The server returned only the legacy partial fallback catalogue; it was not cached.');
+      }
+      if (data.length === 0 && cachedProducts) {
+        console.warn('Catalogue endpoint returned no products; preserving the previously cached catalogue.');
+        return cachedProducts;
+      }
       try {
         localStorage.setItem('syntuc_cached_products', JSON.stringify(data));
       } catch (_) {}
-      return data;
+      return data as Product[];
     } catch (err) {
-      console.warn('Notice loading products from server, using catalog cache:', err);
-      try {
-        const cached = localStorage.getItem('syntuc_cached_products');
-        if (cached) return JSON.parse(cached);
-      } catch (_) {}
-      return [];
+      if (cachedProducts) {
+        console.warn('Catalogue request failed; preserving the previously cached full catalogue:', err);
+        return cachedProducts;
+      }
+      console.error('Unable to load the authoritative catalogue and no safe full cache is available:', err);
+      throw err instanceof Error ? err : new Error('Failed to load the live catalogue.');
     }
   },
 
