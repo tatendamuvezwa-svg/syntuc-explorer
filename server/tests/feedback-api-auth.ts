@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import express from 'express';
-import feedbackRoutes from '../routes/feedback.ts';
+import feedbackRoutes, { isFeedbackAdministrator } from '../routes/feedback.ts';
+
+assert.equal(isFeedbackAdministrator('admin'), true, 'admin role must be allowed to read feedback responses');
+assert.equal(isFeedbackAdministrator('reservations_coordinator'), false, 'coordinator role must not read feedback responses');
+assert.equal(isFeedbackAdministrator(undefined), false, 'missing role must not read feedback responses');
 
 const app = express();
 app.use(express.json());
