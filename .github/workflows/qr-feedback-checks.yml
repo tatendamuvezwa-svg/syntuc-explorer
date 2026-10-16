@@ -32,5 +32,7 @@ jobs:
         run: npm ci
       - name: TypeScript type check
         run: npm run lint
+      - name: Feedback validation unit tests
+        run: npm run test:feedback-validation
       - name: Production frontend build
         run: npm run build
