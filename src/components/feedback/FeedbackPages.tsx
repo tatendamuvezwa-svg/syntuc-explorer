@@ -286,7 +286,12 @@ export const FeedbackAdminPage: React.FC<{ onBackToExplorer: () => void }> = ({ 
       item.overallExperience || '',
       item.recommendation || '',
     ]);
-    const escapeCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const escapeCell = (value: unknown) => {
+      const raw = String(value ?? '');
+      // Prevent spreadsheet formula execution when guests' free-text is opened in Excel/Sheets.
+      const safe = /^[\\s]*[=+\\-@]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
     const csv = [headers, ...rows].map((row) => row.map(escapeCell).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
