@@ -184,7 +184,12 @@ export function verifyStaffAuthToken(token: string): { valid: boolean; userId: s
     }
 
     const payload = `${userId}:${expiresAt}`;
-    const expectedSig = crypto.createHmac('sha256', STAFF_AUTH_SECRET).update(payload).digest('hex');
+    let expectedSig: string;
+    try {
+      expectedSig = crypto.createHmac('sha256', requireStaffAuthSecret()).update(payload).digest('hex');
+    } catch {
+      return { valid: false, userId: null };
+    }
     const sigBuf = Buffer.from(sig);
     const expectedSigBuf = Buffer.from(expectedSig);
 
