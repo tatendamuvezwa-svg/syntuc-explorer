@@ -22,8 +22,11 @@ async function readApiJson<T>(res: Response, endpoint: string): Promise<T> {
   } catch {
     const isHtml = /^\s*(?:<!doctype\s+html|<html\b)/i.test(body);
     if (isHtml) {
+      const buildMarker = res.headers.get('x-syntuc-api-build') || 'missing';
+      const contentType = res.headers.get('content-type') || 'not provided';
+      const responseUrl = res.url || endpoint;
       throw new Error(
-        `${endpoint} returned HTML instead of JSON (HTTP ${res.status}). The API route may be missing or the deployed frontend and backend versions may not match.`
+        `${endpoint} returned HTML instead of JSON (HTTP ${res.status}). Content-Type: ${contentType}; API build marker: ${buildMarker}; response URL: ${responseUrl}. A missing marker indicates the response likely came from a different frontend/proxy/runtime than this API server.`
       );
     }
     throw new Error(`${endpoint} returned an invalid JSON response (HTTP ${res.status}).`);

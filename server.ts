@@ -43,6 +43,14 @@ const isProduction = process.env.NODE_ENV === 'production';
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Stable runtime fingerprint for diagnosing AI Studio frontend/backend version drift.
+// The marker is deliberately non-secret and is attached before any API route executes.
+const API_BUILD_ID = 'coordinator-partial-load-2026-10-16-v1';
+app.use('/api', (_req, res, next) => {
+  res.setHeader('X-Syntuc-Api-Build', API_BUILD_ID);
+  next();
+});
+
 // Serve static uploaded media files from /data/uploads
 const uploadsDir = path.resolve(__dirname, 'data/uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -52,12 +60,14 @@ app.use('/uploads', express.static(uploadsDir));
 
 // System Health & Diagnostics
 app.get('/api/health', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
     status: 'ok',
     product: 'Syntuc Explorer',
     brand: 'SAINTECH',
     database: 'Cloud Firestore (Authoritative Native)',
     version: '3.0.0',
+    apiBuild: API_BUILD_ID,
     timestamp: new Date().toISOString(),
   });
 });

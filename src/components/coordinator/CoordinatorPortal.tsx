@@ -153,7 +153,9 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     setLoadingData(true);
     setDataLoadError(null);
     try {
-      const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.all([
+      // Load each desk resource independently. One stale/missing endpoint must not
+      // discard successful products, reservations, leads, or other coordinator data.
+      const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.allSettled([
         api.getLeads(),
         api.getReservations(),
         api.getCoordinatorProducts(),
@@ -163,23 +165,54 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         api.getCategories(),
         api.getKnowledgeSources(),
       ]);
-      setLeads(leadsRes);
-      setReservations(resRes);
-      setProducts(prodRes);
-      setPackages(pkgRes);
-      setOperators(opsRes);
-      setProperties(propsRes);
-      setCategories(catsRes);
-      setSources(srcRes);
+
+      const failures: string[] = [];
+      const applyResult = <T,>(
+        result: PromiseSettledResult<T>,
+        label: string,
+        setter: (value: T) => void
+      ) => {
+        if (result.status === 'fulfilled') {
+          setter(result.value);
+        } else {
+          const reason = result.reason;
+          const detail = reason instanceof Error ? reason.message : 'request failed';
+          failures.push(`${label}: ${detail}`);
+        }
+      };
+
+      applyResult(leadsRes, 'Leads & touch history', setLeads);
+      applyResult(resRes, 'Reservation requests', setReservations);
+      applyResult(prodRes, 'Catalogue products', setProducts);
+      applyResult(pkgRes, 'Catalogue packages', setPackages);
+      applyResult(opsRes, 'Operators', setOperators);
+      applyResult(propsRes, 'Properties', setProperties);
+      applyResult(catsRes, 'Categories', setCategories);
+      applyResult(srcRes, 'Knowledge sources', setSources);
+
       if (staffUser?.role === 'admin') {
         try {
           const usersRes = await api.getStaffUsers();
           setStaffUsers(usersRes);
-        } catch (_) {}
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : 'request failed';
+          failures.push(`Staff accounts: ${detail}`);
+        }
       }
-      if (prodRes.length > 0 && !selectedProductForMedia) {
-        setSelectedProductForMedia(prodRes[0].id);
+
+      if (prodRes.status === 'fulfilled' && prodRes.value.length > 0 && !selectedProductForMedia) {
+        setSelectedProductForMedia(prodRes.value[0].id);
       }
+
+      if (failures.length > 0) {
+        console.error('Coordinator partial data-load failure:', failures);
+        setDataLoadError(
+          `Some live desk data could not be loaded. Successfully loaded sections remain available, and failed sections were not replaced with empty data. ${failures.join(' | ')}. Check the connection and use Retry.`
+        );
+      }
+      // This boolean is used by reservation deletion to report whether the
+      // reservation list itself refreshed, not whether every unrelated tab loaded.
+      return resRes.status === 'fulfilled';
     } catch (e) {
       console.error('Coordinator data fetch error:', e);
       const detail = e instanceof Error ? e.message : 'The server returned an unknown data-loading error.';
@@ -188,7 +221,6 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     } finally {
       setLoadingData(false);
     }
-    return true;
   };
 
   const handleToggleStaffActive = async (userId: string) => {
