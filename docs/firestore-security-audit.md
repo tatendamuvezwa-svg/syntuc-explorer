@@ -67,3 +67,26 @@ The staff-token signing secret previously had a predictable hard-coded fallback.
 
 This branch adds the audit, a read-only Firebase Admin connectivity diagnostic, and a production auth-secret guard. It does **not** yet migrate all server data-access helpers/routes to the Admin SDK, and it does not yet tighten the public rules for other collections. Those changes must be implemented and tested before the rules can safely be locked down. The diagnostic has not been run in the target deployed runtime from this workspace.
 
+## Implementation status — 16 October 2026
+
+The feature branch now:
+
+- Uses Firebase Admin SDK for the shared server Firestore adapter, including reservation batch writes and media operations that previously used the client SDK.
+- Denies all direct browser/client SDK reads and writes in `firestore.rules`. Repository frontend services inspected for this change call the server API rather than importing the Firestore client SDK.
+- Removes hard-coded fallback user credentials from the server helper and refuses stale in-memory fallback reads for server data access. Tombstone read/write failures now fail closed.
+- Verifies the configured Firestore database with a read-only `listCollections()` request before the server begins listening. This verifies ADC/IAM at startup; it has not yet been run in the target deployed runtime from this workspace.
+- Requires a configured production `STAFF_AUTH_SECRET` (or `SESSION_SECRET`) and documents the secret in `.env.example` without including a real value.
+- Adds automated smoke tests for feedback API authentication/input handling, staff-secret behavior, and the deny-all Firestore rules.
+
+### Runtime requirements before accepting real guest data
+
+1. Configure a strong random `STAFF_AUTH_SECRET` in the deployment secret manager. Do not use the placeholder in `.env.example`. Existing staff sessions/tokens signed with the old fallback will be invalid; verify staff login/token issuance in preview.
+2. Ensure the deployed server identity has Firestore IAM access to project/database configured in `firebase-applet-config.json`. Startup now fails closed if it cannot perform a read-only database request.
+3. Deploy to preview and verify coordinator login, public catalogue, guest session/trip, reservation creation, guest reservation link/messages, coordinator operations, media upload/edit, analytics, and feedback persistence/read authorization.
+4. Test a real feedback submission using synthetic data only, verify the response exists in Firestore and is visible only to an authorized administrator, then delete the test record.
+5. Confirm rollback plan before production deployment.
+
+Admin SDK requests bypass Firestore rules. Consequently, API route authorization is the security boundary. Sensitive coordinator/media/analytics endpoints must remain protected by `requireCoordinatorAuth`; guest session and reservation endpoints must validate session secrets or high-entropy guest tokens. The public catalogue and analytics intake endpoints are intentionally public but must return only approved public data and never private records.
+
+The code and CI checks can validate structural behavior, but they cannot prove the actual Cloud Run/AI Studio service identity has been granted IAM permissions. The runtime check and end-to-end preview regression are deployment-gated and must not be represented as completed until run.
+
