@@ -107,7 +107,10 @@ async function startServer() {
     if (!fdb) {
       throw new Error('Could not initialize Cloud Firestore connection.');
     }
-    console.log('[Syntuc Server] Authoritative Cloud Firestore database active.');
+    // Verify ADC/IAM and the configured database before serving API traffic.
+    // Admin SDK bypasses Firestore rules, so server identity and API authorization are critical.
+    await fdb.listCollections();
+    console.log('[Syntuc Server] Firebase Admin credentials and Firestore IAM access verified.');
 
     // Setup Vite in development or static dist in production
     if (!isProduction) {
