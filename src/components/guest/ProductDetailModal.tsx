@@ -183,7 +183,9 @@ export const ProductDetailModal: React.FC = () => {
               {product?.productType === 'accommodation' ? 'Accommodation' : 'Activity & Experience'}
             </span>
             <span className="text-xs text-stone-500 font-medium">
-              Verified by {product?.operator?.name || 'Syntuc Victoria Falls'}
+              {product?.evidenceStatus && ['ESTABLISHED', 'SUPPORTED'].includes(product.evidenceStatus)
+                ? `Verified partner: ${product?.operator?.name || product?.operatorName || 'Victoria Falls Operator'}`
+                : `Partner: ${product?.operator?.name || product?.operatorName || 'Victoria Falls Operator'}`}
             </span>
           </div>
           <button
@@ -353,9 +355,15 @@ export const ProductDetailModal: React.FC = () => {
                           <span className="capitalize font-medium text-stone-600">
                             {formatPriceBasisLabel(v.priceBasis || 'per_person')}
                           </span>
-                          <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                            Verified
-                          </span>
+                          {v.evidenceStatus && ['ESTABLISHED', 'SUPPORTED'].includes(v.evidenceStatus) ? (
+                            <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              Verified
+                            </span>
+                          ) : v.evidenceStatus === 'PROVISIONAL' ? (
+                            <span className="text-[10px] uppercase font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              Provisional
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     );

@@ -375,10 +375,12 @@ export const ExploreView: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Verified Partner Badge */}
-                  <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center shadow-xs">
-                    <ShieldCheck className="w-3 h-3 text-[#54775A] mr-1" /> Verified
-                  </div>
+                  {/* Verified Partner Badge - Reflects actual verification state */}
+                  {product.evidenceStatus && ['ESTABLISHED', 'SUPPORTED'].includes(product.evidenceStatus) && (
+                    <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center shadow-xs">
+                      <ShieldCheck className="w-3 h-3 text-[#54775A] mr-1" /> Verified
+                    </div>
+                  )}
 
                   {/* Price Banner */}
                   <div className="absolute bottom-3 left-3 right-3 bg-[#17251D]/88 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex justify-between items-center text-xs">
@@ -400,7 +402,7 @@ export const ExploreView: React.FC = () => {
                     {/* Operator & Location */}
                     <div className="flex items-center justify-between text-xs text-stone-500 mb-1.5">
                       <span className="font-semibold text-[#365D43] truncate">
-                        {product.operatorName || 'Verified Partner'}
+                        {product.operatorName || 'Local Operator'}
                       </span>
                       {product.duration && (
                         <span className="flex items-center text-stone-400 ml-2 whitespace-nowrap">

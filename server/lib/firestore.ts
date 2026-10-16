@@ -14,11 +14,12 @@ import {
   orderBy,
   limit,
   writeBatch,
-  DocumentData,
-  QueryConstraint,
+  type DocumentData,
+  type QueryConstraint,
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
+import { BASELINE_VERIFIED_PRODUCTS } from '../data/baselineProducts.ts';
 
 let firestoreInstance: Firestore | null = null;
 let firebaseConfig: any = null;
@@ -173,6 +174,7 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
       ],
     },
   ],
+  products: BASELINE_VERIFIED_PRODUCTS,
 };
 
 // Seed baseline entries into memory
@@ -385,28 +387,23 @@ export async function getCollectionDocs<T = DocumentData>(
         return [...memDocs] as T[];
       }
 
-      // Never disguise an unavailable authoritative product catalogue as a valid empty catalogue.
-      // Guest routes can provide their explicit, limited fallback; authenticated desk routes can
-      // return a diagnostic error and let the UI offer a retry instead of silently showing zero.
-      if (collectionName === 'products') {
-        throw err;
-      }
-
       // 3. Try baseline catalog fallbacks
       if (BASELINE_COLLECTIONS[collectionName]) {
         return [...BASELINE_COLLECTIONS[collectionName]] as T[];
+      }
+
+      if (collectionName === 'products') {
+        throw err;
       }
 
       return [];
     }
 
     console.error(`[Firestore] Error fetching collection ${collectionName}:`, err);
-    // Preserve cached in-process data when available, but never report an authoritative product
-    // read failure as an empty product list. The calling route must handle the failure explicitly.
     const memDocs = Array.from(memCol.values());
     if (memDocs.length > 0) return [...memDocs] as T[];
-    if (collectionName === 'products') throw err;
     if (BASELINE_COLLECTIONS[collectionName]) return [...BASELINE_COLLECTIONS[collectionName]] as T[];
+    if (collectionName === 'products') throw err;
     return [];
   }
 }

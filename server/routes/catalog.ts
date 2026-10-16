@@ -44,11 +44,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "Departure times and vessel choice are subject to request confirmation. National Park fee is additional.",
-    "primaryMediaId": null,
+    "primaryMediaId": "med_d146f751adf7508ef581e918",
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": null
+    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621388697.jpeg"
   },
   {
     "id": "prod_pure_africa_lunch_cruise",
@@ -83,11 +83,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "National Park fee is additional. Vessel and date require confirmation.",
-    "primaryMediaId": null,
+    "primaryMediaId": "med_3746a46efdb0deb236259a8b",
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": null
+    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621519769.jpeg"
   },
   {
     "id": "prod_zambezi_explorer_cruise",
@@ -160,11 +160,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "National Park fee is additional. Departure and availability require confirmation.",
-    "primaryMediaId": null,
+    "primaryMediaId": "med_dc1d6e95d8fcd7995aa4d1e8",
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": null
+    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621459236.jpeg"
   },
   {
     "id": "prod_pure_africa_classic_dinner_cruise",
@@ -200,11 +200,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "No children under 12. National Parks fee is additional.",
-    "primaryMediaId": null,
+    "primaryMediaId": "med_7232475fdd0ac740a9294aca",
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": null
+    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621427967.jpeg"
   },
   {
     "id": "prod_pure_africa_eatery_lunch",
@@ -364,6 +364,67 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
   }
 ];
 
+/**
+ * Strict guest-publication requirements.
+ * A product appears to guests ONLY when it meets all data model criteria:
+ * - Explicitly published (isPublished === true)
+ * - Must not be a package in the products catalog
+ * - Verification genuinely completed (evidenceStatus is ESTABLISHED or SUPPORTED, not NEEDS_VERIFICATION/PROVISIONAL; and if imported, catalogImportStatus is VERIFIED)
+ * - Valid product title and category
+ * - Meaningful, product-specific description (>= 30 chars, not draft placeholder or generic imported string)
+ * - Appropriate thumbnail/image representing the actual experience
+ * - Current supplier attribution (valid operatorId, not unassigned)
+ * - Price and pricing unit confirmed (valid basePrice > 0, priceBasis present)
+ * - Essential inclusions and duration confirmed where applicable (non-empty duration, non-empty inclusions)
+ */
+export function meetsGuestPublicationRequirements(p: any): boolean {
+  if (!p || p.isPublished !== true) return false;
+
+  // Packages are handled separately via /packages
+  if (p.productType === 'package' || p.categorySlug === 'packages') return false;
+
+  // Verification must be genuinely completed
+  if (p.catalogImportKey && p.catalogImportStatus !== 'VERIFIED') return false;
+  if (p.evidenceStatus === 'NEEDS_VERIFICATION' || p.evidenceStatus === 'PROVISIONAL') return false;
+  if (p.evidenceStatus && !['ESTABLISHED', 'SUPPORTED'].includes(p.evidenceStatus)) return false;
+
+  // Valid product title and category
+  if (!p.name || typeof p.name !== 'string' || p.name.trim().length < 3) return false;
+  if (!p.categorySlug || typeof p.categorySlug !== 'string' || p.categorySlug.trim().length === 0) return false;
+
+  // Meaningful, product-specific description
+  const desc = (p.description || '').trim();
+  if (desc.length < 30) return false;
+  const lowerDesc = desc.toLowerCase();
+  if (lowerDesc.includes('draft import') || lowerDesc.includes('not bookable until verified') || lowerDesc.includes('verify current rate')) {
+    return false;
+  }
+  // Generic import template without real product-specific description
+  if (desc.includes(', supplied by ') && desc.includes('in the Victoria Falls tourism region.') && desc.length < 120) {
+    return false;
+  }
+
+  // Current supplier attribution (valid known operator)
+  if (!p.operatorId || p.operatorName === 'Unassigned — review required' || p.operatorName === 'Syntuc Partner') {
+    return false;
+  }
+
+  // Price and pricing unit confirmed
+  const price = Number(p.basePrice);
+  if (isNaN(price) || price <= 0) return false;
+  if (!p.priceBasis) return false;
+
+  // Essential inclusions and duration confirmed
+  if (!p.duration || typeof p.duration !== 'string' || p.duration.trim().length === 0) return false;
+  if (!Array.isArray(p.inclusions) || p.inclusions.length === 0) return false;
+
+  // Appropriate thumbnail / image must be present
+  const hasImage = Boolean(p.primaryImageUrl || p.primaryMediaId || p._fallbackImageUrl);
+  if (!hasImage) return false;
+
+  return true;
+}
+
 // GET all published products with primary media and operator info
 router.get('/products', async (req: Request, res: Response) => {
   try {
@@ -409,14 +470,17 @@ router.get('/products', async (req: Request, res: Response) => {
       };
     });
 
-    res.json(productsWithDetails);
+    const guestEligibleProducts = productsWithDetails.filter(meetsGuestPublicationRequirements);
+
+    res.json(guestEligibleProducts);
   } catch (error) {
     console.warn('Error fetching products (falling back to canonical catalog):', error);
-    res.json(PURE_AFRICA_FALLBACK_PRODUCTS.map(p => ({
+    const fallbackWithDetails = PURE_AFRICA_FALLBACK_PRODUCTS.map(p => ({
       ...p,
       primaryImageUrl: p._fallbackImageUrl || null,
       primaryImageAlt: p.name,
-    })));
+    }));
+    res.json(fallbackWithDetails.filter(meetsGuestPublicationRequirements));
   }
 });
 
@@ -491,20 +555,28 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       primaryMedia = media.find((m) => m.isPrimary) || media[0] || null;
     }
 
-    res.json({
+    const finalDetail = {
       ...product,
       operator,
       property,
       rooms,
       variants,
       media,
+      operatorName: operator?.name || product.operatorName || 'Syntuc Partner',
       primaryImageUrl: primaryMedia?.url || product._fallbackImageUrl || null,
       primaryImageAlt: primaryMedia?.altText || product.name,
-    });
+    };
+
+    if (!meetsGuestPublicationRequirements(finalDetail)) {
+      res.status(404).json({ error: 'PRODUCT_NOT_FOUND', message: 'Product is not available for guest display.' });
+      return;
+    }
+
+    res.json(finalDetail);
   } catch (error) {
     console.warn('Notice fetching product detail (checking fallback):', error);
     const fallbackProduct = PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === req.params.id);
-    if (fallbackProduct) {
+    if (fallbackProduct && meetsGuestPublicationRequirements(fallbackProduct)) {
       res.json({
         ...fallbackProduct,
         rooms: [],
@@ -561,23 +633,15 @@ router.get('/packages', async (req: Request, res: Response) => {
   try {
     const tombstones = await getTombstones();
     const allPackages = await getCollectionDocs<any>('packages');
-    let packages = allPackages.filter(
-      (p) => p.isPublished && !tombstones.has(`packages_${p.id}`)
+    const validPackages = allPackages.filter(
+      (p) => p.isPublished && !tombstones.has(`packages_${p.id}`) && p.primaryImageUrl && p.pricePerPerson && Number(p.pricePerPerson) > 0
     );
 
-    // If no published packages found in packages collection, also check products collection
-    if (packages.length === 0) {
-      const allProducts = await getCollectionDocs<any>('products');
-      packages = allProducts.filter(
-        (p) => (p.productType === 'package' || p.categorySlug === 'packages') && p.isPublished && !tombstones.has(`products_${p.id}`)
-      );
-    }
-
-    res.json(packages);
+    res.json(validPackages);
   } catch (error) {
     console.warn('Error fetching packages (using published catalog fallback):', error);
     const allPackages = await getCollectionDocs<any>('packages');
-    res.json(allPackages.filter((p) => p.isPublished));
+    res.json(allPackages.filter((p) => p.isPublished && p.primaryImageUrl));
   }
 });
 
