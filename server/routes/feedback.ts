@@ -4,7 +4,6 @@ import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware
 import { listFeedbackResponses, saveFeedbackResponse } from '../lib/feedbackStore.ts';
 
 const router = Router();
-const COLLECTION = 'heritage_feedback_responses';
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_SUBMISSIONS_PER_WINDOW = 5;
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
@@ -20,6 +19,17 @@ const RATING_FIELDS = [
 
 function cleanText(value: unknown, maxLength: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
+
+function validateExperienceDate(value: unknown): string | null {
+  const date = cleanText(value, 10);
+  if (!date) return null;
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return null;
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  if (date > today) return null;
+  return date;
 }
 
 function getRateLimitKey(req: Request): string {
@@ -110,7 +120,7 @@ router.post('/', async (req: Request, res: Response) => {
       experience: 'Sunset Cruise',
       name: name || null,
       email: email || null,
-      experienceDate: cleanText(body.experienceDate, 10) || null,
+      experienceDate,
       ratings,
       overallExperience,
       recommendation,
