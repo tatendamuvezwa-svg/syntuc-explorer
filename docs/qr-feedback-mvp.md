@@ -60,3 +60,11 @@ Do not try to secure this one collection by adding a deny-only match while leavi
 - No feedback-specific automated test, TypeScript lint, or production build result has been verified for this branch.
 - Keep PR #32 as draft until security design is resolved and build/manual checks are completed.
 
+## Security migration update — 16 October 2026
+
+The broad catch-all Firestore allow rule has now been removed on this feature branch, and `heritage_feedback_responses` has an explicit `allow read, write: if false` rule for client SDK access. The feedback API uses the server-side Firebase Admin SDK helper. This means direct client access to the feedback collection is denied by rules, while the server API can access it with the deployed service identity.
+
+**This is not a complete Firestore security remediation.** Existing explicit rules for `reservation_requests`, `reservation_items`, analytics, media, products, guests, guest tokens, guest messages, healthcheck, and deleted records still grant unrestricted client read/write. These need a separate, carefully tested rules migration. Collections without an explicit allow now fail closed, which may expose missing rules or break workflows that rely on direct client SDK access. Regression-test the whole application before deploying these rules.
+
+The repository has not been deployed from this branch. GitHub Actions build/typecheck checks for the latest rules commit must complete successfully, and live Firestore behavior must be verified in a safe preview environment before merge. The server runtime must have Application Default Credentials and IAM access to the configured Firestore database.
+
