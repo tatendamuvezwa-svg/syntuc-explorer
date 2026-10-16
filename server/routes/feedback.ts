@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { requireCoordinatorAuth, AuthenticatedStaffRequest } from '../middleware/auth.ts';
-import { getCollectionDocs, setDocById } from '../lib/firestore.ts';
+import { listFeedbackResponses, saveFeedbackResponse } from '../lib/feedbackStore.ts';
 
 const router = Router();
 const COLLECTION = 'heritage_feedback_responses';
@@ -118,7 +118,7 @@ router.post('/', async (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
     };
 
-    await setDocById(COLLECTION, id, response, false);
+    await saveFeedbackResponse(id, response);
     res.status(201).json({ success: true, id, message: 'Thank you. Your feedback has been submitted.' });
   } catch (error) {
     console.error('[Feedback API] Failed to save guest feedback:', error);
@@ -137,8 +137,7 @@ router.get('/responses', requireCoordinatorAuth, async (req: AuthenticatedStaffR
   }
 
   try {
-    const responses = await getCollectionDocs<any>(COLLECTION);
-    responses.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const responses = await listFeedbackResponses();
     res.setHeader('Cache-Control', 'no-store');
     res.json(responses.slice(0, 500));
   } catch (error) {
