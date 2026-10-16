@@ -19,7 +19,6 @@ import {
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
-import { BASELINE_VERIFIED_PRODUCTS } from '../data/baselineProducts.ts';
 
 let firestoreInstance: Firestore | null = null;
 let firebaseConfig: any = null;
@@ -174,7 +173,6 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
       ],
     },
   ],
-  products: BASELINE_VERIFIED_PRODUCTS,
 };
 
 // Seed baseline entries into memory
@@ -240,6 +238,9 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     const ref = doc(fdb, collectionName, id);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
+      // Product records are authoritative in Firestore. Never resurrect a deleted/missing
+      // product from the process memory store, which may contain startup baseline data.
+      if (collectionName === 'products') return null;
       if (memDoc) return memDoc as T;
       return null;
     }
@@ -247,6 +248,10 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     memCol.set(id, data);
     return data;
   } catch (err: any) {
+    if (collectionName === 'products') {
+      console.error(`[Firestore] Authoritative product read failed for ${id}; refusing memory fallback.`, err);
+      throw err;
+    }
     if (isQuotaOrNetworkError(err)) {
       console.warn(`[Firestore] Quota/network issue reading ${collectionName}/${id}; using memory store.`);
       if (memDoc) return memDoc as T;
@@ -277,11 +282,12 @@ export async function setDocById<T extends Record<string, any>>(
     const ref = doc(fdb, collectionName, id);
     await setDoc(ref, { id, ...data }, { merge });
   } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      console.warn(`[Firestore] Quota exceeded on write to ${collectionName}/${id}; persisted safely in memory.`);
-      return;
-    }
-    console.error(`[Firestore] Failed to persist ${collectionName}/${id}:`, err);
+    // Memory is only a cache, not durable persistence. Roll back optimistic memory state
+    // and surface the failure so routes cannot report an unsaved write as successful.
+    if (existing && Object.keys(existing).length > 0) memCol.set(id, existing);
+    else memCol.delete(id);
+    collectionCache.delete(collectionName);
+    console.error(`[Firestore] Failed to persist ${collectionName}/${id}; in-memory change rolled back:`, err);
     throw err;
   }
 }
@@ -309,17 +315,17 @@ export async function updateDocById(
     const ref = doc(fdb, collectionName, id);
     await setDoc(ref, { id, ...data }, { merge: true });
   } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      console.warn(`[Firestore] Quota exceeded on update to ${collectionName}/${id}; updated safely in memory.`);
-      return;
-    }
-    console.error(`[Firestore] Failed to update ${collectionName}/${id}:`, err);
+    if (existing && Object.keys(existing).length > 0) memCol.set(id, existing);
+    else memCol.delete(id);
+    collectionCache.delete(collectionName);
+    console.error(`[Firestore] Failed to update ${collectionName}/${id}; in-memory change rolled back:`, err);
     throw err;
   }
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
   const memCol = getMemoryCollection(collectionName);
+  const existing = memCol.get(id);
   memCol.delete(id);
   collectionCache.delete(collectionName);
 
@@ -328,11 +334,9 @@ export async function deleteDocById(collectionName: string, id: string): Promise
     const ref = doc(fdb, collectionName, id);
     await deleteDoc(ref);
   } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      console.warn(`[Firestore] Quota exceeded on delete of ${collectionName}/${id}; removed from memory.`);
-      return;
-    }
-    console.error(`[Firestore] Failed to delete ${collectionName}/${id}:`, err);
+    if (existing) memCol.set(id, existing);
+    collectionCache.delete(collectionName);
+    console.error(`[Firestore] Failed to delete ${collectionName}/${id}; in-memory deletion rolled back:`, err);
     throw err;
   }
 }
@@ -381,29 +385,29 @@ export async function getCollectionDocs<T = DocumentData>(
         return [...cached.data] as T[];
       }
 
-      // 2. Try memory store
+      // Product catalogue reads must not fall back to startup baseline records:
+      // those records are not the live supplier catalogue and can hide Firestore failures.
+      if (collectionName === 'products') throw err;
+
+      // 2. Non-catalogue collections may use process-local resilience fallbacks.
       const memDocs = Array.from(memCol.values());
       if (memDocs.length > 0) {
         return [...memDocs] as T[];
       }
 
-      // 3. Try baseline catalog fallbacks
+      // 3. Baseline fallbacks for non-authoritative support collections.
       if (BASELINE_COLLECTIONS[collectionName]) {
         return [...BASELINE_COLLECTIONS[collectionName]] as T[];
-      }
-
-      if (collectionName === 'products') {
-        throw err;
       }
 
       return [];
     }
 
     console.error(`[Firestore] Error fetching collection ${collectionName}:`, err);
+    if (collectionName === 'products') throw err;
     const memDocs = Array.from(memCol.values());
     if (memDocs.length > 0) return [...memDocs] as T[];
     if (BASELINE_COLLECTIONS[collectionName]) return [...BASELINE_COLLECTIONS[collectionName]] as T[];
-    if (collectionName === 'products') throw err;
     return [];
   }
 }
