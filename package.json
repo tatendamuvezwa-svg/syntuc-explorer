@@ -14,7 +14,8 @@
     "test:reservation-deletion": "tsx server/tests/reservation-deletion-unit.ts",
     "test:pure-africa": "tsx server/tests/pure-africa-catalog.ts",
     "test:operator-catalog-import": "tsx server/tests/operator-catalog-import.ts",
-    "test:feedback-validation": "tsx server/tests/feedback-validation.ts"
+    "test:feedback-validation": "tsx server/tests/feedback-validation.ts",
+    "diagnose:firebase-admin": "tsx server/tests/firebase-admin-diagnostic.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
