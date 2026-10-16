@@ -182,7 +182,8 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
       }
     } catch (e) {
       console.error('Coordinator data fetch error:', e);
-      setDataLoadError('Live desk data could not be loaded. Existing data has been retained where available. Check the connection and use Retry.');
+      const detail = e instanceof Error ? e.message : 'The server returned an unknown data-loading error.';
+      setDataLoadError(`Live desk data could not be loaded: ${detail}. Existing data has been retained where available. Check the connection and use Retry.`);
       return false;
     } finally {
       setLoadingData(false);

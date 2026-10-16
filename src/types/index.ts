@@ -125,6 +125,8 @@ export interface TripPlan {
   interests: string[];
   intensity: string;
   items: TripItem[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TripItem {

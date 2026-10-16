@@ -15,6 +15,18 @@ import { getAttributionHeaders } from './analytics.ts';
 
 const API_BASE = '/api';
 
+async function getApiErrorMessage(res: Response, fallback: string): Promise<string> {
+  const payload = await res.json().catch(() => ({} as Record<string, unknown>));
+  const message = typeof payload.message === 'string' ? payload.message : '';
+  const code = typeof payload.diagnosticCode === 'string'
+    ? payload.diagnosticCode
+    : typeof payload.error === 'string' ? payload.error : '';
+  const detail = message || code;
+  return detail
+    ? `${fallback}: ${detail} (HTTP ${res.status})`
+    : `${fallback} (HTTP ${res.status})`;
+}
+
 function getSessionHeaders(): Record<string, string> {
   const sessionId = localStorage.getItem('syntuc_guest_session_id') || '';
   const signature = localStorage.getItem('syntuc_guest_signature') || '';
@@ -180,8 +192,12 @@ export const api = {
         id: 'trip_' + sessionId.slice(0, 16),
         guestSessionId: sessionId,
         title: 'My Victoria Falls Journey',
+        startDate: null,
+        endDate: null,
         adultsCount: 2,
         childrenCount: 0,
+        interests: [],
+        intensity: 'MODERATE',
         items: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -363,29 +379,19 @@ export const api = {
   },
 
   async getLeads(): Promise<Lead[]> {
-    try {
-      const res = await fetch(`${API_BASE}/coordinator/leads`, {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error('Failed to load leads');
-      return await res.json();
-    } catch (err) {
-      console.warn('Notice loading leads, using fallback:', err);
-      return [];
-    }
+    const res = await fetch(`${API_BASE}/coordinator/leads`, {
+      headers: getStaffHeaders(),
+    });
+    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load leads'));
+    return res.json();
   },
 
   async getReservations(): Promise<ReservationRequest[]> {
-    try {
-      const res = await fetch(`${API_BASE}/coordinator/reservations`, {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error('Failed to load reservations');
-      return await res.json();
-    } catch (err) {
-      console.warn('Notice loading reservations, using fallback:', err);
-      return [];
-    }
+    const res = await fetch(`${API_BASE}/coordinator/reservations`, {
+      headers: getStaffHeaders(),
+    });
+    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load reservations'));
+    return res.json();
   },
 
   async getReservationDetail(id: string): Promise<ReservationRequest> {
@@ -440,7 +446,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/products`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load coordinator products');
+    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load coordinator products'));
     return res.json();
   },
 
@@ -582,7 +588,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/operators`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load operators');
+    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load operators'));
     return res.json();
   },
 
@@ -607,7 +613,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/properties`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load properties');
+    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load properties'));
     return res.json();
   },
 
@@ -615,7 +621,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/packages`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load coordinator packages');
+    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load coordinator packages'));
     return res.json();
   },
 
@@ -706,16 +712,11 @@ export const api = {
   },
 
   async getKnowledgeSources(): Promise<KnowledgeSource[]> {
-    try {
-      const res = await fetch(`${API_BASE}/coordinator/knowledge-sources`, {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error('Failed to load knowledge sources');
-      return await res.json();
-    } catch (err) {
-      console.warn('Notice loading knowledge sources, using fallback:', err);
-      return [];
-    }
+    const res = await fetch(`${API_BASE}/coordinator/knowledge-sources`, {
+      headers: getStaffHeaders(),
+    });
+    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load knowledge sources'));
+    return res.json();
   },
 
   async runR2SecurityTests(): Promise<any> {
