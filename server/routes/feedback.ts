@@ -24,14 +24,13 @@ function cleanText(value: unknown, maxLength: number): string {
 function validateExperienceDate(value: unknown): string | null {
   const date = cleanText(value, 10);
   if (!date) return null;
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const parsed = new Date(`${date}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
   const today = new Date().toISOString().slice(0, 10);
   if (date > today) return null;
   return date;
 }
-
 function getRateLimitKey(req: Request): string {
   // Keep the address transient for abuse prevention; never persist it with feedback.
   return req.ip || req.socket.remoteAddress || 'unknown';
@@ -110,6 +109,12 @@ router.post('/', async (req: Request, res: Response) => {
     const email = cleanText(body.email, 254).toLowerCase();
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       res.status(400).json({ error: 'INVALID_EMAIL', message: 'Please enter a valid email address or leave it blank.' });
+      return;
+    }
+    const experienceDateInput = cleanText(body.experienceDate, 10);
+    const experienceDate = validateExperienceDate(experienceDateInput);
+    if (experienceDateInput && !experienceDate) {
+      res.status(400).json({ error: 'INVALID_EXPERIENCE_DATE', message: 'Please enter a valid date of experience that is not in the future.' });
       return;
     }
 
