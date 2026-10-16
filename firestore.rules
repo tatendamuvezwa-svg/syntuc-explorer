@@ -70,5 +70,7 @@ service cloud.firestore {
     // Guest messages
     match /guest_messages/{messageId} {
       allow read, write: if true;
-    }}
+    }
+  }
+}
 }
