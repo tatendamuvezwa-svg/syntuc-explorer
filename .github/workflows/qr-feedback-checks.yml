@@ -36,5 +36,9 @@ jobs:
         run: npm run test:feedback-validation
       - name: Staff authentication secret tests
         run: npm run test:staff-auth-secret
+      - name: Feedback API auth and input smoke tests
+        run: npm run test:feedback-api-auth
+      - name: Firestore rules static tests
+        run: npm run test:firestore-rules
       - name: Production frontend build
         run: npm run build

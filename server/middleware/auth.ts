@@ -36,10 +36,17 @@ export function signSessionId(sessionId: string, secret: string): string {
  * Server-authoritative secret for signing coordinator tokens.
  * Derived from environment or fallback constant with high entropy.
  */
-const STAFF_AUTH_SECRET =
-  process.env.STAFF_AUTH_SECRET ||
-  process.env.SESSION_SECRET ||
-  'syntuc_staff_token_secret_auth_v2_f8e9a1b2c3d4e5f6';
+const DEVELOPMENT_STAFF_AUTH_SECRET = crypto.randomBytes(32).toString('hex');
+
+function requireStaffAuthSecret(): string {
+  // Read at call time so dotenv/runtime environment initialization is respected.
+  const configured = process.env.STAFF_AUTH_SECRET || process.env.SESSION_SECRET;
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('STAFF_AUTH_SECRET must be configured in production; refusing to use a predictable fallback.');
+  }
+  return DEVELOPMENT_STAFF_AUTH_SECRET;
+}
 
 /**
  * Verify plaintext password against stored hash in Firestore.
@@ -111,7 +118,7 @@ export function createStaffAuthToken(userId: string, expiresInHours = 24): strin
   const expiresAt = Date.now() + expiresInHours * 60 * 60 * 1000;
   const payloadObj = { userId, expiresAt };
   const payloadStr = Buffer.from(JSON.stringify(payloadObj)).toString('base64url');
-  const sig = crypto.createHmac('sha256', STAFF_AUTH_SECRET).update(payloadStr).digest('hex');
+  const sig = crypto.createHmac('sha256', requireStaffAuthSecret()).update(payloadStr).digest('hex');
   return `stafftok.${payloadStr}.${sig}`;
 }
 
@@ -133,7 +140,12 @@ export function verifyStaffAuthToken(token: string): { valid: boolean; userId: s
     }
 
     const [, payloadStr, sig] = parts;
-    const expectedSig = crypto.createHmac('sha256', STAFF_AUTH_SECRET).update(payloadStr).digest('hex');
+    let expectedSig: string;
+    try {
+      expectedSig = crypto.createHmac('sha256', requireStaffAuthSecret()).update(payloadStr).digest('hex');
+    } catch {
+      return { valid: false, userId: null };
+    }
     const sigBuf = Buffer.from(sig);
     const expectedSigBuf = Buffer.from(expectedSig);
 
@@ -172,7 +184,12 @@ export function verifyStaffAuthToken(token: string): { valid: boolean; userId: s
     }
 
     const payload = `${userId}:${expiresAt}`;
-    const expectedSig = crypto.createHmac('sha256', STAFF_AUTH_SECRET).update(payload).digest('hex');
+    let expectedSig: string;
+    try {
+      expectedSig = crypto.createHmac('sha256', requireStaffAuthSecret()).update(payload).digest('hex');
+    } catch {
+      return { valid: false, userId: null };
+    }
     const sigBuf = Buffer.from(sig);
     const expectedSigBuf = Buffer.from(expectedSig);
 

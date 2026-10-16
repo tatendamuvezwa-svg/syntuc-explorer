@@ -13,7 +13,13 @@
     "test:security": "tsx server/tests/r2-security.ts",
     "test:reservation-deletion": "tsx server/tests/reservation-deletion-unit.ts",
     "test:pure-africa": "tsx server/tests/pure-africa-catalog.ts",
-    "test:operator-catalog-import": "tsx server/tests/operator-catalog-import.ts"
+    "test:operator-catalog-import": "tsx server/tests/operator-catalog-import.ts",
+    "test:feedback-validation": "tsx server/tests/feedback-validation.ts",
+    "diagnose:firebase-admin": "tsx server/tests/firebase-admin-diagnostic.ts",
+    "test:staff-auth-secret": "tsx server/tests/staff-auth-secret.ts",
+    "test:feedback-api-auth": "tsx server/tests/feedback-api-auth.ts",
+    "test:firestore-rules": "tsx server/tests/firestore-rules.ts",
+    "test:firestore-admin-integration": "tsx server/tests/acceptance-persistence.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
