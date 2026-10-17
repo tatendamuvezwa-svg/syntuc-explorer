@@ -36,7 +36,7 @@ router.get('/products', async (req: Request, res: Response) => {
       return {
         ...p,
         operatorName: op?.name || 'Syntuc Partner',
-        primaryImageUrl: primaryMedia?.url || p._fallbackImageUrl || null,
+        primaryImageUrl: primaryMedia?.url || null,
         primaryImageAlt: primaryMedia?.altText || p.name,
       };
     });
@@ -101,7 +101,7 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       rooms,
       variants,
       media,
-      primaryImageUrl: primaryMedia?.url || product._fallbackImageUrl || null,
+      primaryImageUrl: primaryMedia?.url || null,
       primaryImageAlt: primaryMedia?.altText || product.name,
     });
   } catch (error) {
@@ -169,9 +169,11 @@ router.get('/packages', async (req: Request, res: Response) => {
 
     res.json(packages);
   } catch (error) {
-    console.warn('Error fetching packages (using published catalog fallback):', error);
-    const allPackages = await getCollectionDocs<any>('packages');
-    res.json(allPackages.filter((p) => p.isPublished));
+    console.error('[Catalog API] Failed to read authoritative packages:', error);
+    res.status(503).json({
+      error: 'CATALOG_UNAVAILABLE',
+      message: 'The live package catalogue could not be loaded. No fallback packages were substituted.',
+    });
   }
 });
 
