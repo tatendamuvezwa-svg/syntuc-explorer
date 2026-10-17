@@ -391,6 +391,10 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     const ref = doc(fdb, collectionName, id);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
+      if (collectionName === 'products' || collectionName === 'packages') {
+        memCol.delete(id);
+        return null;
+      }
       if (memDoc) return memDoc as T;
       return null;
     }
@@ -413,7 +417,7 @@ export async function setDocById<T extends Record<string, any>>(
   data: T,
   merge: boolean = true
 ): Promise<void> {
-  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error('Cannot write products while Firestore is unavailable; no in-memory-only write was performed.');
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error(`Cannot write ${collectionName} while Firestore is unavailable; no in-memory-only write was performed.`);
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = merge ? { ...existing, id, ...data } : { id, ...data };
@@ -450,7 +454,7 @@ export async function updateDocById(
   id: string,
   data: Partial<DocumentData>
 ): Promise<void> {
-  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error('Cannot update products while Firestore is unavailable; no in-memory-only update was performed.');
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error(`Cannot update ${collectionName} while Firestore is unavailable; no in-memory-only update was performed.`);
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = { ...existing, id, ...data };
@@ -478,7 +482,7 @@ export async function updateDocById(
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
-  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error('Cannot delete products while Firestore is unavailable; no in-memory-only deletion was performed.');
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error(`Cannot delete ${collectionName} while Firestore is unavailable; no in-memory-only deletion was performed.`);
   const memCol = getMemoryCollection(collectionName);
   memCol.delete(id);
   collectionCache.delete(collectionName);
