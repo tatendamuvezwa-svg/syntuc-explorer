@@ -1507,6 +1507,24 @@ router.patch('/staff-users/:id/toggle-active', requireCoordinatorAuth, async (re
   }
 });
 
+// GET /api/coordinator/boat-cruise-reviews - Authorized staff retrieval of boat cruise reviews
+router.get('/boat-cruise-reviews', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
+  try {
+    const reviews = await getCollectionDocs<any>('boat_cruise_reviews');
+    // Sort descending by submittedAt
+    const sorted = [...reviews].sort((a, b) => {
+      const timeA = new Date(a.submittedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.submittedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    res.json(sorted);
+  } catch (error) {
+    console.error('Failed to load boat cruise reviews for coordinator:', error);
+    res.status(500).json({ error: 'FAILED_TO_LOAD_REVIEWS', message: 'Unable to retrieve reviews from the store.' });
+  }
+});
+
 // POST /api/coordinator/logout - Explicit server-side session termination
 router.post('/logout', requireCoordinatorAuth, async (req: AuthenticatedStaffRequest, res: Response) => {
   res.json({ success: true, message: 'Coordinator session successfully terminated' });

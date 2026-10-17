@@ -12,6 +12,7 @@ import { GuestReservationDashboard } from './components/guest/GuestReservationDa
 import { SchoolTripPlannerModal } from './components/guest/SchoolTripPlannerModal.tsx';
 import { SyntucAssistantWidget } from './components/guest/SyntucAssistantWidget.tsx';
 import { CoordinatorPortal } from './components/coordinator/CoordinatorPortal.tsx';
+import { FeedbackView } from './components/guest/FeedbackView.tsx';
 import { CheckCircle2 } from 'lucide-react';
 import { initAnalyticsSession, trackEvent } from './services/analytics.ts';
 
@@ -37,6 +38,9 @@ function MainAppContent() {
     if (path === '/coordinator') {
       return { path: '/coordinator' };
     }
+    if (path === '/feedback') {
+      return { path: '/feedback' };
+    }
     return { path: '/' };
   });
 
@@ -49,6 +53,8 @@ function MainAppContent() {
         setCurrentRoute({ path: '/guest/reservation', guestToken: token });
       } else if (path === '/coordinator') {
         setCurrentRoute({ path: '/coordinator' });
+      } else if (path === '/feedback') {
+        setCurrentRoute({ path: '/feedback' });
       } else {
         setCurrentRoute({ path: '/' });
       }
@@ -64,6 +70,9 @@ function MainAppContent() {
     } else if (path === '/coordinator') {
       window.history.pushState({}, '', '/coordinator');
       setCurrentRoute({ path: '/coordinator' });
+    } else if (path === '/feedback') {
+      window.history.pushState({}, '', '/feedback');
+      setCurrentRoute({ path: '/feedback' });
     } else {
       window.history.pushState({}, '', '/');
       setCurrentRoute({ path: '/' });
@@ -100,6 +109,8 @@ function MainAppContent() {
             token={currentRoute.guestToken}
             onBackToExplore={() => navigateTo('/')}
           />
+        ) : currentRoute.path === '/feedback' ? (
+          <FeedbackView onBackToExplore={() => navigateTo('/')} />
         ) : (
           <>
             {activeTab === 'packages' ? <PackagesView /> : <ExploreView />}

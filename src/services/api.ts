@@ -10,6 +10,7 @@ import {
   AssistantResponse,
   MediaAsset,
   ProductVariant,
+  BoatCruiseReview,
 } from '../types/index.ts';
 import { getAttributionHeaders } from './analytics.ts';
 
@@ -757,5 +758,40 @@ export const api = {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || data.error || 'Could not record publication');
     return data;
+  },
+
+  // --- Boat Cruise Reviews ---
+  async submitBoatCruiseReview(data: {
+    welcomeRating: number;
+    cleanlinessRating: number;
+    drinksRating: number;
+    snacksRating: number;
+    captainInfoRating: number;
+    recommend: 'yes' | 'no';
+    overallComments?: string;
+    guestName?: string;
+    guestEmail?: string;
+  }): Promise<{ success: boolean; id: string; message: string; submittedAt: string }> {
+    const res = await fetch(`${API_BASE}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload.message || payload.error || 'Failed to submit review');
+    }
+    return payload;
+  },
+
+  async getBoatCruiseReviews(): Promise<BoatCruiseReview[]> {
+    const res = await fetch(`${API_BASE}/coordinator/boat-cruise-reviews`, {
+      headers: getStaffHeaders(),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload.message || payload.error || 'Failed to load boat cruise reviews');
+    }
+    return payload;
   },
 };

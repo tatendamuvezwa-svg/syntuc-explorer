@@ -32,9 +32,12 @@ import {
   Globe,
   GraduationCap,
   TrendingUp,
+  Ship,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { AnalyticsDashboard } from './AnalyticsDashboard.tsx';
-import { Lead, ReservationRequest, Product, KnowledgeSource, Package as PackageType, Category } from '../../types/index.ts';
+import { Lead, ReservationRequest, Product, KnowledgeSource, Package as PackageType, Category, BoatCruiseReview } from '../../types/index.ts';
 import { ProductEditorModal } from './ProductEditorModal.tsx';
 import { PackageEditorModal } from './PackageEditorModal.tsx';
 import { ReservationDetailModal } from './ReservationDetailModal.tsx';
@@ -58,12 +61,14 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
 
   // Active workbench tab
   const [activeTab, setActiveTab] = useState<
-    'leads' | 'reservations' | 'analytics' | 'products' | 'media' | 'sources' | 'security' | 'staff'
+    'leads' | 'reservations' | 'analytics' | 'products' | 'media' | 'sources' | 'security' | 'staff' | 'reviews'
   >('reservations');
 
   // Operational data
   const [leads, setLeads] = useState<Lead[]>([]);
   const [reservations, setReservations] = useState<ReservationRequest[]>([]);
+  const [boatCruiseReviews, setBoatCruiseReviews] = useState<BoatCruiseReview[]>([]);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [packages, setPackages] = useState<PackageType[]>([]);
   const [operators, setOperators] = useState<any[]>([]);
@@ -151,7 +156,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     if (!isAuthenticated) return false;
     setLoadingData(true);
     try {
-      const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.all([
+      const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes, reviewsRes] = await Promise.all([
         api.getLeads(),
         api.getReservations(),
         api.getCoordinatorProducts(),
@@ -160,6 +165,11 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         api.getProperties(),
         api.getCategories(),
         api.getKnowledgeSources(),
+        api.getBoatCruiseReviews().catch((err) => {
+          console.warn('Notice loading boat cruise reviews:', err);
+          setReviewsError(err?.message || 'Failed to load reviews');
+          return [];
+        }),
       ]);
       setLeads(leadsRes);
       setReservations(resRes);
@@ -169,6 +179,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
       setProperties(propsRes);
       setCategories(catsRes);
       setSources(srcRes);
+      setBoatCruiseReviews(reviewsRes);
       if (staffUser?.role === 'admin') {
         try {
           const usersRes = await api.getStaffUsers();
@@ -547,6 +558,17 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
             }`}
           >
             Reservation Requests ({reservations.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            className={`px-4 py-2 rounded-xl transition flex items-center space-x-1.5 ${
+              activeTab === 'reviews'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-stone-600 hover:bg-stone-100'
+            }`}
+          >
+            <Ship className="w-3.5 h-3.5" />
+            <span>Boat Cruise Reviews ({boatCruiseReviews.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -1571,6 +1593,262 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                       >
                         {res.passed ? 'PASSED' : 'FAILED'}
                       </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 7: Boat Cruise Reviews */}
+        {activeTab === 'reviews' && (
+          <div className="mt-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-stone-900 font-display flex items-center">
+                  <Ship className="w-5 h-5 text-amber-700 mr-2" />
+                  Heritage Expedition Boat Cruise Reviews
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Verified guest feedback submitted for the Heritage Expedition Sunset Cruise.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={loadAllData}
+                disabled={loadingData}
+                className="self-start sm:self-auto px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin' : ''}`} />
+                <span>Refresh Reviews</span>
+              </button>
+            </div>
+
+            {/* Error Banner */}
+            {reviewsError && (
+              <div
+                role="alert"
+                className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{reviewsError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAllData}
+                  className="font-bold underline text-rose-900 ml-4 hover:opacity-80"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Loading State */}
+            {loadingData && boatCruiseReviews.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs">
+                <RefreshCw className="w-6 h-6 animate-spin text-amber-600 mx-auto mb-3" />
+                <p className="text-xs font-medium text-stone-500">Loading guest reviews from Firestore...</p>
+              </div>
+            ) : boatCruiseReviews.length === 0 ? (
+              /* Empty State */
+              <div className="bg-white rounded-3xl border border-stone-200 p-12 text-center shadow-xs">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mx-auto mb-3">
+                  <Ship className="w-6 h-6" />
+                </div>
+                <h4 className="text-sm font-bold text-stone-900 mb-1">No Boat Cruise Reviews Yet</h4>
+                <p className="text-xs text-stone-500 max-w-md mx-auto">
+                  When guests complete the feedback form at <span className="font-mono text-amber-800">/feedback</span>, their submissions will appear here in real time.
+                </p>
+              </div>
+            ) : (
+              /* Reviews List & Aggregate Summary */
+              <div className="space-y-6">
+                {/* Metrics Summary Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+                    <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block mb-1">
+                      Total Reviews
+                    </span>
+                    <span className="text-2xl font-bold text-stone-900">
+                      {boatCruiseReviews.length}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+                    <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block mb-1">
+                      Recommendation Rate
+                    </span>
+                    <span className="text-2xl font-bold text-emerald-700">
+                      {Math.round(
+                        (boatCruiseReviews.filter((r) => r.recommend === 'yes').length /
+                          boatCruiseReviews.length) *
+                          100
+                      )}
+                      %
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+                    <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block mb-1">
+                      Avg. Welcome & Reception
+                    </span>
+                    <span className="text-2xl font-bold text-stone-900">
+                      {(
+                        boatCruiseReviews.reduce((sum, r) => sum + (r.welcomeRating || 0), 0) /
+                        boatCruiseReviews.length
+                      ).toFixed(1)}{' '}
+                      <span className="text-xs font-normal text-stone-400">/ 5</span>
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs">
+                    <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider block mb-1">
+                      Avg. Boat Cleanliness
+                    </span>
+                    <span className="text-2xl font-bold text-stone-900">
+                      {(
+                        boatCruiseReviews.reduce((sum, r) => sum + (r.cleanlinessRating || 0), 0) /
+                        boatCruiseReviews.length
+                      ).toFixed(1)}{' '}
+                      <span className="text-xs font-normal text-stone-400">/ 5</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Review Cards */}
+                <div className="space-y-4">
+                  {boatCruiseReviews.map((rev) => (
+                    <div
+                      key={rev.id}
+                      className="bg-white rounded-3xl border border-stone-200 p-5 sm:p-6 shadow-xs hover:border-stone-300 transition-colors space-y-4"
+                    >
+                      {/* Card Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-stone-100">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center shrink-0">
+                            <Ship className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-stone-900 block">
+                              {rev.experienceName || 'Heritage Expedition Sunset Cruise'}
+                            </span>
+                            <span className="text-[11px] text-stone-500">
+                              Submitted {new Date(rev.submittedAt).toLocaleString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Recommendation badge */}
+                        <div>
+                          {rev.recommend === 'yes' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <ThumbsUp className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Recommends Cruise</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+                              <ThumbsDown className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Does Not Recommend</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 5 Dimension Ratings Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                        <div className="p-3 rounded-2xl bg-stone-50 border border-stone-100">
+                          <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-semibold mb-1">
+                            Welcome
+                          </span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-base font-bold text-stone-900">
+                              {rev.welcomeRating}
+                            </span>
+                            <span className="text-[11px] text-stone-400">/ 5</span>
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-stone-50 border border-stone-100">
+                          <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-semibold mb-1">
+                            Cleanliness
+                          </span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-base font-bold text-stone-900">
+                              {rev.cleanlinessRating}
+                            </span>
+                            <span className="text-[11px] text-stone-400">/ 5</span>
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-stone-50 border border-stone-100">
+                          <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-semibold mb-1">
+                            Drinks
+                          </span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-base font-bold text-stone-900">
+                              {rev.drinksRating}
+                            </span>
+                            <span className="text-[11px] text-stone-400">/ 5</span>
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-stone-50 border border-stone-100">
+                          <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-semibold mb-1">
+                            Snacks
+                          </span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-base font-bold text-stone-900">
+                              {rev.snacksRating}
+                            </span>
+                            <span className="text-[11px] text-stone-400">/ 5</span>
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-2xl bg-stone-50 border border-stone-100 col-span-2 sm:col-span-1">
+                          <span className="text-[10px] text-stone-500 uppercase tracking-wider block font-semibold mb-1">
+                            Captain Info
+                          </span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-base font-bold text-stone-900">
+                              {rev.captainInfoRating}
+                            </span>
+                            <span className="text-[11px] text-stone-400">/ 5</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Comments (if provided) */}
+                      {rev.overallComments && (
+                        <div className="p-4 rounded-2xl bg-[#FBFAF7] border border-[#E9E6DF] text-xs text-stone-700 leading-relaxed italic">
+                          "{rev.overallComments}"
+                        </div>
+                      )}
+
+                      {/* Guest Identification (Authorized Staff Restricted) */}
+                      <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500 border-t border-stone-100">
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-stone-700">Guest:</span>
+                          <span>{rev.guestName || 'Anonymous Guest'}</span>
+                          {rev.guestEmail && (
+                            <>
+                              <span className="text-stone-300">•</span>
+                              <span className="text-stone-600">{rev.guestEmail}</span>
+                            </>
+                          )}
+                        </div>
+                        <span className="font-mono text-[10px] text-stone-400">
+                          ID: {rev.id}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>

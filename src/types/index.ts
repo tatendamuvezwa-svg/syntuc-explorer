@@ -262,3 +262,19 @@ export interface AssistantResponse {
   action: AssistantAction | null;
   requiresCoordinator: boolean;
 }
+
+export interface BoatCruiseReview {
+  id: string;
+  projectName: string;
+  experienceName: string;
+  welcomeRating: number;
+  cleanlinessRating: number;
+  drinksRating: number;
+  snacksRating: number;
+  captainInfoRating: number;
+  recommend: 'yes' | 'no';
+  overallComments?: string;
+  guestName?: string;
+  guestEmail?: string;
+  submittedAt: string;
+}
