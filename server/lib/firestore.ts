@@ -141,104 +141,6 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
     { id: 'usr_coord_1', passwordHash: 'syntuc2026!secure', isActive: true, role: 'reservations_coordinator', email: 'reservations@syntuc.com', name: 'Victoria Falls Reservations Desk' },
     { id: 'usr_user_email', email: 'tatenda.muvezwa@gmail.com', name: 'Tatenda Muvezwa', isActive: true, role: 'admin', passwordHash: 'admin2026!' },
   ],
-  packages: [
-    {
-      id: 'pkg_essential_vf',
-      name: 'Victoria Falls Essential Journey',
-      tagline: 'The iconic 4-day introduction to Victoria Falls: rainforest, flight of angels & sunset cruise.',
-      description: 'A seamlessly coordinated 4-day, 3-night holiday combining town accommodation at Shearwater Explorers Village with the three must-do experiences: a guided rainforest walking tour of the Falls, the world-famous 12-minute Flight of Angels helicopter flight, and a pure luxury sunset catamaran cruise on the Zambezi.',
-      durationDays: 4,
-      durationNights: 3,
-      pricePerPerson: '680',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        '3 nights accommodation with daily breakfast',
-        'All 3 signature activities as listed',
-        'Return Victoria Falls International Airport transfers',
-        'Dedicated Syntuc Explorer trip coordination',
-      ],
-      exclusions: [
-        'Rainforest National Park entry fee ($50)',
-        'Helicopter aviation levy ($15)',
-        'River usage fee ($12)',
-      ],
-      highlights: [
-        '3 nights at Shearwater Explorers Village with breakfast',
-        '12-minute Flight of Angels scenic helicopter flight',
-        'Zambezi Explorer luxury sunset cruise with canapés & open bar',
-        'Victoria Falls Rainforest guided walking tour with poncho',
-        'All airport and scheduled activity transfers included',
-      ],
-    },
-    {
-      id: 'pkg_luxury_zambezi',
-      name: 'Zambezi Luxury Safari & River Retreat',
-      tagline: 'All-inclusive 5-star riverfront canvas sanctuary, wildlife safaris & extended gorge helicopter flight.',
-      description: 'Designed for the discerning traveler seeking complete wilderness immersion with unmatched luxury. Stay 3 nights at Old Drift Lodge in Zambezi National Park with private plunge pool, indulge in daily river boat safaris and game drives, fly on the 25-minute extended helicopter flight over Batoka Gorge, and dine suspended over the gorge at The Lookout Café.',
-      durationDays: 4,
-      durationNights: 3,
-      pricePerPerson: '2450',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        'All luxury accommodations, all meals and premium open bar',
-        'All guided safari drives and river cruises inside Zambezi National Park',
-        '25-minute extended helicopter tour',
-        'Executive VIP airport transfers',
-      ],
-      exclusions: [
-        'Park conservation fees ($15/day)',
-        'Helicopter park levy ($15)',
-      ],
-      highlights: [
-        '3 nights all-inclusive luxury at Old Drift Lodge in Zambezi National Park',
-        '25-minute Zambezi Gorge & Falls extended helicopter flight',
-        'Private Zambezi Explorer sunset cruise with gourmet dinner',
-        'The Lookout Café cliffside dining voucher',
-        'Unlimited morning and evening wildlife game drives and river boat safaris',
-      ],
-    },
-    {
-      id: 'pkg_batoka_adventure',
-      name: 'Batoka Adventure & Wilderness Duo',
-      tagline: 'High-adrenaline white-water rafting, Chobe Botswana safari, and panoramic hotel stay.',
-      description: "The definitive adventure package for active travelers. Base yourself for 2 nights at the Victoria Falls Rainbow Hotel overlooking the Falls spray. Conquer the world's greatest Grade 5 rapids on the Zambezi River with full-day rafting, and embark on a full-day cross-border safari to Botswana's Chobe National Park to witness hundreds of elephants along the Chobe River.",
-      durationDays: 3,
-      durationNights: 2,
-      pricePerPerson: '590',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        '2 nights accommodation with breakfast',
-        'Full day white-water rafting with gear and guide',
-        'Full day Chobe safari trip with border transfers and lunch',
-        'Simunye theatre admission',
-      ],
-      exclusions: [
-        'Parks river levy ($10)',
-        'Botswana park fee ($15)',
-      ],
-      highlights: [
-        '2 nights at Victoria Falls Rainbow Hotel with breakfast',
-        'Full-day Grade 5 Batoka Gorge White Water Rafting with gorge buffet lunch',
-        'Full-day Chobe National Park Safari in Botswana (boat safari + 4x4 game drive + lodge buffet)',
-        'Simunye African theatrical evening performance ticket',
-      ],
-    },
-  ],
   properties: [
     {
       id: 'prop_azambezi',
@@ -479,7 +381,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
   const memDoc = memCol.get(id);
 
   if (isBreakerActive()) {
-    if (collectionName === 'products') throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
+    if ((collectionName === 'products' || collectionName === 'packages')) throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
     if (memDoc) return memDoc as T;
     return null;
   }
@@ -499,7 +401,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
     }
-    if (collectionName === 'products') throw err;
+    if ((collectionName === 'products' || collectionName === 'packages')) throw err;
     if (memDoc) return memDoc as T;
     return null;
   }
@@ -511,7 +413,7 @@ export async function setDocById<T extends Record<string, any>>(
   data: T,
   merge: boolean = true
 ): Promise<void> {
-  if (collectionName === 'products' && isBreakerActive()) throw new Error('Cannot write products while Firestore is unavailable; no in-memory-only write was performed.');
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error('Cannot write products while Firestore is unavailable; no in-memory-only write was performed.');
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = merge ? { ...existing, id, ...data } : { id, ...data };
@@ -531,7 +433,7 @@ export async function setDocById<T extends Record<string, any>>(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
-      if (collectionName === 'products') throw err;
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       return;
     }
     throw err;
@@ -548,7 +450,7 @@ export async function updateDocById(
   id: string,
   data: Partial<DocumentData>
 ): Promise<void> {
-  if (collectionName === 'products' && isBreakerActive()) throw new Error('Cannot update products while Firestore is unavailable; no in-memory-only update was performed.');
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error('Cannot update products while Firestore is unavailable; no in-memory-only update was performed.');
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = { ...existing, id, ...data };
@@ -568,7 +470,7 @@ export async function updateDocById(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
-      if (collectionName === 'products') throw err;
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       return;
     }
     throw err;
@@ -576,7 +478,7 @@ export async function updateDocById(
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
-  if (collectionName === 'products' && isBreakerActive()) throw new Error('Cannot delete products while Firestore is unavailable; no in-memory-only deletion was performed.');
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error('Cannot delete products while Firestore is unavailable; no in-memory-only deletion was performed.');
   const memCol = getMemoryCollection(collectionName);
   memCol.delete(id);
   collectionCache.delete(collectionName);
@@ -592,7 +494,7 @@ export async function deleteDocById(collectionName: string, id: string): Promise
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
-      if (collectionName === 'products') throw err;
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       return;
     }
     throw err;
@@ -609,9 +511,9 @@ export async function getCollectionDocs<T = DocumentData>(
 
   // If circuit breaker is active, serve previously read live data only; products have no embedded baseline.
   if (isBreakerActive()) {
-    if (collectionName === 'products') throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
+    if ((collectionName === 'products' || collectionName === 'packages')) throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
     const allDocs = Array.from(memCol.values());
-    if (collectionName === 'products' && allDocs.length === 0) {
+    if ((collectionName === 'products' || collectionName === 'packages') && allDocs.length === 0) {
       throw new Error('Live Firestore products are unavailable while the circuit breaker is active.');
     }
     if (allDocs.length === 0 && BASELINE_COLLECTIONS[collectionName]) {
@@ -652,12 +554,12 @@ export async function getCollectionDocs<T = DocumentData>(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
-      if (collectionName === 'products') throw err;
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       const allDocs = Array.from(memCol.values());
       if (allDocs.length > 0) {
         return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
       }
-      if (collectionName === 'products') {
+      if ((collectionName === 'products' || collectionName === 'packages')) {
         throw err;
       }
       if (BASELINE_COLLECTIONS[collectionName]) {
@@ -670,10 +572,10 @@ export async function getCollectionDocs<T = DocumentData>(
       return [];
     }
 
-    if (collectionName === 'products') {
+    if ((collectionName === 'products' || collectionName === 'packages')) {
       throw err;
     }
-    if (collectionName === 'products') throw err;
+    if ((collectionName === 'products' || collectionName === 'packages')) throw err;
     const allDocs = Array.from(memCol.values());
     return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
   }
