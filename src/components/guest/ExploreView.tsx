@@ -21,6 +21,7 @@ export const ExploreView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'accommodation' | 'activity'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
@@ -34,6 +35,7 @@ export const ExploreView: React.FC = () => {
         const [prodList, catList] = await Promise.all([
           api.getProducts().catch((err) => {
             console.warn('Notice loading products:', err);
+            setCatalogError('The live catalogue is temporarily unavailable. Please try again shortly.');
             return [];
           }),
           api.getCategories().catch((err) => {
@@ -287,7 +289,19 @@ export const ExploreView: React.FC = () => {
         </div>
 
         {/* Product Cards Grid */}
-        {loading ? (
+        {catalogError ? (
+          <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+            <h3 className="text-lg font-semibold text-amber-950">Catalogue temporarily unavailable</h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-amber-900">{catalogError}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-full bg-[#263B30] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#354D40]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1, 2, 3, 4, 5, 6].map(i => (
               <div
