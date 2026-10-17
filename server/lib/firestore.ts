@@ -474,8 +474,8 @@ export async function getCollectionDocs<T = DocumentData>(
     return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
   }
 
-  // If no constraints, check fresh collection cache
-  if (!hasConstraints) {
+  // Do not serve cached catalogue snapshots: products and packages must reflect live Firestore.
+  if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
     const cached = collectionCache.get(collectionName);
     if (cached && now - cached.timestamp < CACHE_TTL_MS) {
       return [...cached.data] as T[];
@@ -488,13 +488,17 @@ export async function getCollectionDocs<T = DocumentData>(
     const q = hasConstraints ? query(cRef, ...constraints) : cRef;
     const snap = await getDocs(q);
     const docs: T[] = [];
+    if (isAuthoritativeCatalogCollection(collectionName) && !hasConstraints) {
+      memCol.clear();
+      collectionCache.delete(collectionName);
+    }
     snap.forEach((d) => {
       const docData = { id: d.id, ...d.data() } as T;
       docs.push(docData);
       memCol.set(d.id, docData);
     });
 
-    if (!hasConstraints) {
+    if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
       collectionCache.set(collectionName, { timestamp: now, data: docs });
     }
 
