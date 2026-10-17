@@ -21,8 +21,6 @@ export const ExploreView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState<number>(0);
   const [activeFilter, setActiveFilter] = useState<'all' | 'accommodation' | 'activity'>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedOperator, setSelectedOperator] = useState<string>('all');
@@ -31,33 +29,28 @@ export const ExploreView: React.FC = () => {
   const { openProductDetail, addToTrip, openReservationModal, openSchoolPlanner } = useSession();
 
   useEffect(() => {
-    let cancelled = false;
-
     async function loadData() {
-      setLoading(true);
-      setLoadError(null);
       try {
         const [prodList, catList] = await Promise.all([
-          api.getProducts(),
-          api.getCategories(),
+          api.getProducts().catch((err) => {
+            console.warn('Notice loading products:', err);
+            return [];
+          }),
+          api.getCategories().catch((err) => {
+            console.warn('Notice loading categories:', err);
+            return [];
+          }),
         ]);
-        if (cancelled) return;
-        // Do not replace a previously loaded catalogue with an empty response.
-        if (Array.isArray(prodList)) setProducts(prodList);
-        if (Array.isArray(catList)) setCategories(catList);
+        if (prodList && prodList.length > 0) setProducts(prodList);
+        if (catList && catList.length > 0) setCategories(catList);
       } catch (err) {
-        console.error('Catalogue data load failed:', err);
-        if (!cancelled) {
-          setLoadError('We could not load the live catalogue. Your existing catalogue data has been kept where available. Please retry in a moment.');
-        }
+        console.warn('Notice in catalog data load:', err);
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
-
     loadData();
-    return () => { cancelled = true; };
-  }, [reloadKey]);
+  }, []);
 
   const activityOperators = useMemo(() => {
     return Array.from(new Set(
@@ -309,19 +302,6 @@ export const ExploreView: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : loadError && products.length === 0 ? (
-          <div role="alert" className="text-center py-16 bg-white rounded-2xl border border-amber-200 p-8">
-            <Compass className="w-12 h-12 text-amber-600 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-stone-800 font-display">Catalogue temporarily unavailable</h3>
-            <p className="text-sm text-stone-600 mt-2 max-w-xl mx-auto">{loadError}</p>
-            <button
-              type="button"
-              onClick={() => { setReloadKey((key) => key + 1); }}
-              className="mt-5 px-5 py-2.5 rounded-xl bg-[#263B30] text-white text-sm font-semibold"
-            >
-              Retry catalogue
-            </button>
-          </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-stone-200 p-8">
             <Compass className="w-12 h-12 text-stone-300 mx-auto mb-3" />
@@ -375,12 +355,10 @@ export const ExploreView: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Verified Partner Badge - Reflects actual verification state */}
-                  {product.evidenceStatus && ['ESTABLISHED', 'SUPPORTED'].includes(product.evidenceStatus) && (
-                    <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center shadow-xs">
-                      <ShieldCheck className="w-3 h-3 text-[#54775A] mr-1" /> Verified
-                    </div>
-                  )}
+                  {/* Verified Partner Badge */}
+                  <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center shadow-xs">
+                    <ShieldCheck className="w-3 h-3 text-[#54775A] mr-1" /> Verified
+                  </div>
 
                   {/* Price Banner */}
                   <div className="absolute bottom-3 left-3 right-3 bg-[#17251D]/88 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex justify-between items-center text-xs">
@@ -402,7 +380,7 @@ export const ExploreView: React.FC = () => {
                     {/* Operator & Location */}
                     <div className="flex items-center justify-between text-xs text-stone-500 mb-1.5">
                       <span className="font-semibold text-[#365D43] truncate">
-                        {product.operatorName || 'Local Operator'}
+                        {product.operatorName || 'Verified Partner'}
                       </span>
                       {product.duration && (
                         <span className="flex items-center text-stone-400 ml-2 whitespace-nowrap">

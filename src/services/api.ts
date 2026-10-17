@@ -15,36 +15,6 @@ import { getAttributionHeaders } from './analytics.ts';
 
 const API_BASE = '/api';
 
-async function readApiJson<T>(res: Response, endpoint: string): Promise<T> {
-  const body = await res.text();
-  try {
-    return JSON.parse(body) as T;
-  } catch {
-    const isHtml = /^\s*(?:<!doctype\s+html|<html\b)/i.test(body);
-    if (isHtml) {
-      const buildMarker = res.headers.get('x-syntuc-api-build') || 'missing';
-      const contentType = res.headers.get('content-type') || 'not provided';
-      const responseUrl = res.url || endpoint;
-      throw new Error(
-        `${endpoint} returned HTML instead of JSON (HTTP ${res.status}). Content-Type: ${contentType}; API build marker: ${buildMarker}; response URL: ${responseUrl}. A missing marker indicates the response likely came from a different frontend/proxy/runtime than this API server.`
-      );
-    }
-    throw new Error(`${endpoint} returned an invalid JSON response (HTTP ${res.status}).`);
-  }
-}
-
-async function getApiErrorMessage(res: Response, fallback: string): Promise<string> {
-  const payload = await res.json().catch(() => ({} as Record<string, unknown>));
-  const message = typeof payload.message === 'string' ? payload.message : '';
-  const code = typeof payload.diagnosticCode === 'string'
-    ? payload.diagnosticCode
-    : typeof payload.error === 'string' ? payload.error : '';
-  const detail = message || code;
-  return detail
-    ? `${fallback}: ${detail} (HTTP ${res.status})`
-    : `${fallback} (HTTP ${res.status})`;
-}
-
 function getSessionHeaders(): Record<string, string> {
   const sessionId = localStorage.getItem('syntuc_guest_session_id') || '';
   const signature = localStorage.getItem('syntuc_guest_signature') || '';
@@ -67,58 +37,20 @@ function getStaffHeaders(): Record<string, string> {
 export const api = {
   // --- Catalog ---
   async getProducts(): Promise<Product[]> {
-    const fallbackOnlyIds = new Set([
-      'prod_pure_africa_sunrise_cruise',
-      'prod_pure_africa_lunch_cruise',
-      'prod_zambezi_explorer_cruise',
-      'prod_pure_africa_dinner_cruise',
-      'prod_pure_africa_classic_dinner_cruise',
-      'prod_pure_africa_eatery_lunch',
-      'prod_pure_africa_eatery_dinner',
-      'prod_pure_africa_eatery_dinner_sunset_combo',
-      'prod_pure_africa_eatery_potjie_sunset_combo',
-    ]);
-    const isLegacyPartialCatalogue = (value: unknown): value is Product[] =>
-      Array.isArray(value) &&
-      value.length > 0 &&
-      value.length <= fallbackOnlyIds.size &&
-      value.every((item) => Boolean(item && typeof item === 'object' && fallbackOnlyIds.has((item as Product).id)));
-
-    let cachedProducts: Product[] | null = null;
-    try {
-      const cached = localStorage.getItem('syntuc_cached_products');
-      if (cached) {
-        const parsed: unknown = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0 && !isLegacyPartialCatalogue(parsed)) {
-          cachedProducts = parsed as Product[];
-        }
-      }
-    } catch (_) {
-      // Ignore malformed cache and request the authoritative catalogue.
-    }
-
     try {
       const res = await fetch(`${API_BASE}/catalog/products`);
-      if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load products'));
-      const data: unknown = await res.json();
-      if (!Array.isArray(data)) throw new Error('The catalogue endpoint returned an invalid response.');
-      if (isLegacyPartialCatalogue(data)) {
-        throw new Error('The server returned a legacy partial catalogue; it was not cached.');
-      }
-      if (data.length === 0 && cachedProducts) {
-        console.warn('Live catalogue returned no products; preserving the existing non-empty cache.');
-        return cachedProducts;
-      }
+      if (!res.ok) throw new Error('Failed to load products');
+      const data = await res.json();
       try {
         localStorage.setItem('syntuc_cached_products', JSON.stringify(data));
       } catch (_) {}
-      return data as Product[];
+      return data;
     } catch (err) {
-      if (cachedProducts) {
-        console.warn('Catalogue request failed; preserving the existing full catalogue cache:', err);
-        return cachedProducts;
-      }
-      console.error('Unable to load the live catalogue and no safe cache is available:', err);
+      console.warn('Notice loading products from server, using catalog cache:', err);
+      try {
+        const cached = localStorage.getItem('syntuc_cached_products');
+        if (cached) return JSON.parse(cached);
+      } catch (_) {}
       return [];
     }
   },
@@ -248,12 +180,8 @@ export const api = {
         id: 'trip_' + sessionId.slice(0, 16),
         guestSessionId: sessionId,
         title: 'My Victoria Falls Journey',
-        startDate: null,
-        endDate: null,
         adultsCount: 2,
         childrenCount: 0,
-        interests: [],
-        intensity: 'MODERATE',
         items: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -435,19 +363,29 @@ export const api = {
   },
 
   async getLeads(): Promise<Lead[]> {
-    const res = await fetch(`${API_BASE}/coordinator/leads`, {
-      headers: getStaffHeaders(),
-    });
-    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load leads'));
-    return readApiJson<Lead[]>(res, '/api/coordinator/leads');
+    try {
+      const res = await fetch(`${API_BASE}/coordinator/leads`, {
+        headers: getStaffHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load leads');
+      return await res.json();
+    } catch (err) {
+      console.warn('Notice loading leads, using fallback:', err);
+      return [];
+    }
   },
 
   async getReservations(): Promise<ReservationRequest[]> {
-    const res = await fetch(`${API_BASE}/coordinator/reservations`, {
-      headers: getStaffHeaders(),
-    });
-    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load reservations'));
-    return readApiJson<ReservationRequest[]>(res, '/api/coordinator/reservations');
+    try {
+      const res = await fetch(`${API_BASE}/coordinator/reservations`, {
+        headers: getStaffHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load reservations');
+      return await res.json();
+    } catch (err) {
+      console.warn('Notice loading reservations, using fallback:', err);
+      return [];
+    }
   },
 
   async getReservationDetail(id: string): Promise<ReservationRequest> {
@@ -502,8 +440,8 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/products`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load coordinator products'));
-    return readApiJson<Product[]>(res, '/api/coordinator/products');
+    if (!res.ok) throw new Error('Failed to load coordinator products');
+    return res.json();
   },
 
   async importOperatorCatalogs(): Promise<any> {
@@ -644,8 +582,8 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/operators`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load operators'));
-    return readApiJson<any[]>(res, '/api/coordinator/operators');
+    if (!res.ok) throw new Error('Failed to load operators');
+    return res.json();
   },
 
   async getStaffUsers(): Promise<any[]> {
@@ -669,16 +607,16 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/properties`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load properties'));
-    return readApiJson<any[]>(res, '/api/coordinator/properties');
+    if (!res.ok) throw new Error('Failed to load properties');
+    return res.json();
   },
 
   async getCoordinatorPackages(): Promise<any[]> {
     const res = await fetch(`${API_BASE}/coordinator/packages`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load coordinator packages'));
-    return readApiJson<any[]>(res, '/api/coordinator/packages');
+    if (!res.ok) throw new Error('Failed to load coordinator packages');
+    return res.json();
   },
 
   async createPackage(data: any): Promise<any> {
@@ -768,11 +706,16 @@ export const api = {
   },
 
   async getKnowledgeSources(): Promise<KnowledgeSource[]> {
-    const res = await fetch(`${API_BASE}/coordinator/knowledge-sources`, {
-      headers: getStaffHeaders(),
-    });
-    if (!res.ok) throw new Error(await getApiErrorMessage(res, 'Failed to load knowledge sources'));
-    return readApiJson<KnowledgeSource[]>(res, '/api/coordinator/knowledge-sources');
+    try {
+      const res = await fetch(`${API_BASE}/coordinator/knowledge-sources`, {
+        headers: getStaffHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to load knowledge sources');
+      return await res.json();
+    } catch (err) {
+      console.warn('Notice loading knowledge sources, using fallback:', err);
+      return [];
+    }
   },
 
   async runR2SecurityTests(): Promise<any> {

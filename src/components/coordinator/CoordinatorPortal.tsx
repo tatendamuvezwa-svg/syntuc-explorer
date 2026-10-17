@@ -39,7 +39,6 @@ import { ProductEditorModal } from './ProductEditorModal.tsx';
 import { PackageEditorModal } from './PackageEditorModal.tsx';
 import { ReservationDetailModal } from './ReservationDetailModal.tsx';
 import { ErrorBoundary } from '../shared/ErrorBoundary.tsx';
-import { FeedbackAdminPage } from '../feedback/FeedbackPages.tsx';
 
 interface CoordinatorPortalProps {
   onBackToExplorer: () => void;
@@ -59,7 +58,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
 
   // Active workbench tab
   const [activeTab, setActiveTab] = useState<
-    'leads' | 'reservations' | 'analytics' | 'products' | 'media' | 'sources' | 'security' | 'staff' | 'feedback'
+    'leads' | 'reservations' | 'analytics' | 'products' | 'media' | 'sources' | 'security' | 'staff'
   >('reservations');
 
   // Operational data
@@ -75,7 +74,6 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [r2Report, setR2Report] = useState<any>(null);
   const [runningR2, setRunningR2] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState<boolean>(false);
-  const [dataLoadError, setDataLoadError] = useState<string | null>(null);
   const [isImportingOperatorCatalog, setIsImportingOperatorCatalog] = useState<boolean>(false);
   const [isOperatorImportConfirmationOpen, setIsOperatorImportConfirmationOpen] = useState<boolean>(false);
   const [catalogItemPendingVerification, setCatalogItemPendingVerification] = useState<{ id: string; isPackage: boolean; name: string } | null>(null);
@@ -152,11 +150,8 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const loadAllData = async (): Promise<boolean> => {
     if (!isAuthenticated) return false;
     setLoadingData(true);
-    setDataLoadError(null);
     try {
-      // Load each desk resource independently. One stale/missing endpoint must not
-      // discard successful products, reservations, leads, or other coordinator data.
-      const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.allSettled([
+      const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes] = await Promise.all([
         api.getLeads(),
         api.getReservations(),
         api.getCoordinatorProducts(),
@@ -166,62 +161,30 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         api.getCategories(),
         api.getKnowledgeSources(),
       ]);
-
-      const failures: string[] = [];
-      const applyResult = <T,>(
-        result: PromiseSettledResult<T>,
-        label: string,
-        setter: (value: T) => void
-      ) => {
-        if (result.status === 'fulfilled') {
-          setter(result.value);
-        } else {
-          const reason = result.reason;
-          const detail = reason instanceof Error ? reason.message : 'request failed';
-          failures.push(`${label}: ${detail}`);
-        }
-      };
-
-      applyResult(leadsRes, 'Leads & touch history', setLeads);
-      applyResult(resRes, 'Reservation requests', setReservations);
-      applyResult(prodRes, 'Catalogue products', setProducts);
-      applyResult(pkgRes, 'Catalogue packages', setPackages);
-      applyResult(opsRes, 'Operators', setOperators);
-      applyResult(propsRes, 'Properties', setProperties);
-      applyResult(catsRes, 'Categories', setCategories);
-      applyResult(srcRes, 'Knowledge sources', setSources);
-
+      setLeads(leadsRes);
+      setReservations(resRes);
+      setProducts(prodRes);
+      setPackages(pkgRes);
+      setOperators(opsRes);
+      setProperties(propsRes);
+      setCategories(catsRes);
+      setSources(srcRes);
       if (staffUser?.role === 'admin') {
         try {
           const usersRes = await api.getStaffUsers();
           setStaffUsers(usersRes);
-        } catch (error) {
-          const detail = error instanceof Error ? error.message : 'request failed';
-          failures.push(`Staff accounts: ${detail}`);
-        }
+        } catch (_) {}
       }
-
-      if (prodRes.status === 'fulfilled' && prodRes.value.length > 0 && !selectedProductForMedia) {
-        setSelectedProductForMedia(prodRes.value[0].id);
+      if (prodRes.length > 0 && !selectedProductForMedia) {
+        setSelectedProductForMedia(prodRes[0].id);
       }
-
-      if (failures.length > 0) {
-        console.error('Coordinator partial data-load failure:', failures);
-        setDataLoadError(
-          `Some live desk data could not be loaded. Successfully loaded sections remain available, and failed sections were not replaced with empty data. ${failures.join(' | ')}. Check the connection and use Retry.`
-        );
-      }
-      // This boolean is used by reservation deletion to report whether the
-      // reservation list itself refreshed, not whether every unrelated tab loaded.
-      return resRes.status === 'fulfilled';
     } catch (e) {
       console.error('Coordinator data fetch error:', e);
-      const detail = e instanceof Error ? e.message : 'The server returned an unknown data-loading error.';
-      setDataLoadError(`Live desk data could not be loaded: ${detail}. Existing data has been retained where available. Check the connection and use Retry.`);
       return false;
     } finally {
       setLoadingData(false);
     }
+    return true;
   };
 
   const handleToggleStaffActive = async (userId: string) => {
@@ -572,17 +535,6 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         </div>
       </div>
 
-      {dataLoadError && (
-        <div role="alert" className="max-w-7xl mx-auto mt-4 px-4 sm:px-6 lg:px-8">
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="text-sm text-amber-950">{dataLoadError}</div>
-            <button type="button" onClick={() => { void loadAllData(); }} disabled={loadingData} className="shrink-0 rounded-lg bg-[#263B30] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              {loadingData ? 'Retrying…' : 'Retry desk data'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Main Workbench Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center space-x-2 border-b border-stone-200 pb-3 overflow-x-auto text-xs font-semibold">
@@ -663,19 +615,6 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
           </button>
           {staffUser?.role === 'admin' && (
             <button
-              onClick={() => setActiveTab('feedback')}
-              className={`px-4 py-2 rounded-xl transition flex items-center ${
-                activeTab === 'feedback'
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'text-stone-600 hover:bg-stone-100'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5 mr-1" />
-              Guest Feedback
-            </button>
-          )}
-          {staffUser?.role === 'admin' && (
-            <button
               onClick={() => setActiveTab('staff')}
               className={`px-4 py-2 rounded-xl transition flex items-center ${
                 activeTab === 'staff'
@@ -688,13 +627,6 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
             </button>
           )}
         </div>
-
-        {/* Tab: Guest Feedback — administrator-only pilot workspace */}
-        {activeTab === 'feedback' && staffUser?.role === 'admin' && (
-          <div className="mt-6">
-            <FeedbackAdminPage onBackToExplorer={onBackToExplorer} />
-          </div>
-        )}
 
         {/* Tab: Analytics */}
         {activeTab === 'analytics' && (

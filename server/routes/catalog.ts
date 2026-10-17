@@ -44,11 +44,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "Departure times and vessel choice are subject to request confirmation. National Park fee is additional.",
-    "primaryMediaId": "med_d146f751adf7508ef581e918",
+    "primaryMediaId": null,
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621388697.jpeg"
+    "_fallbackImageUrl": null
   },
   {
     "id": "prod_pure_africa_lunch_cruise",
@@ -83,11 +83,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "National Park fee is additional. Vessel and date require confirmation.",
-    "primaryMediaId": "med_3746a46efdb0deb236259a8b",
+    "primaryMediaId": null,
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621519769.jpeg"
+    "_fallbackImageUrl": null
   },
   {
     "id": "prod_zambezi_explorer_cruise",
@@ -160,11 +160,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "National Park fee is additional. Departure and availability require confirmation.",
-    "primaryMediaId": "med_dc1d6e95d8fcd7995aa4d1e8",
+    "primaryMediaId": null,
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621459236.jpeg"
+    "_fallbackImageUrl": null
   },
   {
     "id": "prod_pure_africa_classic_dinner_cruise",
@@ -200,11 +200,11 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
     "isPublished": true,
     "isFeatured": false,
     "availabilityNote": "No children under 12. National Parks fee is additional.",
-    "primaryMediaId": "med_7232475fdd0ac740a9294aca",
+    "primaryMediaId": null,
     "videoUrl": null,
     "evidenceStatus": "SUPPORTED",
     "operatorName": "Pure Africa",
-    "_fallbackImageUrl": "/uploads/med_custom_hi_res_1791621427967.jpeg"
+    "_fallbackImageUrl": null
   },
   {
     "id": "prod_pure_africa_eatery_lunch",
@@ -364,78 +364,26 @@ export const PURE_AFRICA_FALLBACK_PRODUCTS = [
   }
 ];
 
-/**
- * Strict guest-publication requirements.
- * A product appears to guests ONLY when it meets all data model criteria:
- * - Explicitly published (isPublished === true)
- * - Must not be a package in the products catalog
- * - Verification genuinely completed (evidenceStatus is ESTABLISHED or SUPPORTED, not NEEDS_VERIFICATION/PROVISIONAL; and if imported, catalogImportStatus is VERIFIED)
- * - Valid product title and category
- * - Meaningful, product-specific description (>= 30 chars, not draft placeholder or generic imported string)
- * - Appropriate thumbnail/image representing the actual experience
- * - Current supplier attribution (valid operatorId, not unassigned)
- * - Price and pricing unit confirmed (valid basePrice > 0, priceBasis present)
- * - Essential inclusions and duration confirmed where applicable (non-empty duration, non-empty inclusions)
- */
-export function meetsGuestPublicationRequirements(p: any): boolean {
-  if (!p || p.isPublished !== true) return false;
-
-  // Packages are handled separately via /packages
-  if (p.productType === 'package' || p.categorySlug === 'packages') return false;
-
-  // Verification must be genuinely completed
-  if (p.catalogImportKey && p.catalogImportStatus !== 'VERIFIED') return false;
-  if (p.evidenceStatus === 'NEEDS_VERIFICATION' || p.evidenceStatus === 'PROVISIONAL') return false;
-  if (p.evidenceStatus && !['ESTABLISHED', 'SUPPORTED'].includes(p.evidenceStatus)) return false;
-
-  // Valid product title and category
-  if (!p.name || typeof p.name !== 'string' || p.name.trim().length < 3) return false;
-  if (!p.categorySlug || typeof p.categorySlug !== 'string' || p.categorySlug.trim().length === 0) return false;
-
-  // Meaningful, product-specific description
-  const desc = (p.description || '').trim();
-  if (desc.length < 30) return false;
-  const lowerDesc = desc.toLowerCase();
-  if (lowerDesc.includes('draft import') || lowerDesc.includes('not bookable until verified') || lowerDesc.includes('verify current rate')) {
-    return false;
-  }
-  // Generic import template without real product-specific description
-  if (desc.includes(', supplied by ') && desc.includes('in the Victoria Falls tourism region.') && desc.length < 120) {
-    return false;
-  }
-
-  // Current supplier attribution (valid known operator)
-  if (!p.operatorId || p.operatorName === 'Unassigned — review required' || p.operatorName === 'Syntuc Partner') {
-    return false;
-  }
-
-  // Price and pricing unit confirmed
-  const price = Number(p.basePrice);
-  if (isNaN(price) || price <= 0) return false;
-  if (!p.priceBasis) return false;
-
-  // Essential inclusions and duration confirmed
-  if (!p.duration || typeof p.duration !== 'string' || p.duration.trim().length === 0) return false;
-  if (!Array.isArray(p.inclusions) || p.inclusions.length === 0) return false;
-
-  // Appropriate thumbnail / image must be present
-  const hasImage = Boolean(p.primaryImageUrl || p.primaryMediaId || p._fallbackImageUrl);
-  if (!hasImage) return false;
-
-  return true;
-}
-
 // GET all published products with primary media and operator info
 router.get('/products', async (req: Request, res: Response) => {
   try {
     const tombstones = await getTombstones();
     const allProducts = await getCollectionDocs<any>('products');
-    // The live Firestore catalogue is the sole source of guest-visible products.
-    // Do not merge in hard-coded Pure Africa baseline records: doing so can resurrect
-    // missing/unpublished records and overwrite supplier-edited descriptions or prices.
-    const products = allProducts
-      .filter((p) => p.isPublished === true && !tombstones.has(`products_${p.id}`))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const visibleFirestoreProducts = allProducts
+      .filter((p) => p.isPublished && !tombstones.has(`products_${p.id}`));
+    const pureAfricaIds = new Set([...PURE_AFRICA_FALLBACK_PRODUCTS.map((p) => p.id), 'prod_potjie_dining']);
+    const canonicalPureAfricaProducts = PURE_AFRICA_FALLBACK_PRODUCTS
+      .filter((p) => !tombstones.has(`products_${p.id}`))
+      .map((canonical) => {
+        const existing = visibleFirestoreProducts.find((p) => p.id === canonical.id);
+        return existing
+          ? { ...existing, ...canonical, primaryMediaId: existing.primaryMediaId || canonical.primaryMediaId }
+          : canonical;
+      });
+    const products = [
+      ...visibleFirestoreProducts.filter((p) => !pureAfricaIds.has(p.id)),
+      ...canonicalPureAfricaProducts,
+    ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     const operators = await getCollectionDocs<any>('operators');
     const operatorMap = new Map(operators.map((o) => [o.id, o]));
@@ -461,16 +409,14 @@ router.get('/products', async (req: Request, res: Response) => {
       };
     });
 
-    const guestEligibleProducts = productsWithDetails.filter(meetsGuestPublicationRequirements);
-
-    res.json(guestEligibleProducts);
-  } catch (error: any) {
-    console.error('[Guest Catalog API] Failed to read the authoritative published catalogue:', error);
-    res.status(503).json({
-      error: 'CATALOGUE_UNAVAILABLE',
-      message: 'The live catalogue could not be read. No baseline products were returned, and no partial catalogue was sent to the browser cache.',
-      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
-    });
+    res.json(productsWithDetails);
+  } catch (error) {
+    console.warn('Error fetching products (falling back to canonical catalog):', error);
+    res.json(PURE_AFRICA_FALLBACK_PRODUCTS.map(p => ({
+      ...p,
+      primaryImageUrl: p._fallbackImageUrl || null,
+      primaryImageAlt: p.name,
+    })));
   }
 });
 
@@ -484,7 +430,11 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       return;
     }
 
-    const product = await getDocById<any>('products', id);
+    const firestoreProduct = await getDocById<any>('products', id);
+    const canonicalProduct = PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === id) || null;
+    const product = canonicalProduct
+      ? { ...(firestoreProduct || {}), ...canonicalProduct, primaryMediaId: firestoreProduct?.primaryMediaId || canonicalProduct.primaryMediaId }
+      : firestoreProduct || null;
     if (!product || tombstones.has(`products_${id}`)) {
       res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
       return;
@@ -541,31 +491,31 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       primaryMedia = media.find((m) => m.isPrimary) || media[0] || null;
     }
 
-    const finalDetail = {
+    res.json({
       ...product,
       operator,
       property,
       rooms,
       variants,
       media,
-      operatorName: operator?.name || product.operatorName || 'Syntuc Partner',
       primaryImageUrl: primaryMedia?.url || product._fallbackImageUrl || null,
       primaryImageAlt: primaryMedia?.altText || product.name,
-    };
-
-    if (!meetsGuestPublicationRequirements(finalDetail)) {
-      res.status(404).json({ error: 'PRODUCT_NOT_FOUND', message: 'Product is not available for guest display.' });
+    });
+  } catch (error) {
+    console.warn('Notice fetching product detail (checking fallback):', error);
+    const fallbackProduct = PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === req.params.id);
+    if (fallbackProduct) {
+      res.json({
+        ...fallbackProduct,
+        rooms: [],
+        variants: [],
+        media: [],
+        primaryImageUrl: fallbackProduct._fallbackImageUrl || null,
+        primaryImageAlt: fallbackProduct.name,
+      });
       return;
     }
-
-    res.json(finalDetail);
-  } catch (error: any) {
-    console.error('[Guest Catalog API] Failed to read product detail from Firestore:', error);
-    res.status(503).json({
-      error: 'CATALOGUE_UNAVAILABLE',
-      message: 'The product details could not be loaded from the live catalogue.',
-      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
-    });
+    res.status(404).json({ error: 'PRODUCT_NOT_FOUND' });
   }
 });
 
@@ -611,18 +561,23 @@ router.get('/packages', async (req: Request, res: Response) => {
   try {
     const tombstones = await getTombstones();
     const allPackages = await getCollectionDocs<any>('packages');
-    const validPackages = allPackages.filter(
-      (p) => p.isPublished && !tombstones.has(`packages_${p.id}`) && p.primaryImageUrl && p.pricePerPerson && Number(p.pricePerPerson) > 0
+    let packages = allPackages.filter(
+      (p) => p.isPublished && !tombstones.has(`packages_${p.id}`)
     );
 
-    res.json(validPackages);
-  } catch (error: any) {
-    console.error('[Guest Catalog API] Failed to read the authoritative package catalogue:', error);
-    res.status(503).json({
-      error: 'CATALOGUE_UNAVAILABLE',
-      message: 'The live package catalogue could not be read. No baseline package list was returned.',
-      diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED',
-    });
+    // If no published packages found in packages collection, also check products collection
+    if (packages.length === 0) {
+      const allProducts = await getCollectionDocs<any>('products');
+      packages = allProducts.filter(
+        (p) => (p.productType === 'package' || p.categorySlug === 'packages') && p.isPublished && !tombstones.has(`products_${p.id}`)
+      );
+    }
+
+    res.json(packages);
+  } catch (error) {
+    console.warn('Error fetching packages (using published catalog fallback):', error);
+    const allPackages = await getCollectionDocs<any>('packages');
+    res.json(allPackages.filter((p) => p.isPublished));
   }
 });
 

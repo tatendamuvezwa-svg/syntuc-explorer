@@ -12,7 +12,6 @@ import schoolTripRoutes from './server/routes/schoolTrips.ts';
 import assistantRoutes from './server/routes/assistant.ts';
 import analyticsRoutes from './server/routes/analytics.ts';
 import marketingRoutes from './server/routes/marketing.ts';
-import feedbackRoutes from './server/routes/feedback.ts';
 import { getFirestoreDb } from './server/lib/firestore.ts';
 
 dotenv.config();
@@ -44,14 +43,6 @@ const isProduction = process.env.NODE_ENV === 'production';
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Stable runtime fingerprint for diagnosing AI Studio frontend/backend version drift.
-// The marker is deliberately non-secret and is attached before any API route executes.
-const API_BUILD_ID = 'coordinator-partial-load-2026-10-16-v1';
-app.use('/api', (_req, res, next) => {
-  res.setHeader('X-Syntuc-Api-Build', API_BUILD_ID);
-  next();
-});
-
 // Serve static uploaded media files from /data/uploads
 const uploadsDir = path.resolve(__dirname, 'data/uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -61,14 +52,12 @@ app.use('/uploads', express.static(uploadsDir));
 
 // System Health & Diagnostics
 app.get('/api/health', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
   res.json({
     status: 'ok',
     product: 'Syntuc Explorer',
     brand: 'SAINTECH',
     database: 'Cloud Firestore (Authoritative Native)',
     version: '3.0.0',
-    apiBuild: API_BUILD_ID,
     timestamp: new Date().toISOString(),
   });
 });
@@ -85,19 +74,6 @@ app.use('/api/school-trips', schoolTripRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/marketing', marketingRoutes);
-app.use('/api/feedback', feedbackRoutes);
-
-// Keep unmatched API requests in the JSON API layer. Without this guard, Vite's SPA
-// fallback can answer an unknown /api/* URL with index.html, causing clients to fail
-// with the misleading "Unexpected token '<'" JSON parsing error.
-app.use('/api', (req, res) => {
-  res.status(404).json({
-    error: 'API_ROUTE_NOT_FOUND',
-    message: 'No API route matched this request.',
-    method: req.method,
-    path: req.originalUrl,
-  });
-});
 
 // Server startup with direct authoritative Cloud Firestore
 async function startServer() {
@@ -107,10 +83,7 @@ async function startServer() {
     if (!fdb) {
       throw new Error('Could not initialize Cloud Firestore connection.');
     }
-    // Verify ADC/IAM and the configured database before serving API traffic.
-    // Admin SDK bypasses Firestore rules, so server identity and API authorization are critical.
-    await fdb.listCollections();
-    console.log('[Syntuc Server] Firebase Admin credentials and Firestore IAM access verified.');
+    console.log('[Syntuc Server] Authoritative Cloud Firestore database active.');
 
     // Setup Vite in development or static dist in production
     if (!isProduction) {
