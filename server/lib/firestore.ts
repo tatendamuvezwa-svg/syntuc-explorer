@@ -115,7 +115,7 @@ function matchesConstraints(item: any, constraints: QueryConstraint[]): boolean 
   return true;
 }
 
-// Comprehensive baseline fallbacks for all collections
+// Baselines for non-product collections only; products must come from live Firestore.
 const BASELINE_COLLECTIONS: Record<string, any[]> = {
   categories: [
     { id: 'cat_lodge', displayOrder: 1, slug: 'lodge-resort', type: 'accommodation', name: 'Riverfront Lodges & Resorts' },
@@ -140,104 +140,6 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
     { id: 'usr_admin_1', name: 'SAINTECH System Admin', passwordHash: 'saintech2026!admin', email: 'admin@saintech.io', role: 'admin', isActive: true },
     { id: 'usr_coord_1', passwordHash: 'syntuc2026!secure', isActive: true, role: 'reservations_coordinator', email: 'reservations@syntuc.com', name: 'Victoria Falls Reservations Desk' },
     { id: 'usr_user_email', email: 'tatenda.muvezwa@gmail.com', name: 'Tatenda Muvezwa', isActive: true, role: 'admin', passwordHash: 'admin2026!' },
-  ],
-  packages: [
-    {
-      id: 'pkg_essential_vf',
-      name: 'Victoria Falls Essential Journey',
-      tagline: 'The iconic 4-day introduction to Victoria Falls: rainforest, flight of angels & sunset cruise.',
-      description: 'A seamlessly coordinated 4-day, 3-night holiday combining town accommodation at Shearwater Explorers Village with the three must-do experiences: a guided rainforest walking tour of the Falls, the world-famous 12-minute Flight of Angels helicopter flight, and a pure luxury sunset catamaran cruise on the Zambezi.',
-      durationDays: 4,
-      durationNights: 3,
-      pricePerPerson: '680',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        '3 nights accommodation with daily breakfast',
-        'All 3 signature activities as listed',
-        'Return Victoria Falls International Airport transfers',
-        'Dedicated Syntuc Explorer trip coordination',
-      ],
-      exclusions: [
-        'Rainforest National Park entry fee ($50)',
-        'Helicopter aviation levy ($15)',
-        'River usage fee ($12)',
-      ],
-      highlights: [
-        '3 nights at Shearwater Explorers Village with breakfast',
-        '12-minute Flight of Angels scenic helicopter flight',
-        'Zambezi Explorer luxury sunset cruise with canapés & open bar',
-        'Victoria Falls Rainforest guided walking tour with poncho',
-        'All airport and scheduled activity transfers included',
-      ],
-    },
-    {
-      id: 'pkg_luxury_zambezi',
-      name: 'Zambezi Luxury Safari & River Retreat',
-      tagline: 'All-inclusive 5-star riverfront canvas sanctuary, wildlife safaris & extended gorge helicopter flight.',
-      description: 'Designed for the discerning traveler seeking complete wilderness immersion with unmatched luxury. Stay 3 nights at Old Drift Lodge in Zambezi National Park with private plunge pool, indulge in daily river boat safaris and game drives, fly on the 25-minute extended helicopter flight over Batoka Gorge, and dine suspended over the gorge at The Lookout Café.',
-      durationDays: 4,
-      durationNights: 3,
-      pricePerPerson: '2450',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        'All luxury accommodations, all meals and premium open bar',
-        'All guided safari drives and river cruises inside Zambezi National Park',
-        '25-minute extended helicopter tour',
-        'Executive VIP airport transfers',
-      ],
-      exclusions: [
-        'Park conservation fees ($15/day)',
-        'Helicopter park levy ($15)',
-      ],
-      highlights: [
-        '3 nights all-inclusive luxury at Old Drift Lodge in Zambezi National Park',
-        '25-minute Zambezi Gorge & Falls extended helicopter flight',
-        'Private Zambezi Explorer sunset cruise with gourmet dinner',
-        'The Lookout Café cliffside dining voucher',
-        'Unlimited morning and evening wildlife game drives and river boat safaris',
-      ],
-    },
-    {
-      id: 'pkg_batoka_adventure',
-      name: 'Batoka Adventure & Wilderness Duo',
-      tagline: 'High-adrenaline white-water rafting, Chobe Botswana safari, and panoramic hotel stay.',
-      description: "The definitive adventure package for active travelers. Base yourself for 2 nights at the Victoria Falls Rainbow Hotel overlooking the Falls spray. Conquer the world's greatest Grade 5 rapids on the Zambezi River with full-day rafting, and embark on a full-day cross-border safari to Botswana's Chobe National Park to witness hundreds of elephants along the Chobe River.",
-      durationDays: 3,
-      durationNights: 2,
-      pricePerPerson: '590',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      categorySlug: 'packages',
-      productType: 'package',
-      isPublished: true,
-      primaryImageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80',
-      inclusions: [
-        '2 nights accommodation with breakfast',
-        'Full day white-water rafting with gear and guide',
-        'Full day Chobe safari trip with border transfers and lunch',
-        'Simunye theatre admission',
-      ],
-      exclusions: [
-        'Parks river levy ($10)',
-        'Botswana park fee ($15)',
-      ],
-      highlights: [
-        '2 nights at Victoria Falls Rainbow Hotel with breakfast',
-        'Full-day Grade 5 Batoka Gorge White Water Rafting with gorge buffet lunch',
-        'Full-day Chobe National Park Safari in Botswana (boat safari + 4x4 game drive + lodge buffet)',
-        'Simunye African theatrical evening performance ticket',
-      ],
-    },
   ],
   properties: [
     {
@@ -418,226 +320,6 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
   guests: [],
   trip_plans: [],
   trip_items: [],
-  products: [
-    {
-      id: 'prod_rainforest_walk',
-      name: 'Victoria Falls Rainforest Guided Walking Tour',
-      productType: 'activity',
-      categorySlug: 'guided-tours',
-      basePrice: '35.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '2.5 Hours',
-      shortDescription: 'Comprehensive guided exploration along the Zimbabwe edge of the Falls.',
-    },
-    {
-      id: 'prod_flight_of_angels',
-      name: 'Flight of Angels — Scenic Helicopter Tour',
-      productType: 'activity',
-      categorySlug: 'flight-air',
-      basePrice: '150.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '12–13 Minutes',
-      shortDescription: 'The classic 12–13 minute scenic helicopter flight directly over the Falls.',
-    },
-    {
-      id: 'prod_zambezi_extended_flight',
-      name: 'Zambezi Gorge & Falls Extended Flight',
-      productType: 'activity',
-      categorySlug: 'flight-air',
-      basePrice: '284.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '25 Minutes',
-      shortDescription: 'The comprehensive 25-minute scenic helicopter flight over the Falls and deep Batoka Gorge.',
-    },
-    {
-      id: 'prod_white_water_rafting',
-      name: 'Batoka Gorge White Water Rafting',
-      productType: 'activity',
-      categorySlug: 'adventure-wildlife',
-      basePrice: '120.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: 'Full Day',
-      shortDescription: 'World-renowned grade 5 rafting through the turbulent rapids of the Batoka Gorge.',
-    },
-    {
-      id: 'prod_bridge_adventures',
-      name: 'Victoria Falls Historic Bridge Adventures',
-      productType: 'activity',
-      categorySlug: 'guided-tours',
-      basePrice: '137.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '2 Hours',
-      shortDescription: 'Walk the cat-walks underneath the 1905 Victoria Falls Bridge.',
-    },
-    {
-      id: 'prod_chobe_safari',
-      name: 'Chobe National Park Day Safari',
-      productType: 'activity',
-      categorySlug: 'adventure-wildlife',
-      basePrice: '170.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      duration: 'Full Day',
-      shortDescription: 'Full-day safari to Botswana including Chobe River boat cruise and 4x4 game drive.',
-    },
-    {
-      id: 'prod_boma_dinner',
-      name: 'The Boma — Dinner & Drum Show',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '60.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_rtg',
-      duration: '3 Hours',
-      shortDescription: 'Legendary African feast, traditional dancing and interactive drumming.',
-    },
-    {
-      id: 'prod_simunye_theatre',
-      name: 'Simunye — We Are One: Theatrical Experience',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '50.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '1.5 Hours',
-      shortDescription: 'An immersive theatrical production in Victoria Falls.',
-    },
-    {
-      id: 'prod_zambezi_game_drive',
-      name: 'Zambezi National Park Safari Game Drive',
-      productType: 'activity',
-      categorySlug: 'adventure-wildlife',
-      basePrice: '75.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      duration: '3 Hours',
-      shortDescription: 'Morning or afternoon wildlife drive along the Zambezi River.',
-    },
-    {
-      id: 'prod_lookout_cafe',
-      name: 'The Lookout Café — Gorge Dining Experience',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '55.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      duration: '2 Hours',
-      shortDescription: 'Perched 120m above the turbulent rapids of the Batoka Gorge.',
-    },
-    {
-      id: 'prod_zambezi_explorer_cruise',
-      name: 'Zambezi Explorer Luxury Sunset Cruise',
-      productType: 'activity',
-      categorySlug: 'river-cruises',
-      basePrice: '69.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_pure_africa',
-      primaryMediaId: 'med_2db2d6add31909b4f3d0adcf',
-      duration: '2 Hours',
-      shortDescription: 'Luxury sunset catamaran cruise on the Zambezi River.',
-    },
-    {
-      id: 'prod_potjie_dining',
-      name: 'The Eatery Waterfront Potjie Dining',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '45.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_pure_africa',
-      primaryMediaId: 'med_c586325b4fea5fe25236ca20',
-      duration: '3 Hours',
-      shortDescription: 'Three-course traditional potjie dining at The Eatery Waterfront.',
-    },
-    {
-      id: 'prod_rainbow',
-      name: 'Victoria Falls Rainbow Hotel',
-      productType: 'accommodation',
-      categorySlug: 'hotel',
-      basePrice: '160.00',
-      currency: 'USD',
-      priceBasis: 'per_room_night',
-      isPublished: true,
-      operatorId: 'op_rtg',
-      propertyId: 'prop_rainbow',
-    },
-    {
-      id: 'prod_azambezi',
-      name: "A'Zambezi River Lodge",
-      productType: 'accommodation',
-      categorySlug: 'lodge-resort',
-      basePrice: '175.00',
-      currency: 'USD',
-      priceBasis: 'per_room_night',
-      isPublished: true,
-      operatorId: 'op_cresta',
-      propertyId: 'prop_azambezi',
-    },
-    {
-      id: 'prod_explorers',
-      name: 'Shearwater Explorers Village',
-      productType: 'accommodation',
-      categorySlug: 'lodge-resort',
-      basePrice: '176.00',
-      currency: 'USD',
-      priceBasis: 'per_single_room_night',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      propertyId: 'prop_explorers',
-    },
-    {
-      id: 'prod_olddrift',
-      name: 'Old Drift Lodge',
-      productType: 'accommodation',
-      categorySlug: 'safari-camp',
-      basePrice: '835.00',
-      currency: 'USD',
-      priceBasis: 'per_person_sharing_night',
-      isPublished: true,
-      operatorId: 'op_machaba',
-      propertyId: 'prop_olddrift',
-    },
-    {
-      id: 'prod_elephantcamp',
-      name: 'The Elephant Camp',
-      productType: 'accommodation',
-      categorySlug: 'safari-camp',
-      basePrice: '890.00',
-      currency: 'USD',
-      priceBasis: 'per_person_sharing_night',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      propertyId: 'prop_elephantcamp',
-    },
-  ],
 };
 
 // Seed baseline entries into memory store
@@ -699,6 +381,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
   const memDoc = memCol.get(id);
 
   if (isBreakerActive()) {
+    if ((collectionName === 'products' || collectionName === 'packages')) throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
     if (memDoc) return memDoc as T;
     return null;
   }
@@ -708,6 +391,10 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     const ref = doc(fdb, collectionName, id);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
+      if (collectionName === 'products' || collectionName === 'packages') {
+        memCol.delete(id);
+        return null;
+      }
       if (memDoc) return memDoc as T;
       return null;
     }
@@ -718,6 +405,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
     }
+    if ((collectionName === 'products' || collectionName === 'packages')) throw err;
     if (memDoc) return memDoc as T;
     return null;
   }
@@ -729,6 +417,7 @@ export async function setDocById<T extends Record<string, any>>(
   data: T,
   merge: boolean = true
 ): Promise<void> {
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error(`Cannot write ${collectionName} while Firestore is unavailable; no in-memory-only write was performed.`);
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = merge ? { ...existing, id, ...data } : { id, ...data };
@@ -748,6 +437,7 @@ export async function setDocById<T extends Record<string, any>>(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       return;
     }
     throw err;
@@ -764,6 +454,7 @@ export async function updateDocById(
   id: string,
   data: Partial<DocumentData>
 ): Promise<void> {
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error(`Cannot update ${collectionName} while Firestore is unavailable; no in-memory-only update was performed.`);
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = { ...existing, id, ...data };
@@ -783,6 +474,7 @@ export async function updateDocById(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       return;
     }
     throw err;
@@ -790,6 +482,7 @@ export async function updateDocById(
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
+  if ((collectionName === 'products' || collectionName === 'packages') && isBreakerActive()) throw new Error(`Cannot delete ${collectionName} while Firestore is unavailable; no in-memory-only deletion was performed.`);
   const memCol = getMemoryCollection(collectionName);
   memCol.delete(id);
   collectionCache.delete(collectionName);
@@ -805,6 +498,7 @@ export async function deleteDocById(collectionName: string, id: string): Promise
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       return;
     }
     throw err;
@@ -819,9 +513,13 @@ export async function getCollectionDocs<T = DocumentData>(
   const now = Date.now();
   const memCol = getMemoryCollection(collectionName);
 
-  // If circuit breaker is active, directly serve from memory/baseline without hitting network
+  // If circuit breaker is active, serve previously read live data only; products have no embedded baseline.
   if (isBreakerActive()) {
+    if ((collectionName === 'products' || collectionName === 'packages')) throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
     const allDocs = Array.from(memCol.values());
+    if ((collectionName === 'products' || collectionName === 'packages') && allDocs.length === 0) {
+      throw new Error('Live Firestore products are unavailable while the circuit breaker is active.');
+    }
     if (allDocs.length === 0 && BASELINE_COLLECTIONS[collectionName]) {
       const baselines = BASELINE_COLLECTIONS[collectionName];
       for (const b of baselines) {
@@ -860,9 +558,13 @@ export async function getCollectionDocs<T = DocumentData>(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if ((collectionName === 'products' || collectionName === 'packages')) throw err;
       const allDocs = Array.from(memCol.values());
       if (allDocs.length > 0) {
         return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
+      }
+      if ((collectionName === 'products' || collectionName === 'packages')) {
+        throw err;
       }
       if (BASELINE_COLLECTIONS[collectionName]) {
         const baselines = BASELINE_COLLECTIONS[collectionName];
@@ -874,6 +576,10 @@ export async function getCollectionDocs<T = DocumentData>(
       return [];
     }
 
+    if ((collectionName === 'products' || collectionName === 'packages')) {
+      throw err;
+    }
+    if ((collectionName === 'products' || collectionName === 'packages')) throw err;
     const allDocs = Array.from(memCol.values());
     return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
   }
