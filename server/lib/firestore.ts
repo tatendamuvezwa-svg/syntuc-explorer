@@ -115,7 +115,7 @@ function matchesConstraints(item: any, constraints: QueryConstraint[]): boolean 
   return true;
 }
 
-// Comprehensive baseline fallbacks for all collections
+// Baselines for non-product collections only; products must come from live Firestore.
 const BASELINE_COLLECTIONS: Record<string, any[]> = {
   categories: [
     { id: 'cat_lodge', displayOrder: 1, slug: 'lodge-resort', type: 'accommodation', name: 'Riverfront Lodges & Resorts' },
@@ -418,226 +418,6 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
   guests: [],
   trip_plans: [],
   trip_items: [],
-  products: [
-    {
-      id: 'prod_rainforest_walk',
-      name: 'Victoria Falls Rainforest Guided Walking Tour',
-      productType: 'activity',
-      categorySlug: 'guided-tours',
-      basePrice: '35.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '2.5 Hours',
-      shortDescription: 'Comprehensive guided exploration along the Zimbabwe edge of the Falls.',
-    },
-    {
-      id: 'prod_flight_of_angels',
-      name: 'Flight of Angels — Scenic Helicopter Tour',
-      productType: 'activity',
-      categorySlug: 'flight-air',
-      basePrice: '150.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '12–13 Minutes',
-      shortDescription: 'The classic 12–13 minute scenic helicopter flight directly over the Falls.',
-    },
-    {
-      id: 'prod_zambezi_extended_flight',
-      name: 'Zambezi Gorge & Falls Extended Flight',
-      productType: 'activity',
-      categorySlug: 'flight-air',
-      basePrice: '284.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '25 Minutes',
-      shortDescription: 'The comprehensive 25-minute scenic helicopter flight over the Falls and deep Batoka Gorge.',
-    },
-    {
-      id: 'prod_white_water_rafting',
-      name: 'Batoka Gorge White Water Rafting',
-      productType: 'activity',
-      categorySlug: 'adventure-wildlife',
-      basePrice: '120.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: 'Full Day',
-      shortDescription: 'World-renowned grade 5 rafting through the turbulent rapids of the Batoka Gorge.',
-    },
-    {
-      id: 'prod_bridge_adventures',
-      name: 'Victoria Falls Historic Bridge Adventures',
-      productType: 'activity',
-      categorySlug: 'guided-tours',
-      basePrice: '137.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '2 Hours',
-      shortDescription: 'Walk the cat-walks underneath the 1905 Victoria Falls Bridge.',
-    },
-    {
-      id: 'prod_chobe_safari',
-      name: 'Chobe National Park Day Safari',
-      productType: 'activity',
-      categorySlug: 'adventure-wildlife',
-      basePrice: '170.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      duration: 'Full Day',
-      shortDescription: 'Full-day safari to Botswana including Chobe River boat cruise and 4x4 game drive.',
-    },
-    {
-      id: 'prod_boma_dinner',
-      name: 'The Boma — Dinner & Drum Show',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '60.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_rtg',
-      duration: '3 Hours',
-      shortDescription: 'Legendary African feast, traditional dancing and interactive drumming.',
-    },
-    {
-      id: 'prod_simunye_theatre',
-      name: 'Simunye — We Are One: Theatrical Experience',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '50.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      duration: '1.5 Hours',
-      shortDescription: 'An immersive theatrical production in Victoria Falls.',
-    },
-    {
-      id: 'prod_zambezi_game_drive',
-      name: 'Zambezi National Park Safari Game Drive',
-      productType: 'activity',
-      categorySlug: 'adventure-wildlife',
-      basePrice: '75.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      duration: '3 Hours',
-      shortDescription: 'Morning or afternoon wildlife drive along the Zambezi River.',
-    },
-    {
-      id: 'prod_lookout_cafe',
-      name: 'The Lookout Café — Gorge Dining Experience',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '55.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      duration: '2 Hours',
-      shortDescription: 'Perched 120m above the turbulent rapids of the Batoka Gorge.',
-    },
-    {
-      id: 'prod_zambezi_explorer_cruise',
-      name: 'Zambezi Explorer Luxury Sunset Cruise',
-      productType: 'activity',
-      categorySlug: 'river-cruises',
-      basePrice: '69.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_pure_africa',
-      primaryMediaId: 'med_2db2d6add31909b4f3d0adcf',
-      duration: '2 Hours',
-      shortDescription: 'Luxury sunset catamaran cruise on the Zambezi River.',
-    },
-    {
-      id: 'prod_potjie_dining',
-      name: 'The Eatery Waterfront Potjie Dining',
-      productType: 'activity',
-      categorySlug: 'dining-culinary',
-      basePrice: '45.00',
-      currency: 'USD',
-      priceBasis: 'per_person',
-      isPublished: true,
-      operatorId: 'op_pure_africa',
-      primaryMediaId: 'med_c586325b4fea5fe25236ca20',
-      duration: '3 Hours',
-      shortDescription: 'Three-course traditional potjie dining at The Eatery Waterfront.',
-    },
-    {
-      id: 'prod_rainbow',
-      name: 'Victoria Falls Rainbow Hotel',
-      productType: 'accommodation',
-      categorySlug: 'hotel',
-      basePrice: '160.00',
-      currency: 'USD',
-      priceBasis: 'per_room_night',
-      isPublished: true,
-      operatorId: 'op_rtg',
-      propertyId: 'prop_rainbow',
-    },
-    {
-      id: 'prod_azambezi',
-      name: "A'Zambezi River Lodge",
-      productType: 'accommodation',
-      categorySlug: 'lodge-resort',
-      basePrice: '175.00',
-      currency: 'USD',
-      priceBasis: 'per_room_night',
-      isPublished: true,
-      operatorId: 'op_cresta',
-      propertyId: 'prop_azambezi',
-    },
-    {
-      id: 'prod_explorers',
-      name: 'Shearwater Explorers Village',
-      productType: 'accommodation',
-      categorySlug: 'lodge-resort',
-      basePrice: '176.00',
-      currency: 'USD',
-      priceBasis: 'per_single_room_night',
-      isPublished: true,
-      operatorId: 'op_shearwater',
-      propertyId: 'prop_explorers',
-    },
-    {
-      id: 'prod_olddrift',
-      name: 'Old Drift Lodge',
-      productType: 'accommodation',
-      categorySlug: 'safari-camp',
-      basePrice: '835.00',
-      currency: 'USD',
-      priceBasis: 'per_person_sharing_night',
-      isPublished: true,
-      operatorId: 'op_machaba',
-      propertyId: 'prop_olddrift',
-    },
-    {
-      id: 'prod_elephantcamp',
-      name: 'The Elephant Camp',
-      productType: 'accommodation',
-      categorySlug: 'safari-camp',
-      basePrice: '890.00',
-      currency: 'USD',
-      priceBasis: 'per_person_sharing_night',
-      isPublished: true,
-      operatorId: 'op_wildhorizons',
-      propertyId: 'prop_elephantcamp',
-    },
-  ],
 };
 
 // Seed baseline entries into memory store
@@ -819,9 +599,12 @@ export async function getCollectionDocs<T = DocumentData>(
   const now = Date.now();
   const memCol = getMemoryCollection(collectionName);
 
-  // If circuit breaker is active, directly serve from memory/baseline without hitting network
+  // If circuit breaker is active, serve previously read live data only; products have no embedded baseline.
   if (isBreakerActive()) {
     const allDocs = Array.from(memCol.values());
+    if (collectionName === 'products' && allDocs.length === 0) {
+      throw new Error('Live Firestore products are unavailable while the circuit breaker is active.');
+    }
     if (allDocs.length === 0 && BASELINE_COLLECTIONS[collectionName]) {
       const baselines = BASELINE_COLLECTIONS[collectionName];
       for (const b of baselines) {
@@ -864,6 +647,9 @@ export async function getCollectionDocs<T = DocumentData>(
       if (allDocs.length > 0) {
         return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
       }
+      if (collectionName === 'products') {
+        throw err;
+      }
       if (BASELINE_COLLECTIONS[collectionName]) {
         const baselines = BASELINE_COLLECTIONS[collectionName];
         for (const b of baselines) {
@@ -874,6 +660,9 @@ export async function getCollectionDocs<T = DocumentData>(
       return [];
     }
 
+    if (collectionName === 'products') {
+      throw err;
+    }
     const allDocs = Array.from(memCol.values());
     return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
   }
