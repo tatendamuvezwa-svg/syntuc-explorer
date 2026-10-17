@@ -731,9 +731,12 @@ router.get('/products', requireCoordinatorAuth, async (req: AuthenticatedStaffRe
     });
 
     res.json(enriched);
-  } catch (error) {
-    console.warn('Notice fetching coordinator products (using fallback):', error);
-    res.json(PURE_AFRICA_FALLBACK_PRODUCTS);
+  } catch (error: any) {
+    console.error('Failed to load coordinator products from Firestore:', error);
+    res.status(503).json({
+      error: 'CATALOGUE_UNAVAILABLE',
+      message: 'The live product catalogue could not be read. No fallback catalogue was substituted.',
+    });
   }
 });
 
