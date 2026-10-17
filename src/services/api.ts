@@ -376,16 +376,18 @@ export const api = {
   },
 
   async getReservations(): Promise<ReservationRequest[]> {
-    try {
-      const res = await fetch(`${API_BASE}/coordinator/reservations`, {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error('Failed to load reservations');
-      return await res.json();
-    } catch (err) {
-      console.warn('Notice loading reservations, using fallback:', err);
-      return [];
+    const res = await fetch(`${API_BASE}/coordinator/reservations`, {
+      headers: getStaffHeaders(),
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload.message || payload.error || 'Failed to load reservations');
     }
+    const data: unknown = await res.json();
+    if (!Array.isArray(data)) {
+      throw new Error('Reservation endpoint returned an invalid response.');
+    }
+    return data as ReservationRequest[];
   },
 
   async getReservationDetail(id: string): Promise<ReservationRequest> {
