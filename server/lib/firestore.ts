@@ -479,6 +479,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
   const memDoc = memCol.get(id);
 
   if (isBreakerActive()) {
+    if (collectionName === 'products') throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
     if (memDoc) return memDoc as T;
     return null;
   }
@@ -498,6 +499,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
     }
+    if (collectionName === 'products') throw err;
     if (memDoc) return memDoc as T;
     return null;
   }
@@ -509,6 +511,7 @@ export async function setDocById<T extends Record<string, any>>(
   data: T,
   merge: boolean = true
 ): Promise<void> {
+  if (collectionName === 'products' && isBreakerActive()) throw new Error('Cannot write products while Firestore is unavailable; no in-memory-only write was performed.');
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = merge ? { ...existing, id, ...data } : { id, ...data };
@@ -528,6 +531,7 @@ export async function setDocById<T extends Record<string, any>>(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if (collectionName === 'products') throw err;
       return;
     }
     throw err;
@@ -544,6 +548,7 @@ export async function updateDocById(
   id: string,
   data: Partial<DocumentData>
 ): Promise<void> {
+  if (collectionName === 'products' && isBreakerActive()) throw new Error('Cannot update products while Firestore is unavailable; no in-memory-only update was performed.');
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   const merged = { ...existing, id, ...data };
@@ -563,6 +568,7 @@ export async function updateDocById(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if (collectionName === 'products') throw err;
       return;
     }
     throw err;
@@ -570,6 +576,7 @@ export async function updateDocById(
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
+  if (collectionName === 'products' && isBreakerActive()) throw new Error('Cannot delete products while Firestore is unavailable; no in-memory-only deletion was performed.');
   const memCol = getMemoryCollection(collectionName);
   memCol.delete(id);
   collectionCache.delete(collectionName);
@@ -585,6 +592,7 @@ export async function deleteDocById(collectionName: string, id: string): Promise
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if (collectionName === 'products') throw err;
       return;
     }
     throw err;
@@ -601,6 +609,7 @@ export async function getCollectionDocs<T = DocumentData>(
 
   // If circuit breaker is active, serve previously read live data only; products have no embedded baseline.
   if (isBreakerActive()) {
+    if (collectionName === 'products') throw new Error('Authoritative products collection unavailable; fallback data is disabled.');
     const allDocs = Array.from(memCol.values());
     if (collectionName === 'products' && allDocs.length === 0) {
       throw new Error('Live Firestore products are unavailable while the circuit breaker is active.');
@@ -643,6 +652,7 @@ export async function getCollectionDocs<T = DocumentData>(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
+      if (collectionName === 'products') throw err;
       const allDocs = Array.from(memCol.values());
       if (allDocs.length > 0) {
         return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
@@ -663,6 +673,7 @@ export async function getCollectionDocs<T = DocumentData>(
     if (collectionName === 'products') {
       throw err;
     }
+    if (collectionName === 'products') throw err;
     const allDocs = Array.from(memCol.values());
     return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
   }
