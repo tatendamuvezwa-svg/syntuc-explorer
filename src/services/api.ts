@@ -164,8 +164,12 @@ export const api = {
         id: 'trip_' + sessionId.slice(0, 16),
         guestSessionId: sessionId,
         title: 'My Victoria Falls Journey',
+        startDate: null,
+        endDate: null,
         adultsCount: 2,
         childrenCount: 0,
+        interests: [],
+        intensity: 'MODERATE',
         items: [],
       };
     }
