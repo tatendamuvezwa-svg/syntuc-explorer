@@ -1,5 +1,4 @@
 import { getDocById, getCollectionDocs } from '../lib/firestore.ts';
-import { PURE_AFRICA_FALLBACK_PRODUCTS } from '../routes/catalog.ts';
 import {
   calculateNights,
   isValidDateString,
@@ -119,7 +118,7 @@ export async function calculateAuthoritativePricing(
   const productMap = new Map<string, any>();
   for (const item of itemsInput) {
     if (!productMap.has(item.productId)) {
-      const prod = await getDocById<any>('products', item.productId) || PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === item.productId);
+      const prod = await getDocById<any>('products', item.productId);
       if (prod) {
         productMap.set(item.productId, prod);
       }
