@@ -771,6 +771,8 @@ export const api = {
     overallComments?: string;
     guestName?: string;
     guestEmail?: string;
+    productId?: string;
+    productName?: string;
   }): Promise<{ success: boolean; id: string; message: string; submittedAt: string }> {
     const res = await fetch(`${API_BASE}/reviews`, {
       method: 'POST',

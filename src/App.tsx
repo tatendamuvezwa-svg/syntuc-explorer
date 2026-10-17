@@ -38,7 +38,7 @@ function MainAppContent() {
     if (path === '/coordinator') {
       return { path: '/coordinator' };
     }
-    if (path === '/feedback') {
+    if (path.startsWith('/feedback')) {
       return { path: '/feedback' };
     }
     return { path: '/' };
@@ -53,7 +53,7 @@ function MainAppContent() {
         setCurrentRoute({ path: '/guest/reservation', guestToken: token });
       } else if (path === '/coordinator') {
         setCurrentRoute({ path: '/coordinator' });
-      } else if (path === '/feedback') {
+      } else if (path.startsWith('/feedback')) {
         setCurrentRoute({ path: '/feedback' });
       } else {
         setCurrentRoute({ path: '/' });
@@ -70,8 +70,8 @@ function MainAppContent() {
     } else if (path === '/coordinator') {
       window.history.pushState({}, '', '/coordinator');
       setCurrentRoute({ path: '/coordinator' });
-    } else if (path === '/feedback') {
-      window.history.pushState({}, '', '/feedback');
+    } else if (path.startsWith('/feedback')) {
+      window.history.pushState({}, '', path);
       setCurrentRoute({ path: '/feedback' });
     } else {
       window.history.pushState({}, '', '/');
@@ -113,7 +113,15 @@ function MainAppContent() {
           <FeedbackView onBackToExplore={() => navigateTo('/')} />
         ) : (
           <>
-            {activeTab === 'packages' ? <PackagesView /> : <ExploreView />}
+            {activeTab === 'packages' ? (
+              <PackagesView />
+            ) : (
+              <ExploreView
+                onOpenFeedback={(productId) =>
+                  navigateTo(productId ? `/feedback?product=${encodeURIComponent(productId)}` : '/feedback')
+                }
+              />
+            )}
             {/* Digital Guide Chat Widget */}
             <SyntucAssistantWidget />
           </>

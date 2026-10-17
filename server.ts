@@ -14,6 +14,7 @@ import analyticsRoutes from './server/routes/analytics.ts';
 import marketingRoutes from './server/routes/marketing.ts';
 import reviewsRoutes from './server/routes/reviews.ts';
 import { getFirestoreDb } from './server/lib/firestore.ts';
+import { ensureHeritageCruiseProduct } from './server/services/seedHeritageCruise.ts';
 
 dotenv.config();
 
@@ -86,6 +87,9 @@ async function startServer() {
       throw new Error('Could not initialize Cloud Firestore connection.');
     }
     console.log('[Syntuc Server] Authoritative Cloud Firestore database active.');
+
+    // Ensure Heritage Standard Sunset Cruise product exists in live catalogue
+    await ensureHeritageCruiseProduct();
 
     // Setup Vite in development or static dist in production
     if (!isProduction) {

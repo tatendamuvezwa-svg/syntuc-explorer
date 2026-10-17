@@ -265,6 +265,8 @@ export interface AssistantResponse {
 
 export interface BoatCruiseReview {
   id: string;
+  productId?: string;
+  productName?: string;
   projectName: string;
   experienceName: string;
   welcomeRating: number;

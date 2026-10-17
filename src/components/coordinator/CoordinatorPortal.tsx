@@ -1732,10 +1732,17 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                             <Ship className="w-4 h-4" />
                           </div>
                           <div>
-                            <span className="text-xs font-bold text-stone-900 block">
-                              {rev.experienceName || 'Heritage Expedition Sunset Cruise'}
-                            </span>
-                            <span className="text-[11px] text-stone-500">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-stone-900">
+                                {rev.productName || rev.experienceName || 'Heritage Standard Sunset Cruise'}
+                              </span>
+                              {rev.productId && (
+                                <span className="inline-block text-[10px] font-mono font-medium text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                  {rev.productId}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-stone-500 block">
                               Submitted {new Date(rev.submittedAt).toLocaleString(undefined, {
                                 year: 'numeric',
                                 month: 'short',

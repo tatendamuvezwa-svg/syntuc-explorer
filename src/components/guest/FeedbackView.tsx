@@ -14,6 +14,8 @@ import { api } from '../../services/api.ts';
 
 interface FeedbackViewProps {
   onBackToExplore?: () => void;
+  productId?: string;
+  productName?: string;
 }
 
 interface RatingQuestion {
@@ -58,7 +60,20 @@ const RATING_VALUES = [
   { value: 5, label: '5 - Excellent' },
 ];
 
-export const FeedbackView: React.FC<FeedbackViewProps> = ({ onBackToExplore }) => {
+export const FeedbackView: React.FC<FeedbackViewProps> = ({
+  onBackToExplore,
+  productId,
+  productName,
+}) => {
+  // Resolve product identifier from props or URL search params
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const targetProductId = productId || searchParams?.get('product') || 'heritage-standard-sunset-cruise';
+  const targetProductName = productName || searchParams?.get('productName') || (
+    targetProductId === 'heritage-standard-sunset-cruise'
+      ? 'Heritage Standard Sunset Cruise'
+      : 'Heritage Expedition Sunset Cruise'
+  );
+
   const [ratings, setRatings] = useState<Record<string, number | null>>({
     welcome: null,
     cleanliness: null,
@@ -114,6 +129,8 @@ export const FeedbackView: React.FC<FeedbackViewProps> = ({ onBackToExplore }) =
         overallComments: overallComments.trim() || undefined,
         guestName: guestName.trim() || undefined,
         guestEmail: guestEmail.trim() || undefined,
+        productId: targetProductId,
+        productName: targetProductName,
       });
 
       // Show success screen only after backend confirms persistence
@@ -152,14 +169,17 @@ export const FeedbackView: React.FC<FeedbackViewProps> = ({ onBackToExplore }) =
             <CheckCircle2 className="w-9 h-9" />
           </div>
 
-          <span className="inline-block text-xs uppercase tracking-wider font-semibold text-[#8B6A3E] mb-2">
+          <span className="inline-block text-xs uppercase tracking-wider font-semibold text-[#8B6A3E] mb-1">
             Heritage Expedition Boat Cruise Review
           </span>
+          <div className="text-xs font-semibold text-[#20372B] bg-[#EBF3EA] px-3 py-1 rounded-full inline-block mb-3 border border-[#D8E3D5]">
+            {targetProductName}
+          </div>
           <h2 className="text-2xl sm:text-3xl font-serif text-[#20372B] mb-3">
             Thank You for Your Feedback
           </h2>
           <p className="text-sm sm:text-base text-[#4A5D50] leading-relaxed mb-8">
-            Your review has been saved to our guest register. Thank you for sharing your experience on the Zambezi River with us.
+            Your review for <strong className="text-[#20372B]">{targetProductName}</strong> has been saved to our guest register. Thank you for sharing your experience on the Zambezi River with us.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -202,13 +222,22 @@ export const FeedbackView: React.FC<FeedbackViewProps> = ({ onBackToExplore }) =
 
         {/* Page Header */}
         <header className="bg-white rounded-3xl border border-[#D8E3D5] p-6 sm:p-8 mb-6 shadow-[0_8px_24px_rgba(38,59,48,0.04)]">
-          <div className="flex items-center gap-3 text-[#8B6A3E] text-xs font-semibold uppercase tracking-wider mb-2">
-            <Ship className="w-4 h-4" />
-            <span>Guest Experience Review</span>
+          <div className="flex items-center justify-between gap-3 text-[#8B6A3E] text-xs font-semibold uppercase tracking-wider mb-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Ship className="w-4 h-4" />
+              <span>Guest Experience Review</span>
+            </div>
+            <span className="text-[11px] font-mono font-medium text-[#4A5D50] bg-[#FAF8F5] px-2 py-0.5 rounded border border-[#E8E4DA]">
+              {targetProductId}
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-serif text-[#20372B] mb-2">
             Heritage Expedition Boat Cruise Review
           </h1>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#EBF3EA] text-[#2C5234] border border-[#D8E3D5] mb-3">
+            <Ship className="w-3.5 h-3.5" />
+            <span>Reviewing: {targetProductName}</span>
+          </div>
           <p className="text-sm text-[#4A5D50] leading-relaxed">
             Please take a moment to share your feedback from your voyage on the Zambezi River. Your ratings help our crew deliver an exceptional safari experience.
           </p>

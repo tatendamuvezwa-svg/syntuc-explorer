@@ -21,6 +21,8 @@ router.post('/', async (req: Request, res: Response) => {
       overallComments,
       guestName,
       guestEmail,
+      productId,
+      productName,
     } = req.body;
 
     const errors: string[] = [];
@@ -64,14 +66,27 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
+    // Resolve stable product identifier
+    const resolvedProductId = typeof productId === 'string' && productId.trim() !== ''
+      ? productId.trim().slice(0, 100)
+      : 'heritage-standard-sunset-cruise';
+
+    const resolvedProductName = typeof productName === 'string' && productName.trim() !== ''
+      ? productName.trim().slice(0, 150)
+      : resolvedProductId === 'heritage-standard-sunset-cruise'
+        ? 'Heritage Standard Sunset Cruise'
+        : 'Heritage Expedition Sunset Cruise';
+
     // Build trusted, server-authoritative review record
     const reviewId = 'rev_cruise_' + crypto.randomBytes(12).toString('hex');
     const nowIso = new Date().toISOString();
 
     const reviewRecord = {
       id: reviewId,
+      productId: resolvedProductId,
+      productName: resolvedProductName,
       projectName: 'Heritage Expedition Boat Cruise Review',
-      experienceName: 'Heritage Expedition Sunset Cruise',
+      experienceName: resolvedProductName,
       welcomeRating,
       cleanlinessRating,
       drinksRating,
@@ -91,6 +106,8 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(201).json({
       success: true,
       id: reviewId,
+      productId: resolvedProductId,
+      productName: resolvedProductName,
       message: 'Review successfully saved.',
       submittedAt: nowIso,
     });

@@ -15,9 +15,14 @@ import {
   Plus,
   ArrowRight,
   ShieldCheck,
+  Ship,
 } from 'lucide-react';
 
-export const ExploreView: React.FC = () => {
+interface ExploreViewProps {
+  onOpenFeedback?: (productId?: string) => void;
+}
+
+export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenFeedback }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -80,6 +85,16 @@ export const ExploreView: React.FC = () => {
       return true;
     });
   }, [products, activeFilter, selectedCategory, selectedOperator, searchQuery]);
+
+  const handleReviewCruise = (productId: string) => {
+    if (onOpenFeedback) {
+      onOpenFeedback(productId);
+    } else {
+      window.history.pushState({}, '', `/feedback?product=${encodeURIComponent(productId)}`);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FAF8F5]">
@@ -325,133 +340,203 @@ export const ExploreView: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredProducts.map(product => (
-              <div
-                key={product.id}
-                className="group bg-white rounded-2xl border border-[#E8E5DE] hover:border-[#C9D6C7] overflow-hidden shadow-[0_4px_24px_rgba(38,59,48,0.035)] hover:shadow-[0_16px_44px_rgba(38,59,48,0.09)] transition-all duration-300 flex flex-col justify-between"
-              >
-                {/* Image & Badges */}
+            {filteredProducts.map((product) => {
+              const isHeritageCruise = product.id === 'heritage-standard-sunset-cruise';
+              const breakdown = (product as any).pricingBreakdown;
+
+              return (
                 <div
-                  className="relative h-56 w-full overflow-hidden bg-stone-100 cursor-pointer"
-                  onClick={() => openProductDetail(product.id)}
+                  key={product.id}
+                  className="group bg-white rounded-2xl border border-[#E8E5DE] hover:border-[#C9D6C7] overflow-hidden shadow-[0_4px_24px_rgba(38,59,48,0.035)] hover:shadow-[0_16px_44px_rgba(38,59,48,0.09)] transition-all duration-300 flex flex-col justify-between"
                 >
-                  <img
-                    src={product.primaryImageUrl || 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=800&q=80'}
-                    alt={product.primaryImageAlt || product.name}
-                    className="w-full h-full object-cover group-hover:scale-[1.025] transition-transform duration-500"
-                    loading="lazy"
-                  />
+                  {/* Image & Badges */}
+                  <div
+                    className="relative h-56 w-full overflow-hidden bg-stone-100 cursor-pointer"
+                    onClick={() => openProductDetail(product.id)}
+                  >
+                    <img
+                      src={product.primaryImageUrl || 'https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=800&q=80'}
+                      alt={product.primaryImageAlt || product.name}
+                      className="w-full h-full object-cover group-hover:scale-[1.025] transition-transform duration-500"
+                      loading="lazy"
+                    />
 
-                  {/* Product Type Tag */}
-                  <div className="absolute top-3 left-3 flex items-center space-x-1.5">
-                    <span
-                      className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg backdrop-blur-md shadow-xs ${
-                        product.productType === 'accommodation'
-                          ? 'bg-[#20372B]/90 text-[#E2BE8C] border border-white/15'
-                          : 'bg-[#20372B]/90 text-[#D6E2D1] border border-white/15'
-                      }`}
-                    >
-                      {product.productType === 'accommodation' ? 'Lodge & Hotel' : 'Activity & Tour'}
-                    </span>
-                  </div>
-
-                  {/* Verified Partner Badge */}
-                  <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center shadow-xs">
-                    <ShieldCheck className="w-3 h-3 text-[#54775A] mr-1" /> Verified
-                  </div>
-
-                  {/* Price Banner */}
-                  <div className="absolute bottom-3 left-3 right-3 bg-[#17251D]/88 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex justify-between items-center text-xs">
-                    <div className="flex items-baseline space-x-1">
-                      <span className="text-[10px] text-stone-300 font-medium">Starting from</span>
-                      <span className="text-base font-bold text-[#E2BE8C]">
-                        US${product.basePrice}
+                    {/* Product Type Tag */}
+                    <div className="absolute top-3 left-3 flex items-center space-x-1.5">
+                      <span
+                        className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg backdrop-blur-md shadow-xs ${
+                          product.productType === 'accommodation'
+                            ? 'bg-[#20372B]/90 text-[#E2BE8C] border border-white/15'
+                            : 'bg-[#20372B]/90 text-[#D6E2D1] border border-white/15'
+                        }`}
+                      >
+                        {product.productType === 'accommodation' ? 'Lodge & Hotel' : 'Activity & Tour'}
                       </span>
                     </div>
-                    <span className="text-[11px] text-stone-300">
-                      {product.priceBasis === 'per_room_night' ? 'per room / night' : 'per person'}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Card Content */}
-                <div className="p-5 flex-1 flex flex-col justify-between">
-                  <div>
-                    {/* Operator & Location */}
-                    <div className="flex items-center justify-between text-xs text-stone-500 mb-1.5">
-                      <span className="font-semibold text-[#365D43] truncate">
-                        {product.operatorName || 'Verified Partner'}
-                      </span>
-                      {product.duration && (
-                        <span className="flex items-center text-stone-400 ml-2 whitespace-nowrap">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {product.duration}
+                    {/* Verified Partner Badge */}
+                    <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs text-stone-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center shadow-xs">
+                      <ShieldCheck className="w-3 h-3 text-[#54775A] mr-1" /> Verified
+                    </div>
+
+                    {/* Price Banner */}
+                    <div className="absolute bottom-3 left-3 right-3 bg-[#17251D]/88 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex justify-between items-center text-xs">
+                      <div className="flex items-baseline space-x-1">
+                        <span className="text-[10px] text-stone-300 font-medium">
+                          {isHeritageCruise ? 'Cruise Price' : 'Starting from'}
                         </span>
+                        <span className="text-base font-bold text-[#E2BE8C]">
+                          US${product.basePrice}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-stone-300">
+                        {product.priceBasis === 'per_room_night' ? 'per room / night' : 'per person'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Content */}
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      {/* Operator & Location */}
+                      <div className="flex items-center justify-between text-xs text-stone-500 mb-1.5">
+                        <span className="font-semibold text-[#365D43] truncate">
+                          {product.operatorName || 'Verified Partner'}
+                        </span>
+                        {product.duration && (
+                          <span className="flex items-center text-stone-400 ml-2 whitespace-nowrap">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {product.duration}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title */}
+                      <h3
+                        onClick={() => openProductDetail(product.id)}
+                        className="text-xl font-medium tracking-[-0.02em] text-[#263B30] group-hover:text-[#54775A] transition font-display line-clamp-1 cursor-pointer"
+                      >
+                        {product.name}
+                      </h3>
+
+                      {/* Short Description */}
+                      <p className="mt-2 text-xs text-stone-600 line-clamp-2 leading-relaxed">
+                        {product.shortDescription}
+                      </p>
+
+                      {/* Dedicated Cruise Price & Park Fees breakdown for Heritage Standard Sunset Cruise */}
+                      {(isHeritageCruise || breakdown) && (
+                        <div className="mt-3.5 p-3 rounded-xl bg-[#FAF8F5] border border-[#E8E4DA] text-xs space-y-2">
+                          <div className="flex items-center justify-between text-stone-700">
+                            <span className="font-semibold">Cruise Price:</span>
+                            <span className="font-bold text-[#20372B]">
+                              US${breakdown?.cruisePrice ?? product.basePrice} per person
+                            </span>
+                          </div>
+
+                          <div className="space-y-1 pt-1.5 border-t border-[#E8E4DA]/80 text-[11px]">
+                            <div className="flex items-center justify-between text-stone-600">
+                              <span>Park fee — international guests:</span>
+                              <span className="font-semibold text-stone-800">
+                                US${breakdown?.parkFeeInternational ?? 12} per person
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-stone-600">
+                              <span>Park fee — local guests:</span>
+                              <span className="font-semibold text-stone-800">
+                                US${breakdown?.parkFeeLocal ?? 6} per person
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-[#E8E4DA] space-y-1">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-[#8B6A3E] block">
+                              Indicative Totals (Includes Cruise + Applicable Park Fee):
+                            </span>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-stone-700 font-medium">International guests:</span>
+                              <span className="font-bold text-[#20372B] font-display">
+                                US${breakdown?.totalInternational ?? 64} per person
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-stone-700 font-medium">Local guests:</span>
+                              <span className="font-bold text-[#20372B] font-display">
+                                US${breakdown?.totalLocal ?? 58} per person
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Key inclusions chips */}
+                      {!isHeritageCruise && !breakdown && product.inclusions && product.inclusions.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {product.inclusions.slice(0, 2).map((inc, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center text-[10px] text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 text-[#54775A] mr-1 shrink-0" />
+                              <span className="truncate max-w-[140px]">{inc}</span>
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
 
-                    {/* Title */}
-                    <h3
-                      onClick={() => openProductDetail(product.id)}
-                      className="text-xl font-medium tracking-[-0.02em] text-[#263B30] group-hover:text-[#54775A] transition font-display line-clamp-1 cursor-pointer"
-                    >
-                      {product.name}
-                    </h3>
+                    {/* Actions */}
+                    <div className="mt-5 pt-4 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openProductDetail(product.id)}
+                        className="px-3 py-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 transition flex items-center cursor-pointer"
+                        title="View Experience Details"
+                      >
+                        <span>View Experience</span>
+                        <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                      </button>
 
-                    {/* Short Description */}
-                    <p className="mt-2 text-xs text-stone-600 line-clamp-2 leading-relaxed">
-                      {product.shortDescription}
-                    </p>
-
-                    {/* Key inclusions chips */}
-                    {product.inclusions && product.inclusions.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {product.inclusions.slice(0, 2).map((inc, i) => (
-                          <span
-                            key={i}
-                            className="inline-flex items-center text-[10px] text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md"
+                      <div className="flex items-center space-x-1.5 flex-wrap">
+                        {/* Visible "Review This Cruise" Action */}
+                        {(isHeritageCruise || product.categorySlug === 'river-cruises') && (
+                          <button
+                            type="button"
+                            onClick={() => handleReviewCruise(product.id)}
+                            className="px-2.5 py-1.5 text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg transition flex items-center cursor-pointer shadow-2xs"
+                            title="Submit a guest review for this cruise"
                           >
-                            <CheckCircle2 className="w-2.5 h-2.5 text-[#54775A] mr-1 shrink-0" />
-                            <span className="truncate max-w-[140px]">{inc}</span>
-                          </span>
-                        ))}
+                            <Ship className="w-3 h-3 mr-1 text-amber-700" />
+                            <span>Review This Cruise</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => addToTrip({ productId: product.id })}
+                          className="px-2.5 py-1.5 text-xs font-semibold bg-[#F0F1EC] hover:bg-[#E5E9E1] text-[#263B30] rounded-lg transition flex items-center cursor-pointer"
+                          title="Add to My Trip"
+                        >
+                          <Plus className="w-3 h-3 mr-0.5 text-amber-700" />
+                          <span>Add</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addToTrip({ productId: product.id });
+                            openReservationModal();
+                          }}
+                          className="px-3 py-1.5 text-xs font-semibold bg-[#263B30] hover:bg-[#34513F] text-white rounded-lg shadow-xs transition cursor-pointer"
+                        >
+                          Reserve
+                        </button>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="mt-5 pt-4 border-t border-stone-100 flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => openProductDetail(product.id)}
-                      className="px-3 py-1.5 text-xs font-semibold text-stone-700 hover:text-stone-900 transition flex items-center cursor-pointer"
-                    >
-                      <span>Details</span>
-                      <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-                    </button>
-
-                    <div className="flex items-center space-x-1.5">
-                      <button
-                        onClick={() => addToTrip({ productId: product.id })}
-                        className="px-3 py-1.5 text-xs font-semibold bg-[#F0F1EC] hover:bg-[#E5E9E1] text-[#263B30] rounded-full transition flex items-center cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3 mr-1 text-amber-700" />
-                        <span>Add to Trip</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          addToTrip({ productId: product.id });
-                          openReservationModal();
-                        }}
-                        className="px-3.5 py-1.5 text-xs font-semibold bg-[#263B30] hover:bg-[#34513F] text-white rounded-lg shadow-xs transition cursor-pointer"
-                      >
-                        Reserve
-                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

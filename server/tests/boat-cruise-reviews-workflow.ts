@@ -100,7 +100,49 @@ async function runTests() {
   assert.ok(reloaded, 'Review must remain available after reload');
   console.log('✓ Review remains available after reload');
 
-  console.log('\nAll Boat Cruise Reviews workflow checks PASSED successfully!');
+  // 7. Heritage Standard Sunset Cruise product catalogue verification
+  const cruiseProduct = await getDocById<any>('products', 'heritage-standard-sunset-cruise');
+  assert.ok(cruiseProduct, 'Heritage Standard Sunset Cruise must exist in authoritative products collection');
+  assert.equal(cruiseProduct.id, 'heritage-standard-sunset-cruise');
+  assert.equal(cruiseProduct.name, 'Heritage Standard Sunset Cruise');
+  assert.equal(cruiseProduct.categorySlug, 'river-cruises');
+  assert.equal(Number(cruiseProduct.basePrice), 52);
+  assert.equal(cruiseProduct.pricingBreakdown?.cruisePrice, 52);
+  assert.equal(cruiseProduct.pricingBreakdown?.parkFeeInternational, 12);
+  assert.equal(cruiseProduct.pricingBreakdown?.parkFeeLocal, 6);
+  assert.equal(cruiseProduct.pricingBreakdown?.totalInternational, 64);
+  assert.equal(cruiseProduct.pricingBreakdown?.totalLocal, 58);
+  console.log('✓ Heritage Standard Sunset Cruise catalogue product verified (US$52 cruise, US$12/US$6 park fees, US$64/US$58 totals)');
+
+  // 8. Associate review with stable product identifier "heritage-standard-sunset-cruise"
+  const cruiseReviewId = 'rev_heritage_cruise_' + Date.now().toString(36);
+  const attributedReview = {
+    id: cruiseReviewId,
+    productId: 'heritage-standard-sunset-cruise',
+    productName: 'Heritage Standard Sunset Cruise',
+    projectName: 'Heritage Expedition Boat Cruise Review',
+    experienceName: 'Heritage Standard Sunset Cruise',
+    welcomeRating: 5,
+    cleanlinessRating: 5,
+    drinksRating: 4,
+    snacksRating: 5,
+    captainInfoRating: 5,
+    recommend: 'yes' as const,
+    overallComments: 'Captivating Zambezi sunset with gracious hospitality.',
+    guestName: 'James Sterling',
+    guestEmail: 'james.sterling@example.com',
+    submittedAt: nowIso,
+    createdAt: nowIso,
+  };
+  await setDocById('boat_cruise_reviews', cruiseReviewId, attributedReview, false);
+
+  const readCruiseReview = await getDocById<any>('boat_cruise_reviews', cruiseReviewId);
+  assert.ok(readCruiseReview, 'Attributed cruise review must be persisted');
+  assert.equal(readCruiseReview.productId, 'heritage-standard-sunset-cruise');
+  assert.equal(readCruiseReview.productName, 'Heritage Standard Sunset Cruise');
+  console.log('✓ Review successfully attributed to stable identifier heritage-standard-sunset-cruise');
+
+  console.log('\nAll Boat Cruise Reviews workflow & Heritage Cruise integration checks PASSED successfully!');
   process.exit(0);
 }
 

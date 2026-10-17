@@ -16,6 +16,7 @@ import {
   Calendar,
   Play,
   Layers,
+  Ship,
 } from 'lucide-react';
 import { Room, MediaAsset } from '../../types/index.ts';
 
@@ -289,6 +290,51 @@ export const ProductDetailModal: React.FC = () => {
               <p>{product.description}</p>
             </div>
 
+            {/* Dedicated Pricing Breakdown for Heritage Standard Sunset Cruise */}
+            {(product.id === 'heritage-standard-sunset-cruise' || product.pricingBreakdown) && (
+              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#E8E4DA] text-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-[#E8E4DA]">
+                  <span className="font-bold text-stone-800 text-sm">Cruise Price:</span>
+                  <span className="font-extrabold text-[#20372B] text-base font-display">
+                    US${product.pricingBreakdown?.cruisePrice ?? 52} per person
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-stone-700">
+                  <div className="flex items-center justify-between">
+                    <span>Park fee — international guests:</span>
+                    <span className="font-bold text-stone-900">
+                      US${product.pricingBreakdown?.parkFeeInternational ?? 12} per person
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Park fee — local guests:</span>
+                    <span className="font-bold text-stone-900">
+                      US${product.pricingBreakdown?.parkFeeLocal ?? 6} per person
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2.5 border-t border-[#E8E4DA] space-y-1.5">
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-[#8B6A3E] block">
+                    Indicative Totals (Includes Cruise Price and Applicable Park Fee):
+                  </span>
+                  <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-[#E8E4DA]">
+                    <span className="font-medium text-stone-800">International guests:</span>
+                    <span className="font-bold text-[#20372B] font-display text-sm">
+                      US${product.pricingBreakdown?.totalInternational ?? 64} per person
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-[#E8E4DA]">
+                    <span className="font-medium text-stone-800">Local guests:</span>
+                    <span className="font-bold text-[#20372B] font-display text-sm">
+                      US${product.pricingBreakdown?.totalLocal ?? 58} per person
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Tariff Variants Section */}
             {product.variants && product.variants.length > 0 && (
               <div className="space-y-3 pt-4 border-t border-stone-200">
@@ -529,7 +575,24 @@ export const ProductDetailModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2.5 flex-wrap">
+                {(product.id === 'heritage-standard-sunset-cruise' || product.categorySlug === 'river-cruises') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeProductDetail();
+                      window.history.pushState({}, '', `/feedback?product=${encodeURIComponent(product.id)}`);
+                      window.dispatchEvent(new PopStateEvent('popstate'));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold text-xs transition flex items-center cursor-pointer shadow-2xs"
+                    title="Review this boat cruise"
+                  >
+                    <Ship className="w-3.5 h-3.5 mr-1.5 text-amber-700" />
+                    <span>Review This Cruise</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => handleAddAndClose(false)}
                   className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold text-xs transition flex items-center cursor-pointer"
