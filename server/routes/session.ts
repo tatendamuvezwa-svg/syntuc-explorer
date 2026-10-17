@@ -15,7 +15,6 @@ import {
   where,
 } from '../lib/firestore.ts';
 import { resolveAuthoritativeVariant } from '../services/variantCatalog.ts';
-import { PURE_AFRICA_FALLBACK_PRODUCTS } from './catalog.ts';
 
 const router = Router();
 
@@ -125,9 +124,7 @@ router.get('/trip', requireGuestSession, async (req: GuestSessionRequest, res: R
 
     // Enrich with product and room details
     const products = await getCollectionDocs<any>('products');
-    const firestoreIds = new Set(products.map((p) => p.id));
-    const allProducts = [...products, ...PURE_AFRICA_FALLBACK_PRODUCTS.filter((p) => !firestoreIds.has(p.id))];
-    const productMap = new Map(allProducts.map((p) => [p.id, p]));
+    const productMap = new Map(products.map((p) => [p.id, p]));
 
     const rooms = await getCollectionDocs<any>('rooms');
     const roomMap = new Map(rooms.map((r) => [r.id, r]));
@@ -232,7 +229,7 @@ router.post('/trip/items', requireGuestSession, async (req: GuestSessionRequest,
     }
 
     // Verify product exists in Firestore
-    const product = await getDocById<any>('products', productId) || PURE_AFRICA_FALLBACK_PRODUCTS.find((p) => p.id === productId);
+    const product = await getDocById<any>('products', productId);
     if (!product) {
       res.status(404).json({
         error: 'PRODUCT_NOT_FOUND',

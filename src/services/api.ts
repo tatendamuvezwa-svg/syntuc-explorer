@@ -37,22 +37,14 @@ function getStaffHeaders(): Record<string, string> {
 export const api = {
   // --- Catalog ---
   async getProducts(): Promise<Product[]> {
-    try {
-      const res = await fetch(`${API_BASE}/catalog/products`);
-      if (!res.ok) throw new Error('Failed to load products');
-      const data = await res.json();
-      try {
-        localStorage.setItem('syntuc_cached_products', JSON.stringify(data));
-      } catch (_) {}
-      return data;
-    } catch (err) {
-      console.warn('Notice loading products from server, using catalog cache:', err);
-      try {
-        const cached = localStorage.getItem('syntuc_cached_products');
-        if (cached) return JSON.parse(cached);
-      } catch (_) {}
-      return [];
+    const res = await fetch(`${API_BASE}/catalog/products`);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload.message || payload.error || 'Failed to load the live product catalogue');
     }
+    const data: unknown = await res.json();
+    if (!Array.isArray(data)) throw new Error('The live product catalogue returned an invalid response.');
+    return data as Product[];
   },
 
   async getProductDetail(id: string): Promise<any> {
@@ -107,22 +99,14 @@ export const api = {
   },
 
   async getPackages(): Promise<Package[]> {
-    try {
-      const res = await fetch(`${API_BASE}/catalog/packages`);
-      if (!res.ok) throw new Error('Failed to load packages');
-      const data = await res.json();
-      try {
-        localStorage.setItem('syntuc_cached_packages', JSON.stringify(data));
-      } catch (_) {}
-      return data;
-    } catch (err) {
-      console.warn('Notice loading packages, using published package cache:', err);
-      try {
-        const cached = localStorage.getItem('syntuc_cached_packages');
-        if (cached) return JSON.parse(cached);
-      } catch (_) {}
-      return [];
+    const res = await fetch(`${API_BASE}/catalog/packages`);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload.message || payload.error || 'Failed to load the live package catalogue');
     }
+    const data: unknown = await res.json();
+    if (!Array.isArray(data)) throw new Error('The live package catalogue returned an invalid response.');
+    return data as Package[];
   },
 
   // --- Guest Session & Trip Plan ---
@@ -180,11 +164,13 @@ export const api = {
         id: 'trip_' + sessionId.slice(0, 16),
         guestSessionId: sessionId,
         title: 'My Victoria Falls Journey',
+        startDate: null,
+        endDate: null,
         adultsCount: 2,
         childrenCount: 0,
+        interests: [],
+        intensity: 'MODERATE',
         items: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
     }
   },

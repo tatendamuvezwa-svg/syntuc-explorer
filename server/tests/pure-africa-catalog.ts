@@ -1,35 +1,25 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PURE_AFRICA_FALLBACK_PRODUCTS } from '../routes/catalog.ts';
 import { CONFIRMED_PRODUCT_VARIANTS } from '../services/variantCatalog.ts';
 
-const products = PURE_AFRICA_FALLBACK_PRODUCTS;
-const byId = new Map<string, any>(products.map((product: any) => [product.id, product] as [string, any]));
+// Public and reservation-facing product records must come from Firestore, not
+// from a hard-coded Pure Africa fallback list.
+for (const file of [
+  'server/routes/catalog.ts',
+  'server/routes/coordinator.ts',
+  'server/routes/session.ts',
+  'server/services/pricing.ts',
+]) {
+  const source = fs.readFileSync(path.resolve(process.cwd(), file), 'utf8');
+  assert.ok(
+    !source.includes('PURE_AFRICA_FALLBACK_PRODUCTS'),
+    `Unexpected embedded product fallback remains in ${file}`,
+  );
+}
 
-const requiredIds = [
-  'prod_pure_africa_sunrise_cruise',
-  'prod_pure_africa_lunch_cruise',
-  'prod_zambezi_explorer_cruise',
-  'prod_pure_africa_dinner_cruise',
-  'prod_pure_africa_classic_dinner_cruise',
-  'prod_pure_africa_eatery_lunch',
-  'prod_pure_africa_eatery_dinner',
-  'prod_pure_africa_eatery_dinner_sunset_combo',
-  'prod_pure_africa_eatery_potjie_sunset_combo',
-];
-
-assert.equal(products.length, 9, 'All nine parent catalogue records should be present');
-for (const id of requiredIds) assert.ok(byId.has(id), `Missing catalogue product: ${id}`);
-
-assert.equal(Number(byId.get('prod_pure_africa_sunrise_cruise')?.basePrice), 92);
-assert.equal(Number(byId.get('prod_pure_africa_lunch_cruise')?.basePrice), 92);
-assert.equal(Number(byId.get('prod_zambezi_explorer_cruise')?.basePrice), 69);
-assert.equal(Number(byId.get('prod_pure_africa_dinner_cruise')?.basePrice), 110);
-assert.equal(Number(byId.get('prod_pure_africa_classic_dinner_cruise')?.basePrice), 185);
-assert.equal(Number(byId.get('prod_pure_africa_eatery_lunch')?.basePrice), 43);
-assert.equal(Number(byId.get('prod_pure_africa_eatery_dinner')?.basePrice), 49);
-
+// Keep the independent, confirmed variant rules while removing the parent
+// product fallback. Parent products must exist in the authoritative catalogue.
 const expectedVariantGroups: Record<string, number> = {
   prod_pure_africa_sunrise_cruise: 2,
   prod_pure_africa_lunch_cruise: 2,
@@ -63,17 +53,11 @@ for (const productId of [
   }
 }
 
-const assets = [
+for (const asset of [
   'data/uploads/med_2db2d6add31909b4f3d0adcf.jpeg',
   'data/uploads/med_c586325b4fea5fe25236ca20.jpeg',
-];
-for (const asset of assets) {
+]) {
   assert.ok(fs.existsSync(path.resolve(process.cwd(), asset)), `Missing referenced image asset: ${asset}`);
 }
 
-assert.equal(byId.get('prod_pure_africa_classic_dinner_cruise')?.minimumAgeYears, 12);
-assert.match(String(byId.get('prod_pure_africa_classic_dinner_cruise')?.minimumAge), /No children under 12/);
-assert.match(String(byId.get('prod_pure_africa_eatery_dinner_sunset_combo')?.schedule), /Summer 16:30/);
-assert.match(String(byId.get('prod_pure_africa_eatery_potjie_sunset_combo')?.description), /three-course Potjie dinner/i);
-
-console.log('Pure Africa catalogue checks passed: 9 parent products, official variants, fee rules, age restriction, schedules, and committed image assets.');
+console.log('Catalogue source checks passed: no embedded Pure Africa product fallback; confirmed variant and fee rules retained.');
