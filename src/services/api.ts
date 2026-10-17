@@ -167,8 +167,6 @@ export const api = {
         adultsCount: 2,
         childrenCount: 0,
         items: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
     }
   },
