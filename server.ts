@@ -14,6 +14,7 @@ import analyticsRoutes from './server/routes/analytics.ts';
 import marketingRoutes from './server/routes/marketing.ts';
 import reviewsRoutes from './server/routes/reviews.ts';
 import { getFirestoreDb, getFirebaseConfig } from './server/lib/firestore.ts';
+import { selectedDatabaseContext } from './server/middleware/databaseSelection.ts';
 import { ensureHeritageCruiseProduct } from './server/services/seedHeritageCruise.ts';
 
 dotenv.config();
@@ -83,8 +84,8 @@ app.use('/api/catalog', catalogRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/reservation', reservationRoutes);
-app.use('/api/coordinator', coordinatorRoutes);
-app.use('/api/media', mediaRoutes);
+app.use('/api/coordinator', selectedDatabaseContext, coordinatorRoutes);
+app.use('/api/media', selectedDatabaseContext, mediaRoutes);
 app.use('/api/school-trips', schoolTripRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/analytics', analyticsRoutes);
