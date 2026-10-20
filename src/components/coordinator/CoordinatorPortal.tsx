@@ -58,6 +58,12 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [emailInput, setEmailInput] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const PRIMARY_DATABASE_ID = 'ai-studio-syntucexplorer-60065304-e43e-44fe-88e1-2ee33d74fe10';
+  const ALTERNATE_DATABASE_ID = 'ai-studio-syntucexplorer-8297878a-a0e6-49a9-aecf-fcb4bb4e0a46';
+  const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>(() => {
+    try { return localStorage.getItem('syntuc_admin_database_id') || PRIMARY_DATABASE_ID; }
+    catch { return PRIMARY_DATABASE_ID; }
+  });
 
   // Active workbench tab
   const [activeTab, setActiveTab] = useState<
@@ -211,7 +217,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     if (isAuthenticated) {
       loadAllData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, selectedDatabaseId]);
 
   useEffect(() => {
     if (selectedProductForMedia && selectedProductForMedia.trim() !== '') {
@@ -530,8 +536,21 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         </div>
 
         <div className="flex items-center space-x-3">
+          {staffUser?.role === 'admin' && (
+            <label className="flex items-center gap-2 text-xs text-stone-200">
+              <span className="hidden sm:inline">Database</span>
+              <select value={selectedDatabaseId} onChange={(event) => {
+                const id = event.target.value;
+                setSelectedDatabaseId(id);
+                try { localStorage.setItem('syntuc_admin_database_id', id); } catch (_) {}
+              }} className="max-w-[245px] rounded-lg border border-stone-600 bg-stone-800 px-2.5 py-2 text-xs text-white outline-none focus:border-amber-400" aria-label="Administrator database selector">
+                <option value={PRIMARY_DATABASE_ID}>Primary · Syntuc Explorer</option>
+                <option value={ALTERNATE_DATABASE_ID}>Alternate · Legacy / Recovery</option>
+              </select>
+            </label>
+          )}
           <button
-            onClick={loadAllData}
+            onClick={loadAllData
             className="p-1.5 text-stone-400 hover:text-white rounded-lg transition"
             title="Refresh Data"
           >
