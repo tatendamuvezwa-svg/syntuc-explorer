@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { getDocById, getDefaultFirestoreDatabaseId, runWithFirestoreDatabase, SUPPORTED_FIRESTORE_DATABASES } from '../lib/firestore.ts';
 import { verifyStaffAuthToken } from './auth.ts';
+import { databaseRequestContext } from './databaseRequestContext.ts';
 
 export async function selectedDatabaseContext(req: Request, res: Response, next: NextFunction): Promise<void> {
   const requested = req.header('x-syntuc-database-id');
@@ -15,7 +16,8 @@ export async function selectedDatabaseContext(req: Request, res: Response, next:
   try {
     const staff = await runWithFirestoreDatabase(getDefaultFirestoreDatabaseId(), () => getDocById<any>('users', tokenResult.userId!));
     if (!staff || !staff.isActive || staff.role !== 'admin') { res.status(403).json({ error: 'ADMIN_REQUIRED_FOR_DATABASE_SWITCH' }); return; }
-    runWithFirestoreDatabase(requested, () => next());
+    databaseRequestContext(req, requested);
+    next();
   } catch (error) {
     console.error('[Database selector] Authorization failed:', error);
     res.status(503).json({ error: 'DATABASE_SELECTION_UNAVAILABLE' });
