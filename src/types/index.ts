@@ -10,9 +10,10 @@ export interface Product {
   description: string;
   location: string;
   duration: string | null;
-  basePrice: string;
+  basePrice: string | null;
   currency: string;
-  priceBasis: 'per_person' | 'per_room_night' | 'per_group';
+  priceBasis: 'per_person' | 'per_room_night' | 'per_group' | 'from' | 'per_trip' | 'per_transfer' | 'unknown' | null | string;
+  classification?: 'Budget' | 'Mid-range' | 'Luxury' | string | null;
   inclusions: string[];
   exclusions: string[];
   suitability: string[];
@@ -22,6 +23,10 @@ export interface Product {
   primaryMediaId: string | null;
   videoUrl: string | null;
   evidenceStatus: string;
+  catalogImportKey?: string | null;
+  catalogImportStatus?: string | null;
+  verificationNotes?: string[];
+  sourceReference?: string | null;
   operatorName?: string;
   primaryImageUrl?: string | null;
   primaryImageAlt?: string | null;

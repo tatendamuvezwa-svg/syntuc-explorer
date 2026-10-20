@@ -1,6 +1,7 @@
 import React from 'react';
 import { Compass, Sparkles, MapPin, ShoppingBag, GraduationCap, ShieldCheck, UserCheck } from 'lucide-react';
 import { useSession } from '../../context/SessionContext.tsx';
+import syntucAvatarImg from '../../assets/images/syntuc_guide_avatar_1792315099007.jpg';
 
 interface NavbarProps {
   onOpenCoordinator: () => void;
@@ -120,9 +121,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   const assistantTrigger = document.getElementById('syntuc-assistant-trigger');
                   if (assistantTrigger) assistantTrigger.click();
                 }}
-                aria-label="Talk to Syntuc" className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-full bg-[#263B30] hover:bg-[#34513F] text-white text-sm font-semibold transition cursor-pointer"
+                aria-label="Talk to Syntuc — Your Syntuc Travel Guide"
+                className="flex items-center justify-center gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-[#263B30] hover:bg-[#34513F] text-white text-xs sm:text-sm font-semibold transition cursor-pointer border border-[#E2BE8C]/40 shadow-xs"
               >
-                <Sparkles className="w-4 h-4 text-[#E2BE8C]" />
+                <div className="relative w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden ring-1.5 ring-[#E2BE8C] shrink-0 bg-stone-900">
+                  <img
+                    src={syntucAvatarImg || '/uploads/syntuc_avatar.jpg'}
+                    alt="Syntuc"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                </div>
                 <span className="hidden sm:inline">Talk to Syntuc</span>
               </button>
             </>
@@ -146,6 +156,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button onClick={() => setActiveTab('explore')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${activeTab === 'explore' ? 'bg-[#263B30] text-white' : 'bg-[#F0F1EC] text-[#46564A]'}`}>Explore</button>
           <button onClick={() => setActiveTab('packages')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition ${activeTab === 'packages' ? 'bg-[#263B30] text-white' : 'bg-[#F0F1EC] text-[#46564A]'}`}>Curated packages</button>
           <button onClick={openSchoolPlanner} className="shrink-0 rounded-full border border-[#D8E3D5] bg-[#EAF0E8] px-4 py-2 text-xs font-semibold text-[#365D43]">School trips</button>
+          <button
+            onClick={() => {
+              const assistantTrigger = document.getElementById('syntuc-assistant-trigger');
+              if (assistantTrigger) assistantTrigger.click();
+            }}
+            className="shrink-0 rounded-full border border-[#E2BE8C]/50 bg-[#20372B] px-3 py-1.5 text-xs font-semibold text-[#E2BE8C] flex items-center gap-1.5 shadow-2xs"
+          >
+            <img
+              src={syntucAvatarImg || '/uploads/syntuc_avatar.jpg'}
+              alt="Syntuc"
+              referrerPolicy="no-referrer"
+              className="w-4 h-4 rounded-full object-cover ring-1 ring-[#E2BE8C]"
+            />
+            <span>Talk to Syntuc</span>
+          </button>
         </nav>
       )}
     </header>

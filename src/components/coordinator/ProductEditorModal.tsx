@@ -67,6 +67,9 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isPublished, setIsPublished] = useState<boolean>(false);
   const [availabilityNote, setAvailabilityNote] = useState<string>('Subject to partner confirmation');
+  const [classification, setClassification] = useState<string>('');
+  const [sourceReference, setSourceReference] = useState<string>('');
+  const [verificationNotes, setVerificationNotes] = useState<string[]>([]);
 
   // Media state
   const [mediaList, setMediaList] = useState<MediaAsset[]>([]);
@@ -119,14 +122,17 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
       setDescription(product.description || '');
       setLocation(product.location || 'Victoria Falls, Zimbabwe');
       setDuration(product.duration || '');
-      setBasePrice(product.basePrice || '50');
+      setBasePrice(product.basePrice !== null && product.basePrice !== undefined ? String(product.basePrice) : '');
       setCurrency(product.currency || 'USD');
-      setPriceBasis(product.priceBasis || 'per_person');
+      setPriceBasis((product.priceBasis as any) || 'per_person');
       setInclusionsText((product.inclusions || []).join('\n'));
       setExclusionsText((product.exclusions || []).join('\n'));
       setVideoUrl(product.videoUrl || '');
       setIsPublished(Boolean(product.isPublished));
       setAvailabilityNote(product.availabilityNote || 'Subject to partner confirmation');
+      setClassification(product.classification || '');
+      setSourceReference(product.sourceReference || '');
+      setVerificationNotes(product.verificationNotes || []);
       if (product.id) {
         loadProductMedia(product.id);
         loadProductVariants(product.id);
@@ -463,7 +469,7 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
       setStatusMessage({ type: 'error', text: 'Product name is required.' });
       return;
     }
-    if (!basePrice || isNaN(Number(basePrice))) {
+    if (productType !== 'accommodation' && (!basePrice || isNaN(Number(basePrice)))) {
       setStatusMessage({ type: 'error', text: 'A valid numeric tariff/base price is required.' });
       return;
     }
@@ -480,7 +486,18 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
       .map(s => s.trim())
       .filter(Boolean);
 
-    const payload = {
+    const hasValidPrice = Boolean(basePrice && !isNaN(Number(basePrice)));
+
+    if (isPublished && product?.catalogImportKey && product?.catalogImportStatus !== 'VERIFIED') {
+      setStatusMessage({
+        type: 'error',
+        text: 'This imported draft must be verified by an administrator before publication.',
+      });
+      setIsSaving(false);
+      return;
+    }
+
+    const payload: any = {
       name: name.trim(),
       productType,
       categorySlug,
@@ -490,9 +507,11 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
       description: description.trim() || `${name.trim()} offers an authentic Victoria Falls experience.`,
       location: location.trim() || 'Victoria Falls, Zimbabwe',
       duration: duration.trim() || null,
-      basePrice: String(Number(basePrice)),
+      basePrice: hasValidPrice ? String(Number(basePrice)) : null,
       currency,
-      priceBasis,
+      priceBasis: hasValidPrice ? priceBasis : null,
+      classification: productType === 'accommodation' ? (classification || null) : null,
+      sourceReference: sourceReference.trim() || null,
       inclusions,
       exclusions,
       isPublished,
@@ -710,20 +729,93 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
                 </div>
               </div>
 
+              {/* Verification notes banner if imported draft */}
+              {verificationNotes.length > 0 && (
+                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs">
+                  <div className="font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                    <span>Draft Verification Notes</span>
+                    {product?.catalogImportStatus === 'VERIFIED' ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">VERIFIED</span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-bold">UNVERIFIED DRAFT</span>
+                    )}
+                  </div>
+                  <ul className="mt-1.5 space-y-1 text-amber-850 list-disc pl-4 text-[11px]">
+                    {verificationNotes.map((note, idx) => (
+                      <li key={idx}>{note}</li>
+                    ))}
+                  </ul>
+                  {sourceReference && (
+                    <div className="mt-2 text-[11px] text-amber-900 font-medium">
+                      <strong>Source Reference:</strong>{' '}
+                      <span className="text-stone-700">{sourceReference}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Accommodation specific fields */}
+              {productType === 'accommodation' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-emerald-50/40 rounded-2xl border border-emerald-200/60">
+                  <div>
+                    <label className="block font-semibold text-emerald-950 mb-1 text-xs">
+                      Accommodation Classification *
+                    </label>
+                    <select
+                      value={classification}
+                      onChange={e => setClassification(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs bg-white font-medium"
+                    >
+                      <option value="">-- Select Classification --</option>
+                      <option value="Budget">Budget</option>
+                      <option value="Mid-range">Mid-range</option>
+                      <option value="Luxury">Luxury</option>
+                    </select>
+                    <p className="text-[10px] text-emerald-800 mt-1">
+                      Fixed market tier (Budget, Mid-range, or Luxury)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-emerald-950 mb-1 text-xs">
+                      Source Reference / Directory URL
+                    </label>
+                    <input
+                      type="text"
+                      value={sourceReference}
+                      onChange={e => setSourceReference(e.target.value)}
+                      placeholder="e.g. Official website, lodge tariff, or directory citation"
+                      className="w-full px-3 py-2 rounded-xl border border-emerald-200 text-xs bg-white"
+                    />
+                    <p className="text-[10px] text-emerald-800 mt-1">
+                      Authoritative tariff or official URL reference
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-amber-50/50 rounded-2xl border border-amber-200/60">
                 <div>
-                  <label className="block font-semibold text-amber-900 mb-1">Tariff / Base Price (USD) *</label>
+                  <label className="block font-semibold text-amber-900 mb-1">
+                    Tariff / Base Price (USD) {productType === 'accommodation' ? '(Optional)' : '*'}
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-stone-400 font-bold">$</span>
                     <input
                       type="number"
                       step="0.01"
-                      required
+                      required={productType !== 'accommodation'}
+                      placeholder={productType === 'accommodation' ? 'Unquoted (null)' : '0.00'}
                       value={basePrice}
                       onChange={e => setBasePrice(e.target.value)}
                       className="w-full pl-7 pr-3 py-2 rounded-xl border border-stone-200 text-xs bg-white font-bold"
                     />
                   </div>
+                  {productType === 'accommodation' && (
+                    <p className="text-[10px] text-amber-800 mt-1">
+                      Leave empty if property tariff is unconfirmed.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -755,12 +847,15 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
                 <div>
                   <div className="font-bold text-stone-800">Catalogue Publication State</div>
                   <div className="text-[11px] text-stone-500">
-                    Draft items are only visible to Reservations Desk coordinators. Published items are live in the guest catalogue.
+                    {product?.catalogImportKey && product?.catalogImportStatus !== 'VERIFIED'
+                      ? 'This imported draft must be verified by an administrator before publication.'
+                      : 'Draft items are only visible to Reservations Desk coordinators. Published items are live in the guest catalogue.'}
                   </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className={`relative inline-flex items-center ${product?.catalogImportKey && product?.catalogImportStatus !== 'VERIFIED' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input
                     type="checkbox"
+                    disabled={Boolean(product?.catalogImportKey && product?.catalogImportStatus !== 'VERIFIED')}
                     checked={isPublished}
                     onChange={e => setIsPublished(e.target.checked)}
                     className="sr-only peer"

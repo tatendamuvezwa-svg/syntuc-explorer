@@ -157,14 +157,14 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     setLoadingData(true);
     try {
       const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes, reviewsRes] = await Promise.all([
-        api.getLeads(),
-        api.getReservations(),
-        api.getCoordinatorProducts(),
-        api.getCoordinatorPackages(),
-        api.getOperators(),
-        api.getProperties(),
-        api.getCategories(),
-        api.getKnowledgeSources(),
+        api.getLeads().catch((err) => { console.warn('Notice loading leads:', err); return []; }),
+        api.getReservations().catch((err) => { console.warn('Notice loading reservations:', err); return []; }),
+        api.getCoordinatorProducts().catch((err) => { console.warn('Notice loading products:', err); return []; }),
+        api.getCoordinatorPackages().catch((err) => { console.warn('Notice loading packages:', err); return []; }),
+        api.getOperators().catch((err) => { console.warn('Notice loading operators:', err); return []; }),
+        api.getProperties().catch((err) => { console.warn('Notice loading properties:', err); return []; }),
+        api.getCategories().catch((err) => { console.warn('Notice loading categories:', err); return []; }),
+        api.getKnowledgeSources().catch((err) => { console.warn('Notice loading sources:', err); return []; }),
         api.getBoatCruiseReviews().catch((err) => {
           console.warn('Notice loading boat cruise reviews:', err);
           setReviewsError(err?.message || 'Failed to load reviews');
@@ -1058,6 +1058,11 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                             <span className="text-[10px] uppercase font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
                               {p.productType}
                             </span>
+                            {p.classification && (
+                              <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                {p.classification}
+                              </span>
+                            )}
                             {p.videoUrl && (
                               <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 flex items-center">
                                 <Video className="w-2.5 h-2.5 mr-1" /> Video
@@ -1084,7 +1089,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                           )}
 
                           <div className="mt-2 text-xs font-semibold text-stone-700">
-                            Tariff: <span className="text-amber-800 font-display font-bold">US${p.basePrice}</span> ({p.priceBasis})
+                            Tariff: <span className="text-amber-800 font-display font-bold">{p.basePrice ? `US$${p.basePrice}` : 'Unquoted / Pending Rate Verification'}</span> {p.priceBasis ? `(${p.priceBasis})` : ''}
                           </div>
                         </div>
                       </div>
@@ -1949,7 +1954,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
               </div>
             </div>
             <p id="operator-import-description" className="text-sm leading-6 text-stone-700">
-              Import the supplied Wild Horizons, Shearwater and Pure Africa catalogue records into the catalogue as unpublished drafts. Existing same-name records will not be overwritten. Missing or duplicate operator mappings will be reported for review. Nothing will be published automatically.
+              Import the supplied operator price-list records and the 24 accommodation candidate drafts into the catalogue as unpublished drafts requiring human verification. Existing same-name records and baseline accommodations will not be overwritten. Nothing will be published automatically.
             </p>
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button

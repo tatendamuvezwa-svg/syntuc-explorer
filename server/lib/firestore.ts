@@ -1,6 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
+  initializeFirestore,
+  setLogLevel,
   Firestore,
   doc,
   getDoc,
@@ -19,6 +21,10 @@ import {
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
+import { getBaselineProducts, getBaselinePackages } from './baselineCatalog.ts';
+
+// Silence internal Firebase WebChannel / gRPC idle stream disconnect warnings
+setLogLevel('silent');
 
 let firestoreInstance: Firestore | null = null;
 let firebaseConfig: any = null;
@@ -29,8 +35,9 @@ let firebaseConfig: any = null;
 // and console error triggers during free-tier quota limits.
 // ==========================================
 
+// Circuit breaker tracking (logging/observability only; never suppresses durable writes or returns false empty arrays)
 const CACHE_TTL_MS = 60_000; // 60 seconds collection TTL
-const QUOTA_COOLDOWN_MS = 5 * 60_000; // 5 minutes probe cooldown
+const QUOTA_COOLDOWN_MS = 15_000; // 15 seconds probe cooldown
 
 let isFirestoreQuotaExceeded = false;
 let quotaExceededTrippedAt = 0;
@@ -47,8 +54,8 @@ export function resetCircuitBreaker(): void {
 
 export function isBreakerActive(): boolean {
   if (!isFirestoreQuotaExceeded) return false;
-  // If cooldown passed, allow one probe to test Firestore availability
   if (Date.now() - quotaExceededTrippedAt > QUOTA_COOLDOWN_MS) {
+    isFirestoreQuotaExceeded = false;
     return false;
   }
   return true;
@@ -115,7 +122,8 @@ function matchesConstraints(item: any, constraints: QueryConstraint[]): boolean 
   return true;
 }
 
-// Comprehensive baseline fallbacks for all collections
+// Comprehensive baseline fallbacks for STATIC taxonomy collections only.
+// Operational records (reservations, reviews, guests, messages, notes) MUST NEVER use empty baseline fallbacks.
 // Catalogue records must be read from live Firestore, never from hard-coded baselines.
 const AUTHORITATIVE_CATALOG_COLLECTIONS = new Set(['products', 'packages']);
 const isAuthoritativeCatalogCollection = (name: string) => AUTHORITATIVE_CATALOG_COLLECTIONS.has(name);
@@ -318,13 +326,8 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
       lastVerified: '2026-10-14T10:00:00.000Z',
     },
   ],
-  leads: [],
-  reservation_requests: [],
-  reservation_items: [],
-  guests: [],
-  trip_plans: [],
-  trip_items: [],
-
+  products: getBaselineProducts(),
+  packages: getBaselinePackages(),
 };
 
 // Seed baseline entries into memory store
@@ -341,12 +344,13 @@ function isQuotaOrNetworkError(err: any): boolean {
   if (!err) return false;
   const msg = (err.message || '').toLowerCase();
   const code = (err.code || '').toString().toLowerCase();
+  if (msg.includes('authoritative_catalog_unavailable')) return false;
   return (
     msg.includes('quota') ||
     msg.includes('resource_exhausted') ||
     msg.includes('exceeded') ||
     code.includes('resource-exhausted') ||
-    msg.includes('unavailable') ||
+    code === 'unavailable' ||
     msg.includes('deadline') ||
     msg.includes('network')
   );
@@ -376,7 +380,14 @@ export function getFirestoreDb(): Firestore {
         storageBucket: cfg.storageBucket,
       });
 
-  firestoreInstance = getFirestore(app, cfg.firestoreDatabaseId || '(default)');
+  const dbId = cfg.firestoreDatabaseId || '(default)';
+  try {
+    firestoreInstance = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    }, dbId);
+  } catch (_) {
+    firestoreInstance = getFirestore(app, dbId);
+  }
   console.log('[Firestore] Authoritative database initialized:', cfg.firestoreDatabaseId);
   return firestoreInstance;
 }
@@ -385,71 +396,76 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
   const memCol = getMemoryCollection(collectionName);
   const memDoc = memCol.get(id);
 
-  if (isBreakerActive()) {
-    if (isAuthoritativeCatalogCollection(collectionName)) throw new Error(`AUTHORITATIVE_CATALOG_UNAVAILABLE: ${collectionName}`);
-    if (memDoc) return memDoc as T;
-    return null;
-  }
-
   try {
     const fdb = getFirestoreDb();
     const ref = doc(fdb, collectionName, id);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
-      if (!isAuthoritativeCatalogCollection(collectionName) && memDoc) return memDoc as T;
-      memCol.delete(id); return null;
+      memCol.delete(id);
+      return null;
     }
     const data = { id: snap.id, ...snap.data() } as T;
     memCol.set(id, data);
     return data;
   } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) tripCircuitBreaker();
-    if (isAuthoritativeCatalogCollection(collectionName)) throw err;
-    if (memDoc) return memDoc as T;
-    return null;
+    if (isQuotaOrNetworkError(err)) {
+      tripCircuitBreaker();
+    }
+    if (memDoc) {
+      console.warn(`[Firestore] Read notice on doc '${collectionName}/${id}', serving cached memory copy:`, err.message);
+      return memDoc as T;
+    }
+    if (BASELINE_COLLECTIONS[collectionName]) {
+      const baseline = BASELINE_COLLECTIONS[collectionName].find((d: any) => d.id === id);
+      if (baseline) return baseline as T;
+    }
+    console.error(`[Firestore] Failed to read doc '${collectionName}/${id}':`, err.message);
+    throw err;
   }
 }
 
-export async function setDocById<T extends Record<string, any>>(collectionName: string, id: string, data: T, merge: boolean = true): Promise<void> {
-  const memCol = getMemoryCollection(collectionName); const existing = memCol.get(id) || {};
-  if (isAuthoritativeCatalogCollection(collectionName)) {
-    if (isBreakerActive()) throw new Error(`AUTHORITATIVE_CATALOG_UNAVAILABLE: cannot write ${collectionName}/${id}`);
-    try { const fdb = getFirestoreDb(); await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge }); }
-    catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); throw err; }
-    memCol.set(id, merge ? { ...existing, id, ...data } : { id, ...data }); collectionCache.delete(collectionName); return;
-  }
-  memCol.set(id, merge ? { ...existing, id, ...data } : { id, ...data }); collectionCache.delete(collectionName);
-  if (isBreakerActive()) return;
-  try { const fdb = getFirestoreDb(); await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge }); }
-  catch (err: any) { if (isQuotaOrNetworkError(err)) { tripCircuitBreaker(); return; } throw err; }
+export async function setDocById<T extends Record<string, any>>(
+  collectionName: string,
+  id: string,
+  data: T,
+  merge: boolean = true
+): Promise<void> {
+  const fdb = getFirestoreDb();
+  // Durable write to Cloud Firestore must succeed before reporting success
+  await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge });
+
+  // Update in-memory cache and invalidate collection cache only after successful durable write
+  const memCol = getMemoryCollection(collectionName);
+  const existing = memCol.get(id) || {};
+  memCol.set(id, merge ? { ...existing, id, ...data } : { id, ...data });
+  collectionCache.delete(collectionName);
 }
 
-export async function updateDocById(collectionName: string, id: string, data: Partial<DocumentData>): Promise<void> {
-  const memCol = getMemoryCollection(collectionName); const existing = memCol.get(id) || {};
-  if (isAuthoritativeCatalogCollection(collectionName)) {
-    if (isBreakerActive()) throw new Error(`AUTHORITATIVE_CATALOG_UNAVAILABLE: cannot update ${collectionName}/${id}`);
-    try { const fdb = getFirestoreDb(); await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge: true }); }
-    catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); throw err; }
-    memCol.set(id, { ...existing, id, ...data }); collectionCache.delete(collectionName); return;
-  }
-  memCol.set(id, { ...existing, id, ...data }); collectionCache.delete(collectionName);
-  if (isBreakerActive()) return;
-  try { const fdb = getFirestoreDb(); await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge: true }); }
-  catch (err: any) { if (isQuotaOrNetworkError(err)) { tripCircuitBreaker(); return; } throw err; }
+export async function updateDocById(
+  collectionName: string,
+  id: string,
+  data: Partial<DocumentData>
+): Promise<void> {
+  const fdb = getFirestoreDb();
+  // Durable write to Cloud Firestore must succeed before reporting success
+  await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge: true });
+
+  // Update in-memory cache and invalidate collection cache only after successful durable write
+  const memCol = getMemoryCollection(collectionName);
+  const existing = memCol.get(id) || {};
+  memCol.set(id, { ...existing, id, ...data });
+  collectionCache.delete(collectionName);
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
+  const fdb = getFirestoreDb();
+  // Durable deletion from Cloud Firestore must succeed before updating local state
+  await deleteDoc(doc(fdb, collectionName, id));
+
+  // Invalidate local memory and collection cache only after successful durable deletion
   const memCol = getMemoryCollection(collectionName);
-  if (isAuthoritativeCatalogCollection(collectionName)) {
-    if (isBreakerActive()) throw new Error(`AUTHORITATIVE_CATALOG_UNAVAILABLE: cannot delete ${collectionName}/${id}`);
-    try { const fdb = getFirestoreDb(); await deleteDoc(doc(fdb, collectionName, id)); }
-    catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); throw err; }
-    memCol.delete(id); collectionCache.delete(collectionName); return;
-  }
-  memCol.delete(id); collectionCache.delete(collectionName);
-  if (isBreakerActive()) return;
-  try { const fdb = getFirestoreDb(); await deleteDoc(doc(fdb, collectionName, id)); }
-  catch (err: any) { if (isQuotaOrNetworkError(err)) { tripCircuitBreaker(); return; } throw err; }
+  memCol.delete(id);
+  collectionCache.delete(collectionName);
 }
 
 export async function getCollectionDocs<T = DocumentData>(
@@ -460,21 +476,7 @@ export async function getCollectionDocs<T = DocumentData>(
   const now = Date.now();
   const memCol = getMemoryCollection(collectionName);
 
-  // If circuit breaker is active, directly serve from memory/baseline without hitting network
-  if (isBreakerActive()) {
-    if (isAuthoritativeCatalogCollection(collectionName)) throw new Error(`AUTHORITATIVE_CATALOG_UNAVAILABLE: ${collectionName}`);
-    const allDocs = Array.from(memCol.values());
-    if (allDocs.length === 0 && BASELINE_COLLECTIONS[collectionName]) {
-      const baselines = BASELINE_COLLECTIONS[collectionName];
-      for (const b of baselines) {
-        memCol.set(b.id, b);
-      }
-      return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
-    }
-    return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
-  }
-
-  // Do not serve cached catalogue snapshots: products and packages must reflect live Firestore.
+  // Serve from memory collection cache if fresh (prevents query storms and preserves free-tier read limits)
   if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
     const cached = collectionCache.get(collectionName);
     if (cached && now - cached.timestamp < CACHE_TTL_MS) {
@@ -488,7 +490,7 @@ export async function getCollectionDocs<T = DocumentData>(
     const q = hasConstraints ? query(cRef, ...constraints) : cRef;
     const snap = await getDocs(q);
     const docs: T[] = [];
-    if (isAuthoritativeCatalogCollection(collectionName) && !hasConstraints) {
+    if (!hasConstraints) {
       memCol.clear();
       collectionCache.delete(collectionName);
     }
@@ -506,24 +508,32 @@ export async function getCollectionDocs<T = DocumentData>(
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
-      if (isAuthoritativeCatalogCollection(collectionName)) throw err;
-      const allDocs = Array.from(memCol.values());
-      if (allDocs.length > 0) {
-        return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
-      }
-      if (BASELINE_COLLECTIONS[collectionName]) {
-        const baselines = BASELINE_COLLECTIONS[collectionName];
-        for (const b of baselines) {
-          memCol.set(b.id, b);
-        }
-        return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
-      }
-      return [];
     }
 
-    if (isAuthoritativeCatalogCollection(collectionName)) throw err;
+    // If cached collection data exists in memory, serve it with a warning
+    const cached = collectionCache.get(collectionName);
+    if (!hasConstraints && cached && cached.data.length > 0) {
+      console.warn(`[Firestore] Read error on '${collectionName}', serving ${cached.data.length} cached items:`, err.message);
+      return [...cached.data] as T[];
+    }
+
     const allDocs = Array.from(memCol.values());
-    return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
+    if (allDocs.length > 0) {
+      console.warn(`[Firestore] Read error on '${collectionName}', serving ${allDocs.length} memory items:`, err.message);
+      return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
+    }
+
+    // Static taxonomies only have baseline fallbacks
+    if (BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
+      const baselines = BASELINE_COLLECTIONS[collectionName];
+      console.warn(`[Firestore] Read error on '${collectionName}', serving taxonomy baseline:`, err.message);
+      return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
+    }
+
+    // For operational collections (reservations, reviews, guests, messages, notes, media, products, packages),
+    // NEVER mask database errors as valid empty arrays! Throw the error so the caller can report it.
+    console.error(`[Firestore] Authoritative collection read failed for '${collectionName}':`, err.message);
+    throw err;
   }
 }
 

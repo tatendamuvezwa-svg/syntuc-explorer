@@ -11,7 +11,7 @@ const keys = new Set<string>();
 for (const item of operatorCatalogImport) {
   assert.ok(allowedOperators.has(item.operatorName), `unexpected operator: ${item.operatorName}`);
   assert.ok(item.name.trim().length > 0, 'product name must not be empty');
-  assert.ok(Number.isFinite(item.basePrice) && item.basePrice > 0, `invalid price for ${item.name}`);
+  assert.ok(item.basePrice !== null && Number.isFinite(item.basePrice) && item.basePrice > 0, `invalid price for ${item.name}`);
   assert.ok(item.sourceReference.trim().length > 0, `source reference missing for ${item.name}`);
   assert.ok(Array.isArray(item.mandatoryFees), `fee list missing for ${item.name}`);
   assert.ok(Array.isArray(item.verificationNotes), `verification notes missing for ${item.name}`);

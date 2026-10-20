@@ -105,14 +105,18 @@ export const ProductDetailModal: React.FC = () => {
     return product.rooms.find((r: any) => r.id === selectedRoomId) || product.rooms[0];
   }, [product, selectedRoomId]);
 
-  const currentPrice = React.useMemo(() => {
-    if (activeVariant) {
-      return Number(activeVariant.price !== undefined ? activeVariant.price : (product?.basePrice ?? 0));
+  const currentPrice = React.useMemo<number | null>(() => {
+    if (activeVariant && activeVariant.price !== undefined && activeVariant.price !== null) {
+      return Number(activeVariant.price);
     }
-    if (activeRoom) {
-      return Number(activeRoom.pricePerNight ?? product?.basePrice ?? 0);
+    if (activeRoom && activeRoom.pricePerNight !== undefined && activeRoom.pricePerNight !== null) {
+      return Number(activeRoom.pricePerNight);
     }
-    return Number(product?.basePrice ?? 0);
+    if (product?.basePrice !== undefined && product?.basePrice !== null && product.basePrice !== '') {
+      const parsed = Number(product.basePrice);
+      return !isNaN(parsed) && parsed > 0 ? parsed : null;
+    }
+    return null;
   }, [activeVariant, activeRoom, product]);
 
   const currentPriceBasis = React.useMemo(() => {
@@ -266,21 +270,34 @@ export const ProductDetailModal: React.FC = () => {
                 <div className="text-xs text-amber-900 font-semibold uppercase tracking-wide">
                   {activeVariant ? 'Authoritative Tariff' : 'Catalog Tariff'}
                 </div>
-                <div className="text-2xl font-extrabold text-amber-800 font-display mt-0.5">
-                  US${currentPrice}
-                  {compulsoryFees.length > 0 && (
-                    <span className="text-xs font-semibold text-stone-600 block sm:inline sm:ml-1">
-                      + US${totalCompulsoryFeesPerPerson} fee
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-stone-500">
-                  {formatPriceBasisLabel(currentPriceBasis)}
-                </div>
-                {compulsoryFees.length > 0 && (
-                  <div className="mt-1.5 text-xs font-extrabold text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-lg inline-block border border-emerald-300">
-                    Effective Total: US${currentPrice + totalCompulsoryFeesPerPerson} / person
-                  </div>
+                {currentPrice !== null ? (
+                  <>
+                    <div className="text-2xl font-extrabold text-amber-800 font-display mt-0.5">
+                      US${currentPrice}
+                      {compulsoryFees.length > 0 && (
+                        <span className="text-xs font-semibold text-stone-600 block sm:inline sm:ml-1">
+                          + US${totalCompulsoryFeesPerPerson} fee
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-stone-500">
+                      {formatPriceBasisLabel(currentPriceBasis)}
+                    </div>
+                    {compulsoryFees.length > 0 && (
+                      <div className="mt-1.5 text-xs font-extrabold text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-lg inline-block border border-emerald-300">
+                        Effective Total: US${currentPrice + totalCompulsoryFeesPerPerson} / person
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="text-lg font-bold text-amber-800 font-display mt-0.5">
+                      Rate on Request
+                    </div>
+                    <div className="text-xs text-stone-500">
+                      Tariff to be confirmed with property
+                    </div>
+                  </>
                 )}
               </div>
             </div>

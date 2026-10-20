@@ -1,5 +1,10 @@
 import { Router, Response } from 'express';
 import { operatorCatalogImport, resolveOperatorMappings } from '../data/operatorCatalogImport.ts';
+import {
+  accommodationCatalogImport,
+  PRESERVED_ACCOMMODATION_CANONICALS,
+  SAFEGUARD_DISTINCTIONS,
+} from '../data/accommodationCatalogImport.ts';
 import crypto from 'crypto';
 import {
   requireCoordinatorAuth,
@@ -501,18 +506,63 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
     const results = { created: 0, updatedAuthoritative: 0, alreadyImported: 0, existingNeedsManualReview: 0, errors: [] as string[], skipped: [] as Array<{ name: string; operator: string; reason: string }> };
     const now = new Date().toISOString();
 
-    for (const item of operatorCatalogImport) {
-      const operatorId = operatorIds[item.operatorName];
-      const mappingIssue = operatorMappingIssues.find((issue) => issue.operator === item.operatorName);
-      const verificationNotes = [...item.verificationNotes, ...(mappingIssue ? [`Operator mapping unresolved: ${item.operatorName} has ${mappingIssue.found} matching operator records. Resolve the operator record before verifying or publishing this draft.`] : [])];
-      const importKey = `operator-pricelist-v1:${normalize(item.operatorName).replace(/ /g, '-') }:${normalize(item.name).replace(/ /g, '-')}`;
-      // Packages live in the packages collection; activities/transfers stay in products.
+    const requestedItems = Array.isArray(req.body?.items) && req.body.items.length > 0
+      ? req.body.items
+      : req.body?.target === 'accommodation'
+      ? accommodationCatalogImport
+      : req.body?.target === 'operator'
+      ? operatorCatalogImport
+      : [...operatorCatalogImport, ...accommodationCatalogImport];
+
+    const canonicalPreservedNames = new Set(
+      PRESERVED_ACCOMMODATION_CANONICALS.flatMap((c) => [
+        normalize(c.name),
+        ...(c.altName ? [normalize(c.altName)] : []),
+      ])
+    );
+
+    const isSafeguardConflict = (itemName: string, candidateMatchName: string) => {
+      const n1 = normalize(itemName);
+      const n2 = normalize(candidateMatchName);
+      if (n1 === 'shongwe oasis' && n2.includes('shongwe lookout')) return true;
+      if (n1 === 'shongwe lookout' && n2.includes('shongwe oasis')) return true;
+      if (n1 === 'victoria falls safari club' && n2.includes('victoria falls safari lodge')) return true;
+      if (n1 === 'victoria falls safari lodge' && n2.includes('victoria falls safari club')) return true;
+      if (n1 === 'zambezi sands river camp' && n2.includes('victoria falls river lodge')) return true;
+      if (n1 === 'victoria falls river lodge' && n2.includes('zambezi sands river camp')) return true;
+      return false;
+    };
+
+    for (const item of requestedItems) {
+      const isAccommodation = item.productType === 'accommodation';
       const isPackage = item.productType === 'package';
+
+      // Safeguard: Never overwrite or recreate the five canonical preserved accommodation records
+      if (canonicalPreservedNames.has(normalize(item.name))) {
+        results.existingNeedsManualReview++;
+        results.skipped.push({
+          name: item.name,
+          operator: item.operatorName || 'Canonical Accommodation',
+          reason: `Preserved baseline accommodation record (${item.name}) cannot be overwritten or recreated by automated import.`,
+        });
+        continue;
+      }
+
+      const operatorId = (operatorIds as any)[item.operatorName] || null;
+      const mappingIssue = operatorMappingIssues.find((issue) => issue.operator === item.operatorName);
+      const verificationNotes = [
+        ...item.verificationNotes,
+        ...(mappingIssue ? [`Operator mapping unresolved: ${item.operatorName} has ${mappingIssue.found} matching operator records. Resolve the operator record before verifying or publishing this draft.`] : []),
+      ];
+
+      const importKey = isAccommodation
+        ? `accommodation-catalog-v1:${normalize(item.name).replace(/ /g, '-')}`
+        : `operator-pricelist-v1:${normalize(item.operatorName).replace(/ /g, '-')}:${normalize(item.name).replace(/ /g, '-')}`;
+
       if (existingKeys.has(importKey)) {
         // A previous import version stored every non-package record as "activity".
         // Repair only records carrying this exact deterministic import key, and only
-        // when the source type is an explicit transfer/fee. No other catalogue records
-        // or manually edited product types are touched.
+        // when the source type is an explicit transfer/fee.
         if (!isPackage && (item.productType === 'transfer' || item.productType === 'fee')) {
           const importedRecord = activeExisting.find((p) => p.catalogImportKey === importKey);
           if (importedRecord && importedRecord.productType === 'activity' &&
@@ -533,18 +583,21 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         results.alreadyImported++;
         continue;
       }
+
       const targetExisting = isPackage ? activeExistingPackages : activeExisting;
-      const sameOperatorName = targetExisting.find((p) =>
-        (p.operatorId === operatorId || !p.operatorId) && normalize(p.name) === normalize(item.name)
-      );
+      const sameOperatorName = targetExisting.find((p) => {
+        if (isSafeguardConflict(item.name, p.name)) return false;
+        if (isAccommodation) {
+          return normalize(p.name) === normalize(item.name);
+        }
+        return (p.operatorId === operatorId || !p.operatorId) && normalize(p.name) === normalize(item.name);
+      });
+
       if (operatorId && sameOperatorName && item.authoritativeOverride && sameOperatorName.operatorId === operatorId) {
-        // The newest Pure Africa catalog is explicitly authoritative. Preserve the existing
-        // document ID/history and update only source-controlled catalog fields.
+        // Authoritative overrides (e.g. Pure Africa latest catalog rates)
         try {
           const updates: Record<string, unknown> = {
             sourceReference: item.sourceReference,
-            // Ensure the Coordinator UI exposes verification status and source notes for
-            // an authoritative update to an existing record, not just newly imported IDs.
             catalogImportKey: importKey,
             catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
             verificationNotes,
@@ -555,13 +608,13 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
             updatedAt: now,
           };
           if (isPackage) {
-            updates.pricePerPerson = String(item.basePrice);
+            updates.pricePerPerson = item.basePrice !== null && item.basePrice !== undefined ? String(item.basePrice) : null;
             updates.inclusions = item.inclusions;
             updates.exclusions = item.exclusions;
             updates.mandatoryFees = item.mandatoryFees;
             await updateDocById('packages', sameOperatorName.id, updates);
           } else {
-            updates.basePrice = String(item.basePrice);
+            updates.basePrice = item.basePrice !== null && item.basePrice !== undefined ? String(item.basePrice) : null;
             updates.currency = 'USD';
             updates.priceBasis = item.priceBasis;
             updates.inclusions = item.inclusions;
@@ -578,13 +631,19 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
           continue;
         }
       }
+
       if (sameOperatorName) {
         results.existingNeedsManualReview++;
-        results.skipped.push({ name: item.name, operator: item.operatorName, reason: `Existing ${isPackage ? 'package' : 'product'} ${sameOperatorName.id} requires manual source/rate reconciliation; no overwrite performed.` });
+        results.skipped.push({
+          name: item.name,
+          operator: item.operatorName,
+          reason: `Existing ${isPackage ? 'package' : isAccommodation ? 'accommodation' : 'product'} ${sameOperatorName.id} requires manual source/rate reconciliation; no overwrite performed.`,
+        });
         continue;
       }
 
-      const productId = (isPackage ? 'imp_pkg_' : 'imp_') + crypto.createHash('sha256').update(importKey).digest('hex').slice(0, 20);
+      const prefix = isPackage ? 'imp_pkg_' : isAccommodation ? 'imp_acc_' : 'imp_';
+      const productId = prefix + crypto.createHash('sha256').update(importKey).digest('hex').slice(0, 20);
       const targetCollection = isPackage ? 'packages' : 'products';
       if (tombstones.has(`${targetCollection}_${productId}`)) {
         results.errors.push(`Deterministic ID ${productId} is tombstoned; manual review required for ${item.operatorName}: ${item.name}`);
@@ -595,33 +654,38 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
         continue;
       }
 
-      const newProduct = {
+      const hasValidPrice = item.basePrice !== null && item.basePrice !== undefined && item.basePrice !== '' && !isNaN(Number(item.basePrice));
+
+      const newProduct: Record<string, any> = {
         id: productId,
         slug: `${normalize(item.name).replace(/ /g, '-')}-${productId.slice(-6)}`,
         name: item.name,
-        productType: item.productType === 'activity' ? 'activity' : item.productType === 'transfer' ? 'transfer' : 'fee',
-        catalogItemType: item.productType,
-        categorySlug: item.categorySlug,
+        productType: isAccommodation ? 'accommodation' : item.productType === 'activity' ? 'activity' : item.productType === 'transfer' ? 'transfer' : 'fee',
+        catalogItemType: item.productType || (isAccommodation ? 'accommodation' : 'activity'),
+        categorySlug: item.categorySlug || (isAccommodation ? 'lodge-resort' : 'activity'),
+        classification: item.classification || null,
         operatorId: operatorId || null,
-        operatorName: item.operatorName,
+        operatorName: item.operatorName || (isAccommodation ? item.name : 'Unassigned / Candidate Property'),
         propertyId: null,
         shortDescription: item.shortDescription,
-        description: item.shortDescription,
+        description: item.fullDescription || item.shortDescription,
         location: 'Victoria Falls, Zimbabwe',
         duration: null,
-        basePrice: String(item.basePrice),
+        basePrice: hasValidPrice ? String(item.basePrice) : null,
         currency: 'USD',
-        priceBasis: item.priceBasis,
-        inclusions: item.inclusions,
-        exclusions: item.exclusions,
-        mandatoryFees: item.mandatoryFees,
+        priceBasis: hasValidPrice ? (item.priceBasis || 'per_person') : null,
+        inclusions: Array.isArray(item.inclusions) ? item.inclusions : [],
+        exclusions: Array.isArray(item.exclusions) ? item.exclusions : [],
+        mandatoryFees: Array.isArray(item.mandatoryFees) ? item.mandatoryFees : [],
         sourceReference: item.sourceReference,
         catalogImportKey: importKey,
         catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
         verificationNotes,
         isPublished: false,
         isFeatured: false,
-        availabilityNote: 'Subject to operator confirmation; draft import not bookable until verified.',
+        availabilityNote: isAccommodation
+          ? 'Draft candidate under review; rates, room inventory, and supplier terms unconfirmed.'
+          : 'Subject to operator confirmation; draft import not bookable until verified.',
         primaryMediaId: null,
         videoUrl: null,
         evidenceStatus: 'NEEDS_VERIFICATION',
@@ -640,7 +704,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
             description: item.shortDescription,
             durationDays: 1,
             durationNights: 0,
-            pricePerPerson: String(item.basePrice),
+            pricePerPerson: hasValidPrice ? String(item.basePrice) : null,
             currency: 'USD',
             highlights: item.inclusions,
             inclusions: item.inclusions,
@@ -656,7 +720,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
             catalogImportKey: importKey,
             catalogImportStatus: 'DRAFT_NEEDS_VERIFICATION',
             verificationNotes,
-            priceBasis: item.priceBasis,
+            priceBasis: hasValidPrice ? item.priceBasis : null,
             isPublished: false,
             createdAt: now,
             updatedAt: now,
@@ -675,7 +739,7 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
           collectionName: isPackage ? 'packages' : 'products',
           modifiedByStaffId: req.staffUser!.id,
           previousSnapshot: null,
-          changeSummary: `Draft operator price-list import: ${item.operatorName} — ${item.name}`,
+          changeSummary: `Draft catalog import: ${item.operatorName} — ${item.name} (${item.productType})`,
           createdAt: now,
         });
         existingKeys.add(importKey);
@@ -687,10 +751,10 @@ router.post('/catalog/import-operator-pricelists', requireCoordinatorAuth, async
 
     res.status(results.errors.length || operatorMappingIssues.length ? 207 : 200).json({
       success: results.errors.length === 0 && operatorMappingIssues.length === 0,
-      message: 'Operator catalog import completed. Imported products remain unpublished drafts. Resolve operator mapping issues before verification or publication.',
+      message: 'Catalog import completed. Imported products remain unpublished drafts requiring verification before publication.',
       operatorMapping: operatorIds,
       operatorMappingIssues,
-      totalSourceRecords: operatorCatalogImport.length,
+      totalSourceRecords: requestedItems.length,
       ...results,
     });
   } catch (error: any) {
@@ -889,13 +953,29 @@ router.put('/products/:id', requireCoordinatorAuth, async (req: AuthenticatedSta
     if (description !== undefined) updatedData.description = description.trim();
     if (location !== undefined) updatedData.location = location.trim();
     if (duration !== undefined) updatedData.duration = duration;
-    if (basePrice !== undefined) updatedData.basePrice = String(basePrice);
+
+    const hasValidPrice = basePrice !== undefined && basePrice !== null && basePrice !== '' && !isNaN(Number(basePrice));
+    if (basePrice !== undefined) updatedData.basePrice = hasValidPrice ? String(basePrice) : null;
     if (currency !== undefined) updatedData.currency = currency;
-    if (priceBasis !== undefined) updatedData.priceBasis = priceBasis;
+    if (priceBasis !== undefined) updatedData.priceBasis = hasValidPrice ? priceBasis : null;
+    if (req.body.classification !== undefined) updatedData.classification = req.body.classification || null;
+    if (req.body.sourceReference !== undefined) updatedData.sourceReference = req.body.sourceReference || null;
+    if (req.body.catalogImportStatus !== undefined) updatedData.catalogImportStatus = req.body.catalogImportStatus;
+    if (req.body.evidenceStatus !== undefined) updatedData.evidenceStatus = req.body.evidenceStatus;
     if (inclusions !== undefined) updatedData.inclusions = inclusions;
     if (exclusions !== undefined) updatedData.exclusions = exclusions;
     if (suitability !== undefined) updatedData.suitability = suitability;
-    if (isPublished !== undefined) updatedData.isPublished = Boolean(isPublished);
+    if (isPublished !== undefined) {
+      const targetPublished = Boolean(isPublished);
+      if (targetPublished && current.catalogImportKey && current.catalogImportStatus !== 'VERIFIED') {
+        res.status(409).json({
+          error: 'CATALOG_VERIFICATION_REQUIRED',
+          message: 'Imported price-list records must be verified by an administrator before publication.',
+        });
+        return;
+      }
+      updatedData.isPublished = targetPublished;
+    }
     if (isFeatured !== undefined) updatedData.isFeatured = Boolean(isFeatured);
     if (videoUrl !== undefined) updatedData.videoUrl = videoUrl ? videoUrl.trim() : null;
     if (availabilityNote !== undefined) updatedData.availabilityNote = availabilityNote;

@@ -13,21 +13,27 @@ import {
   UserCheck,
   Bot,
   RotateCcw,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { AssistantResponse, AssistantAction } from '../../types/index.ts';
 import { trackEvent } from '../../services/analytics.ts';
+import syntucAvatarImg from '../../assets/images/syntuc_guide_avatar_1792315099007.jpg';
 
-const INITIAL_MESSAGES = [
+export const SYNTUC_AVATAR_URL = syntucAvatarImg || '/uploads/syntuc_avatar.jpg';
+
+export const INITIAL_MESSAGES = [
   {
     role: 'assistant' as const,
     text:
-      'Hello! I am Syntuc Explorer, your intelligent guide to Victoria Falls, built by SAINTECH. I can help you compare river lodges, explain scenic helicopter flights, discover Zambezi sunset cruises, or plan educational school trips. How may I assist your journey?',
+      "Hello! I'm Syntuc, your intelligent guide to Victoria Falls. Tell me what you're looking for, and I'll help you explore and compare experiences.",
     action: null,
   },
 ];
 
 export const SyntucAssistantWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [inputMessage, setInputMessage] = useState<string>('');
   const [messages, setMessages] = useState<
     { role: 'user' | 'assistant'; text: string; action?: AssistantAction | null; requiresCoordinator?: boolean }[]
@@ -375,7 +381,7 @@ export const SyntucAssistantWidget: React.FC = () => {
 
   return (
     <>
-      {/* Floating launcher button */}
+      {/* Floating launcher button with avatar identity */}
       <button
         id="syntuc-assistant-trigger"
         onClick={() => {
@@ -384,11 +390,26 @@ export const SyntucAssistantWidget: React.FC = () => {
           }
           setIsOpen(!isOpen);
         }}
-        aria-label="Open Syntuc Explorer digital guide"
-        className="fixed bottom-6 right-6 z-40 p-4 rounded-full bg-gradient-to-r from-amber-600 to-amber-800 text-white shadow-xl shadow-amber-900/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer group"
-        title="Talk to Syntuc Explorer"
+        aria-label="Talk to Syntuc — Your Syntuc Travel Guide"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 p-1.5 pr-4 rounded-full bg-[#20372B] hover:bg-[#2A4637] text-white shadow-[0_12px_36px_rgba(32,55,43,0.35)] border border-[#E2BE8C]/50 hover:scale-[1.03] active:scale-95 transition-all duration-200 cursor-pointer group"
+        title="Talk to Syntuc — Your Syntuc Travel Guide"
       >
-        <Sparkles className="w-6 h-6 animate-pulse text-amber-200" />
+        <div className="relative w-11 h-11 rounded-full overflow-hidden ring-2 ring-[#E2BE8C] shrink-0 bg-stone-900">
+          <img
+            src={SYNTUC_AVATAR_URL}
+            alt="Syntuc Travel Guide"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+          />
+          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#20372B] rounded-full" />
+        </div>
+        <div className="text-left hidden sm:block">
+          <div className="text-xs font-bold text-white flex items-center gap-1.5">
+            <span>Talk to Syntuc</span>
+            <Sparkles className="w-3 h-3 text-[#E2BE8C]" />
+          </div>
+          <span className="text-[10px] text-[#D6E2D1] block leading-tight">Your Travel Guide</span>
+        </div>
       </button>
 
       {/* Slide-out conversational panel */}
@@ -397,39 +418,60 @@ export const SyntucAssistantWidget: React.FC = () => {
           role="dialog"
           aria-modal="false"
           aria-labelledby="assistant-panel-title"
-          className="fixed bottom-22 right-6 z-50 w-[92vw] sm:w-[420px] h-[550px] bg-white rounded-3xl shadow-2xl border border-stone-200/90 flex flex-col overflow-hidden animate-fadeIn"
+          className={`fixed inset-x-2 bottom-3 top-14 sm:inset-auto sm:bottom-22 sm:right-6 ${
+            isExpanded ? 'sm:w-[720px] sm:h-[720px]' : 'sm:w-[480px] sm:h-[640px]'
+          } z-50 bg-[#FBFAF7] rounded-3xl shadow-[0_24px_64px_rgba(20,35,27,0.25)] border border-[#D8E3D5] flex flex-col overflow-hidden transition-all duration-300 animate-fadeIn`}
         >
-          {/* Header */}
-          <div className="bg-stone-900 text-white p-4 flex items-center justify-between border-b border-stone-800">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-600 flex items-center justify-center text-white shadow-xs">
-                <Compass className="w-5 h-5" />
+          {/* Header with Avatar Portrait */}
+          <div className="bg-[#1D3227] text-white p-3.5 sm:p-4 flex items-center justify-between border-b border-[#2C4839] shrink-0">
+            <div className="flex items-center space-x-3">
+              <div className="relative w-11 h-11 rounded-2xl overflow-hidden ring-2 ring-[#E2BE8C]/70 shadow-sm shrink-0 bg-stone-900">
+                <img
+                  src={SYNTUC_AVATAR_URL}
+                  alt="Syntuc"
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full object-cover"
+                />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border border-[#1D3227] rounded-full" />
               </div>
               <div>
-                <div className="flex items-center space-x-1.5">
-                  <h4 id="assistant-panel-title" className="font-bold text-sm font-display text-white">Syntuc Explorer</h4>
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded border border-amber-500/30">
-                    SAINTECH AI
-                  </span>
-                </div>
-                <p className="text-[10px] text-stone-400">Intelligent Victoria Falls Guide</p>
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-[#E2BE8C] block leading-none mb-0.5">
+                  Your Syntuc Travel Guide
+                </span>
+                <h4 id="assistant-panel-title" className="font-bold text-sm sm:text-base font-serif text-white leading-tight">
+                  Syntuc Explorer
+                </h4>
+                <p className="text-[10px] text-[#A6BFAB] flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Online · Victoria Falls Guide</span>
+                </p>
               </div>
             </div>
+
             <div className="flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                aria-label={isExpanded ? 'Collapse panel' : 'Expand panel'}
+                title={isExpanded ? 'Collapse view' : 'Expand for wider view'}
+                className="hidden sm:inline-flex p-1.5 rounded-xl text-[#A6BFAB] hover:text-white hover:bg-[#2C4839] transition cursor-pointer"
+              >
+                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
               <button
                 type="button"
                 onClick={handleResetChat}
                 aria-label="Reset Chat"
                 title="Reset conversation context & start new chat"
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 border border-stone-700 transition cursor-pointer"
+                className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold text-[#D6E2D1] hover:text-white bg-[#2A4637] hover:bg-[#345845] border border-[#3D644F] transition cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                <span>Reset Chat</span>
+                <RotateCcw className="w-3.5 h-3.5 text-[#E2BE8C]" />
+                <span className="hidden sm:inline">Reset</span>
               </button>
               <button
                 onClick={() => setIsOpen(false)}
                 aria-label="Close digital guide"
-                className="p-1.5 rounded-full text-stone-400 hover:text-white hover:bg-stone-800 transition cursor-pointer"
+                className="p-1.5 rounded-xl text-[#A6BFAB] hover:text-white hover:bg-[#2C4839] transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -437,73 +479,153 @@ export const SyntucAssistantWidget: React.FC = () => {
           </div>
 
           {/* Messages list */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-stone-50/50">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
-                    msg.role === 'user'
-                      ? 'bg-amber-600 text-white rounded-tr-xs'
-                      : 'bg-white text-stone-800 border border-stone-200/80 rounded-tl-xs shadow-xs'
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">
-                    {msg.role === 'assistant' ? renderMessageContent(msg.text) : msg.text}
-                  </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FAF8F5]">
+            {/* Welcome Portrait Banner */}
+            <div className="bg-white rounded-2xl border border-[#D8E3D5] p-4 sm:p-5 shadow-[0_2px_12px_rgba(38,59,48,0.03)]">
+              <div className="flex items-start gap-3.5">
+                <div className="relative shrink-0">
+                  <img
+                    src={SYNTUC_AVATAR_URL}
+                    alt="Syntuc - Your Travel Guide"
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover ring-2 ring-[#E2BE8C]/70 shadow-sm bg-stone-900"
+                  />
+                  <span className="absolute -bottom-1 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[#20372B] text-[#E2BE8C] border border-[#E2BE8C]/50 shadow-2xs">
+                    Guide
+                  </span>
                 </div>
-
-                {/* Structured Action Chip */}
-                {msg.action && (
-                  <button
-                    onClick={() => handleActionClick(msg.action!)}
-                    className="mt-2 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer shadow-xs"
-                  >
-                    <span>{msg.action.label || 'View in Explorer'}</span>
-                    <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                  </button>
-                )}
-
-                {/* Coordinator Needed Flag */}
-                {msg.requiresCoordinator && (
-                  <div className="mt-1.5 flex items-center text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    <UserCheck className="w-3 h-3 mr-1 text-amber-700" />
-                    <span>Special requirements flagged for Victoria Falls desk coordinator review.</span>
-                  </div>
-                )}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-[#8B6A3E] block mb-0.5">
+                    Your Syntuc Travel Guide
+                  </span>
+                  <h3 className="text-base sm:text-lg font-serif font-bold text-[#20372B] leading-snug">
+                    Meet Syntuc
+                  </h3>
+                  <p className="text-xs text-[#4A5D50] leading-relaxed mt-1">
+                    Hello! I'm Syntuc, your intelligent guide to Victoria Falls. Tell me what you're looking for, and I'll help you explore and compare experiences.
+                  </p>
+                </div>
               </div>
-            ))}
+              <div className="mt-3 pt-2.5 border-t border-[#EDF2EB] flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-[#5D7063]">
+                <span className="flex items-center gap-1 text-[#20372B] font-semibold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#365D43]" /> Verified Local Rates
+                </span>
+                <span aria-hidden="true" className="text-stone-300">·</span>
+                <span>River Lodges</span>
+                <span aria-hidden="true" className="text-stone-300">·</span>
+                <span>Helicopter Flights</span>
+                <span aria-hidden="true" className="text-stone-300">·</span>
+                <span>Sunset Cruises</span>
+              </div>
+            </div>
+
+            {/* Conversation Messages */}
+            {messages.map((msg, index) => {
+              // Skip first message if identical to welcome banner to avoid duplication
+              if (index === 0 && messages.length > 1) {
+                // If conversation has progressed, we can still show or skip
+              }
+
+              return (
+                <div key={index} className="space-y-1">
+                  {msg.role === 'assistant' ? (
+                    <div className="flex items-start gap-2.5 max-w-[92%] sm:max-w-[85%]">
+                      {/* Avatar Thumbnail beside Assistant Response */}
+                      <div className="relative shrink-0 mt-0.5">
+                        <img
+                          src={SYNTUC_AVATAR_URL}
+                          alt="Syntuc"
+                          referrerPolicy="no-referrer"
+                          className="w-8 h-8 rounded-xl object-cover border border-[#D8E3D5] shadow-2xs bg-stone-900"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[11px] font-bold text-[#20372B]">Syntuc</span>
+                          <span className="text-[9px] font-semibold text-[#8B6A3E] uppercase tracking-wider">
+                            Travel Guide
+                          </span>
+                        </div>
+                        <div className="p-3.5 rounded-2xl rounded-tl-xs bg-white text-[#20372B] border border-[#D8E3D5] shadow-xs text-xs leading-relaxed">
+                          <div className="whitespace-pre-wrap">
+                            {renderMessageContent(msg.text)}
+                          </div>
+                        </div>
+
+                        {/* Structured Action Chip */}
+                        {msg.action && (
+                          <button
+                            onClick={() => handleActionClick(msg.action!)}
+                            className="mt-2 px-3 py-1.5 bg-[#F4F7F3] hover:bg-[#EAF0E8] text-[#20372B] border border-[#D8E3D5] rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer shadow-xs"
+                          >
+                            <span>{msg.action.label || 'View in Explorer'}</span>
+                            <ArrowRight className="w-3.5 h-3.5 ml-1 text-[#8B6A3E]" />
+                          </button>
+                        )}
+
+                        {/* Coordinator Needed Flag */}
+                        {msg.requiresCoordinator && (
+                          <div className="mt-1.5 flex items-center text-[10px] text-[#8B6A3E] bg-[#FAF8F5] px-2.5 py-1 rounded-lg border border-[#E8E4DA]">
+                            <UserCheck className="w-3 h-3 mr-1 text-[#8B6A3E]" />
+                            <span>Special requirements flagged for Victoria Falls desk coordinator review.</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Visitor Message: Clearly distinguished on right with dark theme */
+                    <div className="flex items-start justify-end gap-2 max-w-[88%] ml-auto">
+                      <div className="p-3.5 rounded-2xl rounded-tr-xs bg-[#20372B] text-white text-xs leading-relaxed shadow-xs">
+                        <div className="whitespace-pre-wrap">{msg.text}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             {isProcessing && (
-              <div className="flex items-center space-x-2 text-stone-400 text-xs py-2">
-                <div className="w-2 h-2 rounded-full bg-amber-600 animate-bounce" />
-                <div className="w-2 h-2 rounded-full bg-amber-600 animate-bounce delay-100" />
-                <div className="w-2 h-2 rounded-full bg-amber-600 animate-bounce delay-200" />
-                <span className="text-[11px] text-stone-500">Syntuc is thinking...</span>
+              <div className="flex items-start gap-2.5 text-xs text-[#5D7063]">
+                <img
+                  src={SYNTUC_AVATAR_URL}
+                  alt="Syntuc"
+                  referrerPolicy="no-referrer"
+                  className="w-8 h-8 rounded-xl object-cover border border-[#D8E3D5] shadow-2xs shrink-0 bg-stone-900"
+                />
+                <div className="flex items-center gap-2 bg-white border border-[#D8E3D5] rounded-2xl rounded-tl-xs px-3.5 py-2.5 shadow-2xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#365D43] animate-bounce" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#365D43] animate-bounce [animation-delay:150ms]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#365D43] animate-bounce [animation-delay:300ms]" />
+                  <span className="text-[11px] text-[#365D43] font-medium ml-1">Syntuc is thinking...</span>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Quick prompt chips */}
-          <div className="px-3 py-1.5 bg-stone-100/70 border-t border-stone-200/60 flex items-center space-x-1.5 overflow-x-auto text-[11px]">
+          <div className="px-3 py-2 bg-[#F4F7F3] border-t border-[#D8E3D5] flex items-center space-x-1.5 overflow-x-auto text-[11px] shrink-0">
             <button
               onClick={() => handleSendMessage('What is the difference between the 12m and 25m helicopter flights?')}
-              className="px-2.5 py-1 rounded-full bg-white border border-stone-200 text-stone-700 whitespace-nowrap hover:border-amber-400 hover:text-amber-800 transition"
+              className="px-2.5 py-1 rounded-full bg-white border border-[#D8E3D5] text-[#20372B] whitespace-nowrap hover:border-[#8B6A3E] hover:text-[#8B6A3E] transition shadow-2xs cursor-pointer"
             >
               Compare Helicopters
             </button>
             <button
               onClick={() => handleSendMessage('How does the Bridge Tour incentive work?')}
-              className="px-2.5 py-1 rounded-full bg-white border border-stone-200 text-stone-700 whitespace-nowrap hover:border-amber-400 hover:text-amber-800 transition"
+              className="px-2.5 py-1 rounded-full bg-white border border-[#D8E3D5] text-[#20372B] whitespace-nowrap hover:border-[#8B6A3E] hover:text-[#8B6A3E] transition shadow-2xs cursor-pointer"
             >
               Bridge Tour $0 Incentive
             </button>
             <button
+              onClick={() => handleSendMessage('Tell me about the Heritage Standard Sunset Cruise on the Zambezi.')}
+              className="px-2.5 py-1 rounded-full bg-white border border-[#D8E3D5] text-[#20372B] whitespace-nowrap hover:border-[#8B6A3E] hover:text-[#8B6A3E] transition shadow-2xs cursor-pointer"
+            >
+              Heritage Sunset Cruise
+            </button>
+            <button
               onClick={() => handleSendMessage('What are the school trip accommodation options and tariffs?')}
-              className="px-2.5 py-1 rounded-full bg-white border border-stone-200 text-stone-700 whitespace-nowrap hover:border-amber-400 hover:text-amber-800 transition"
+              className="px-2.5 py-1 rounded-full bg-white border border-[#D8E3D5] text-[#20372B] whitespace-nowrap hover:border-[#8B6A3E] hover:text-[#8B6A3E] transition shadow-2xs cursor-pointer"
             >
               School Trip Tariffs
             </button>
@@ -515,15 +637,15 @@ export const SyntucAssistantWidget: React.FC = () => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="p-3 bg-white border-t border-stone-200 flex items-center space-x-2"
+            className="p-3 bg-white border-t border-[#D8E3D5] flex items-center space-x-2 shrink-0"
           >
             <button
               type="button"
               onClick={handleVoiceInput}
-              className={`p-2 rounded-xl border transition ${
+              className={`p-2 rounded-xl border transition cursor-pointer ${
                 isListening
                   ? 'bg-rose-500 text-white border-rose-600 animate-pulse'
-                  : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                  : 'bg-[#F4F7F3] text-[#4A5D50] border-[#D8E3D5] hover:bg-[#EAF0E8]'
               }`}
               title={isListening ? 'Listening... click to stop' : 'Click for voice input'}
             >
@@ -534,16 +656,16 @@ export const SyntucAssistantWidget: React.FC = () => {
               type="text"
               value={inputMessage}
               onChange={e => setInputMessage(e.target.value)}
-              placeholder={isListening ? 'Listening to your voice...' : 'Ask about Victoria Falls lodges, flights, cruises...'}
-              className="flex-1 px-3 py-2 text-xs rounded-xl bg-stone-50 border border-stone-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+              placeholder={isListening ? 'Listening to your voice...' : 'Ask Syntuc about Victoria Falls lodges, flights, cruises...'}
+              className="flex-1 px-3 py-2 text-xs rounded-xl bg-[#FAF8F5] border border-[#D8E3D5] focus:outline-hidden focus:ring-2 focus:ring-[#365D43]/20 focus:border-[#365D43]"
             />
 
             <button
               type="submit"
               disabled={isProcessing || !inputMessage.trim()}
-              className="p-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-stone-200 text-white transition cursor-pointer"
+              className="p-2 rounded-xl bg-[#20372B] hover:bg-[#2A4637] disabled:bg-stone-200 text-white transition cursor-pointer shadow-xs"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4 text-[#E2BE8C]" />
             </button>
           </form>
         </div>

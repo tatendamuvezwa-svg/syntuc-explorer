@@ -13,6 +13,7 @@ import { SchoolTripPlannerModal } from './components/guest/SchoolTripPlannerModa
 import { SyntucAssistantWidget } from './components/guest/SyntucAssistantWidget.tsx';
 import { CoordinatorPortal } from './components/coordinator/CoordinatorPortal.tsx';
 import { FeedbackView } from './components/guest/FeedbackView.tsx';
+import { TalkView } from './components/guest/TalkView.tsx';
 import { CheckCircle2 } from 'lucide-react';
 import { initAnalyticsSession, trackEvent } from './services/analytics.ts';
 
@@ -41,6 +42,9 @@ function MainAppContent() {
     if (path.startsWith('/feedback')) {
       return { path: '/feedback' };
     }
+    if (path === '/talk' || path === '/talk-to-syntuc' || path === '/chat') {
+      return { path: '/talk' };
+    }
     return { path: '/' };
   });
 
@@ -55,6 +59,8 @@ function MainAppContent() {
         setCurrentRoute({ path: '/coordinator' });
       } else if (path.startsWith('/feedback')) {
         setCurrentRoute({ path: '/feedback' });
+      } else if (path === '/talk' || path === '/talk-to-syntuc' || path === '/chat') {
+        setCurrentRoute({ path: '/talk' });
       } else {
         setCurrentRoute({ path: '/' });
       }
@@ -73,6 +79,9 @@ function MainAppContent() {
     } else if (path.startsWith('/feedback')) {
       window.history.pushState({}, '', path);
       setCurrentRoute({ path: '/feedback' });
+    } else if (path === '/talk' || path === '/talk-to-syntuc' || path === '/chat') {
+      window.history.pushState({}, '', path);
+      setCurrentRoute({ path: '/talk' });
     } else {
       window.history.pushState({}, '', '/');
       setCurrentRoute({ path: '/' });
@@ -111,6 +120,8 @@ function MainAppContent() {
           />
         ) : currentRoute.path === '/feedback' ? (
           <FeedbackView onBackToExplore={() => navigateTo('/')} />
+        ) : currentRoute.path === '/talk' ? (
+          <TalkView onBackToExplore={() => navigateTo('/')} />
         ) : (
           <>
             {activeTab === 'packages' ? (

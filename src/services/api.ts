@@ -427,7 +427,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/products`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load coordinator products');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to load coordinator products');
+    }
     return res.json();
   },
 
@@ -569,7 +572,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/operators`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load operators');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to load operators');
+    }
     return res.json();
   },
 
@@ -594,7 +600,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/properties`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load properties');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to load properties');
+    }
     return res.json();
   },
 
@@ -602,7 +611,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/coordinator/packages`, {
       headers: getStaffHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to load coordinator packages');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to load coordinator packages');
+    }
     return res.json();
   },
 

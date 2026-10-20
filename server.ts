@@ -78,6 +78,14 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/marketing', marketingRoutes);
 app.use('/api/reviews', reviewsRoutes);
 
+// Catch-all JSON 404 handler for unmatched API routes to prevent HTML falling through
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'API_ENDPOINT_NOT_FOUND',
+    message: `API route ${req.method} ${req.originalUrl} not found.`,
+  });
+});
+
 // Server startup with direct authoritative Cloud Firestore
 async function startServer() {
   try {

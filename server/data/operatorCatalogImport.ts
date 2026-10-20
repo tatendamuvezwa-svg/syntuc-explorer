@@ -7,13 +7,15 @@ export type CatalogFee = {
 };
 
 export type OperatorCatalogImportItem = {
-  operatorName: 'Wild Horizons' | 'Shearwater' | 'Pure Africa';
+  operatorName: string;
   name: string;
   categorySlug: string;
-  productType: 'activity' | 'package' | 'transfer' | 'fee';
-  basePrice: number;
-  priceBasis: 'per_person' | 'per_trip' | 'per_transfer' | 'from';
+  productType: 'activity' | 'package' | 'transfer' | 'fee' | 'accommodation';
+  basePrice: number | null;
+  priceBasis: 'per_person' | 'per_trip' | 'per_transfer' | 'from' | 'per_room_night' | 'unknown' | null;
   shortDescription: string;
+  fullDescription?: string;
+  classification?: 'Budget' | 'Mid-range' | 'Luxury';
   inclusions: string[];
   exclusions: string[];
   mandatoryFees: CatalogFee[];
@@ -21,6 +23,8 @@ export type OperatorCatalogImportItem = {
   verificationNotes: string[];
   authoritativeOverride?: boolean;
 };
+
+export { accommodationCatalogImport } from './accommodationCatalogImport.ts';
 
 const wh = 'Wild Horizons brochure summary supplied by the user; original brochure verification required';
 const sh = '2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication';

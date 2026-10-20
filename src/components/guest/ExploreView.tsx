@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Ship,
 } from 'lucide-react';
+import syntucAvatarImg from '../../assets/images/syntuc_guide_avatar_1792315099007.jpg';
 
 interface ExploreViewProps {
   onOpenFeedback?: (productId?: string) => void;
@@ -149,10 +150,19 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenFeedback }) => {
                   const el = document.getElementById('syntuc-assistant-trigger');
                   if (el) el.click();
                 }}
-                className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full border border-white/45 bg-white/[0.07] px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition duration-200 hover:border-white/70 hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                aria-label="Talk to Syntuc — Your Syntuc Travel Guide"
+                className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full border border-white/45 bg-white/[0.07] px-5 py-3 text-sm font-semibold text-white backdrop-blur-sm transition duration-200 hover:border-white/70 hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer shadow-xs group"
               >
-                <Sparkles className="h-4 w-4 text-[#E3C49A]" />
-                Talk to Syntuc
+                <div className="relative w-6 h-6 rounded-full overflow-hidden ring-1.5 ring-[#E3C49A] shrink-0 bg-stone-900">
+                  <img
+                    src={syntucAvatarImg || '/uploads/syntuc_avatar.jpg'}
+                    alt="Syntuc"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                  />
+                  <span className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                </div>
+                <span>Talk to Syntuc</span>
               </button>
 
               <button
