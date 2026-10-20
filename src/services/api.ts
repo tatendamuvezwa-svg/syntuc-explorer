@@ -32,6 +32,7 @@ function getStaffHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
+    'x-syntuc-database-id': localStorage.getItem('syntuc_admin_database_id') || 'ai-studio-syntucexplorer-60065304-e43e-44fe-88e1-2ee33d74fe10',
   };
 }
 
