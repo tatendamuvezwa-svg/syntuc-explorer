@@ -69,6 +69,8 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   const [reservations, setReservations] = useState<ReservationRequest[]>([]);
   const [boatCruiseReviews, setBoatCruiseReviews] = useState<BoatCruiseReview[]>([]);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [reservationsLoadError, setReservationsLoadError] = useState<string | null>(null);
+  const [mediaLoadError, setMediaLoadError] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [packages, setPackages] = useState<PackageType[]>([]);
   const [operators, setOperators] = useState<any[]>([]);
@@ -158,7 +160,13 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     try {
       const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes, reviewsRes] = await Promise.all([
         api.getLeads().catch((err) => { console.warn('Notice loading leads:', err); return []; }),
-        api.getReservations().catch((err) => { console.warn('Notice loading reservations:', err); return []; }),
+        api.getReservations()
+          .then((data) => { setReservationsLoadError(null); return data; })
+          .catch((err) => {
+            console.error('Reservation records could not be loaded:', err);
+            setReservationsLoadError(err?.message || 'Reservations could not be loaded from the authoritative store.');
+            return null;
+          }),
         api.getCoordinatorProducts().catch((err) => { console.warn('Notice loading products:', err); return []; }),
         api.getCoordinatorPackages().catch((err) => { console.warn('Notice loading packages:', err); return []; }),
         api.getOperators().catch((err) => { console.warn('Notice loading operators:', err); return []; }),
@@ -172,7 +180,9 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         }),
       ]);
       setLeads(leadsRes);
-      setReservations(resRes);
+      // Preserve the last known display state when the reservation request fails.
+      // An infrastructure failure must not be presented as zero reservations.
+      if (Array.isArray(resRes)) setReservations(resRes);
       setProducts(prodRes);
       setPackages(pkgRes);
       setOperators(opsRes);
@@ -214,11 +224,25 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   }, [isAuthenticated]);
 
   useEffect(() => {
+    let cancelled = false;
     if (selectedProductForMedia && selectedProductForMedia.trim() !== '') {
-      api.getProductMedia(selectedProductForMedia).then(setProductMediaList).catch(() => setProductMediaList([]));
+      setMediaLoadError(null);
+      api.getProductMedia(selectedProductForMedia)
+        .then((items) => {
+          if (cancelled) return;
+          setProductMediaList(items);
+          setMediaLoadError(null);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error('Product media could not be loaded:', err);
+          setMediaLoadError(err?.message || 'Product media could not be loaded from the authoritative store.');
+        });
     } else {
       setProductMediaList([]);
+      setMediaLoadError(null);
     }
+    return () => { cancelled = true; };
   }, [selectedProductForMedia]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -356,17 +380,20 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
       formData.append('isPrimary', isPrimaryUpload ? 'true' : 'false');
       formData.append('displayOrder', String(productMediaList.length));
 
-      await api.uploadMedia(formData);
-      alert('Media asset uploaded and linked to product successfully!');
+      const uploadResult = await api.uploadMedia(formData);
+      const updated = await api.getProductMedia(selectedProductForMedia);
+      if (!Array.isArray(updated) || !updated.some((item: any) => item.id === uploadResult.mediaId)) {
+        throw new Error('The upload endpoint responded, but the saved media record could not be reloaded for this product. The image has not been confirmed as linked.');
+      }
+      setProductMediaList(updated);
+      setMediaLoadError(null);
+      const prodRes = await api.getCoordinatorProducts();
+      setProducts(prodRes);
       setMediaUploadFile(null);
       setMediaUploadPreview(null);
       setNewMediaCaption('');
       setNewMediaAlt('');
-
-      const updated = await api.getProductMedia(selectedProductForMedia);
-      setProductMediaList(updated);
-      const prodRes = await api.getCoordinatorProducts();
-      setProducts(prodRes);
+      alert('Image uploaded, persisted, linked to this product, and verified after reload.');
     } catch (e: any) {
       alert('Media upload failed: ' + e.message);
     } finally {
@@ -660,6 +687,13 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         {/* Tab 1: Reservations */}
         {activeTab === 'reservations' && (
           <div className="mt-6 space-y-4">
+            {reservationsLoadError && (
+              <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                <p className="font-semibold">Reservation data could not be loaded</p>
+                <p className="mt-1 text-xs">{reservationsLoadError}</p>
+                <p className="mt-1 text-xs">The dashboard is preserving its previous display state. This error does not prove that reservation records were deleted.</p>
+              </div>
+            )}
             <h3 className="text-sm font-bold uppercase tracking-wider text-stone-500">
               Active Reservation Requests
             </h3>
@@ -1306,7 +1340,13 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                 Gallery Assets for Selected Product ({productMediaList.length})
               </h4>
 
-              {productMediaList.length === 0 ? (
+              {mediaLoadError ? (
+                <div role="alert" className="p-5 text-center text-red-800 bg-red-50 rounded-2xl border border-red-200">
+                  <p className="font-semibold">Media could not be verified</p>
+                  <p className="mt-1 text-xs">{mediaLoadError}</p>
+                  <p className="mt-2 text-xs">This is a loading/persistence error, not confirmation that the product has no images. Do not re-upload existing images until the issue is checked.</p>
+                </div>
+              ) : productMediaList.length === 0 ? (
                 <div className="p-8 text-center text-stone-400 bg-stone-50 rounded-2xl border border-dashed border-stone-300">
                   No images currently linked to this product. Upload or link an image below.
                 </div>
