@@ -29,10 +29,12 @@ function getSessionHeaders(): Record<string, string> {
 
 function getStaffHeaders(): Record<string, string> {
   const token = localStorage.getItem('syntuc_staff_token') || '';
+  const selectedDatabaseId = localStorage.getItem('syntuc_admin_database_id');
+  const alternateDatabaseId = 'ai-studio-syntucexplorer-8297878a-a0e6-49a9-aecf-fcb4bb4e0a46';
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
-    'x-syntuc-database-id': localStorage.getItem('syntuc_admin_database_id') || 'ai-studio-syntucexplorer-60065304-e43e-44fe-88e1-2ee33d74fe10',
+    ...(selectedDatabaseId === alternateDatabaseId ? { 'x-syntuc-database-id': selectedDatabaseId } : {}),
   };
 }
 
