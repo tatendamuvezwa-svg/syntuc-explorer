@@ -13,7 +13,7 @@ import assistantRoutes from './server/routes/assistant.ts';
 import analyticsRoutes from './server/routes/analytics.ts';
 import marketingRoutes from './server/routes/marketing.ts';
 import reviewsRoutes from './server/routes/reviews.ts';
-import { getFirestoreDb } from './server/lib/firestore.ts';
+import { getFirestoreDb, getFirebaseConfig } from './server/lib/firestore.ts';
 import { ensureHeritageCruiseProduct } from './server/services/seedHeritageCruise.ts';
 
 dotenv.config();
@@ -54,11 +54,24 @@ app.use('/uploads', express.static(uploadsDir));
 
 // System Health & Diagnostics
 app.get('/api/health', (req, res) => {
+  let firestoreDiagnostics: Record<string, unknown> = { configuredDatabaseId: null, runtimeDatabaseId: null };
+  try {
+    const cfg = getFirebaseConfig();
+    const db = getFirestoreDb() as any;
+    firestoreDiagnostics = {
+      configuredDatabaseId: cfg.firestoreDatabaseId || '(default)',
+      runtimeDatabaseId: db?._databaseId?.database || db?._databaseId?.databaseId || null,
+      projectId: db?._databaseId?.projectId || cfg.projectId || null,
+    };
+  } catch (error) {
+    firestoreDiagnostics = { diagnosticError: 'FIRESTORE_DIAGNOSTICS_UNAVAILABLE' };
+  }
   res.json({
     status: 'ok',
     product: 'Syntuc Explorer',
     brand: 'SAINTECH',
     database: 'Cloud Firestore (Authoritative Native)',
+    firestoreDiagnostics,
     version: '3.0.0',
     timestamp: new Date().toISOString(),
   });
