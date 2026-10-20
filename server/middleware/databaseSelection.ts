@@ -7,6 +7,7 @@ export async function selectedDatabaseContext(req: Request, res: Response, next:
   if (!requested) { next(); return; }
   const supported = requested === getDefaultFirestoreDatabaseId() || SUPPORTED_FIRESTORE_DATABASES.some((db) => db.id === requested);
   if (!supported) { res.status(400).json({ error: 'UNSUPPORTED_DATABASE_SELECTION' }); return; }
+  if (requested === getDefaultFirestoreDatabaseId()) { runWithFirestoreDatabase(requested, () => next()); return; }
   const authorization = req.header('authorization') || '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
   const tokenResult = verifyStaffAuthToken(token);
