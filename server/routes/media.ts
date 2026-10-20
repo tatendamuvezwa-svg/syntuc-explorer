@@ -82,7 +82,7 @@ async function persistMediaToFirestore(mediaAsset: any) {
       ? mediaAsset.thumbnailUrl
       : `__CHUNKED__:${mediaAsset.id}`;
 
-    await setDoc(doc(fdb, 'media_assets', mediaAsset.id), {
+    await setDocById('media_assets', mediaAsset.id, {
       ...mediaAsset,
       url: `__CHUNKED__:${mediaAsset.id}`,
       thumbnailUrl: thumb,
@@ -91,14 +91,14 @@ async function persistMediaToFirestore(mediaAsset: any) {
       rawLength: rawUrl.length,
       createdAt: mediaAsset.createdAt || new Date().toISOString(),
       cloudPersistedAt: new Date().toISOString(),
-    });
+    }, false);
   } else {
-    await setDoc(doc(fdb, 'media_assets', mediaAsset.id), {
+    await setDocById('media_assets', mediaAsset.id, {
       ...mediaAsset,
       isChunked: false,
       createdAt: mediaAsset.createdAt || new Date().toISOString(),
       cloudPersistedAt: new Date().toISOString(),
-    });
+    }, false);
   }
 }
 
