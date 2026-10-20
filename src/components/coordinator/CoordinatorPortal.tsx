@@ -550,7 +550,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
             </label>
           )}
           <button
-            onClick={loadAllData
+            onClick={loadAllData}
             className="p-1.5 text-stone-400 hover:text-white rounded-lg transition"
             title="Refresh Data"
           >
