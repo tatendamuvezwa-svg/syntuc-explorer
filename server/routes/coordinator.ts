@@ -229,9 +229,13 @@ router.get('/reservations', requireCoordinatorAuth, async (req: AuthenticatedSta
     });
 
     res.json(enriched);
-  } catch (error) {
-    console.warn('Notice loading reservations (returning empty baseline):', error);
-    res.json([]);
+  } catch (error: any) {
+    console.error('[Coordinator] Failed to load reservations from the authoritative store:', error);
+    res.status(500).json({
+      error: 'FAILED_TO_LOAD_RESERVATIONS',
+      message: 'Reservations could not be loaded from the authoritative data store. The result is not an empty reservation list.',
+      diagnosticCode: error?.code || 'FIRESTORE_READ_FAILED',
+    });
   }
 });
 
