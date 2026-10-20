@@ -21,13 +21,25 @@ import {
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { getBaselineProducts, getBaselinePackages } from './baselineCatalog.ts';
 
 // Silence internal Firebase WebChannel / gRPC idle stream disconnect warnings
 setLogLevel('silent');
 
-let firestoreInstance: Firestore | null = null;
+const firestoreInstances = new Map<string, Firestore>();
 let firebaseConfig: any = null;
+const databaseContext = new AsyncLocalStorage<string>();
+export const SUPPORTED_FIRESTORE_DATABASES = [
+  { id: 'ai-studio-syntucexplorer-60065304-e43e-44fe-88e1-2ee33d74fe10', label: 'Primary · Syntuc Explorer' },
+  { id: 'ai-studio-syntucexplorer-8297878a-a0e6-49a9-aecf-fcb4bb4e0a46', label: 'Alternate · Legacy / Recovery' },
+] as const;
+export function getDefaultFirestoreDatabaseId(): string { const cfg = getFirebaseConfig(); return cfg.firestoreDatabaseId || '(default)'; }
+export function getActiveFirestoreDatabaseId(): string { return databaseContext.getStore() || getDefaultFirestoreDatabaseId(); }
+export function runWithFirestoreDatabase<T>(databaseId: string, callback: () => T): T {
+  if (databaseId !== getDefaultFirestoreDatabaseId() && !SUPPORTED_FIRESTORE_DATABASES.some((database) => database.id === databaseId)) throw new Error('UNSUPPORTED_FIRESTORE_DATABASE');
+  return databaseContext.run(databaseId, callback);
+}
 
 // ==========================================
 // CIRCUIT BREAKER & IN-MEMORY RESILIENCE LAYER
@@ -68,14 +80,12 @@ interface CacheEntry<T> {
 
 const collectionCache = new Map<string, CacheEntry<any[]>>();
 const memoryStore = new Map<string, Map<string, any>>();
-let tombstonesCache: CacheEntry<Set<string>> | null = null;
-
+const tombstonesCache = new Map<string, CacheEntry<Set<string>>>();
+function scopedKey(name: string): string { return `${getActiveFirestoreDatabaseId()}::${name}`; }
 function getMemoryCollection(name: string): Map<string, any> {
-  let col = memoryStore.get(name);
-  if (!col) {
-    col = new Map<string, any>();
-    memoryStore.set(name, col);
-  }
+  const key = scopedKey(name);
+  let col = memoryStore.get(key);
+  if (!col) { col = new Map<string, any>(); memoryStore.set(key, col); }
   return col;
 }
 
@@ -367,29 +377,20 @@ export function getFirebaseConfig() {
 }
 
 export function getFirestoreDb(): Firestore {
-  if (firestoreInstance) return firestoreInstance;
-
   const cfg = getFirebaseConfig();
-  const app = getApps().length > 0
-    ? getApps()[0]
-    : initializeApp({
-        projectId: cfg.projectId,
-        apiKey: cfg.apiKey,
-        authDomain: cfg.authDomain,
-        appId: cfg.appId,
-        storageBucket: cfg.storageBucket,
-      });
-
-  const dbId = cfg.firestoreDatabaseId || '(default)';
-  try {
-    firestoreInstance = initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true,
-    }, dbId);
-  } catch (_) {
-    firestoreInstance = getFirestore(app, dbId);
-  }
-  console.log('[Firestore] Authoritative database initialized:', cfg.firestoreDatabaseId);
-  return firestoreInstance;
+  const dbId = getActiveFirestoreDatabaseId();
+  const cached = firestoreInstances.get(dbId);
+  if (cached) return cached;
+  const app = getApps().length > 0 ? getApps()[0] : initializeApp({
+    projectId: cfg.projectId, apiKey: cfg.apiKey, authDomain: cfg.authDomain,
+    appId: cfg.appId, storageBucket: cfg.storageBucket,
+  });
+  let instance: Firestore;
+  try { instance = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId); }
+  catch (_) { instance = getFirestore(app, dbId); }
+  firestoreInstances.set(dbId, instance);
+  console.log('[Firestore] Database instance ready:', dbId);
+  return instance;
 }
 
 export async function getDocById<T = DocumentData>(collectionName: string, id: string): Promise<T | null> {
@@ -415,7 +416,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
       console.warn(`[Firestore] Read notice on doc '${collectionName}/${id}', serving cached memory copy:`, err.message);
       return memDoc as T;
     }
-    if (BASELINE_COLLECTIONS[collectionName]) {
+    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName]) {
       const baseline = BASELINE_COLLECTIONS[collectionName].find((d: any) => d.id === id);
       if (baseline) return baseline as T;
     }
@@ -438,7 +439,7 @@ export async function setDocById<T extends Record<string, any>>(
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   memCol.set(id, merge ? { ...existing, id, ...data } : { id, ...data });
-  collectionCache.delete(collectionName);
+  collectionCache.delete(scopedKey(collectionName));
 }
 
 export async function updateDocById(
@@ -454,7 +455,7 @@ export async function updateDocById(
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   memCol.set(id, { ...existing, id, ...data });
-  collectionCache.delete(collectionName);
+  collectionCache.delete(scopedKey(collectionName));
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
@@ -465,7 +466,7 @@ export async function deleteDocById(collectionName: string, id: string): Promise
   // Invalidate local memory and collection cache only after successful durable deletion
   const memCol = getMemoryCollection(collectionName);
   memCol.delete(id);
-  collectionCache.delete(collectionName);
+  collectionCache.delete(scopedKey(collectionName));
 }
 
 export async function getCollectionDocs<T = DocumentData>(
@@ -478,7 +479,7 @@ export async function getCollectionDocs<T = DocumentData>(
 
   // Serve from memory collection cache if fresh (prevents query storms and preserves free-tier read limits)
   if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
-    const cached = collectionCache.get(collectionName);
+    const cached = collectionCache.get(scopedKey(collectionName));
     if (cached && now - cached.timestamp < CACHE_TTL_MS) {
       return [...cached.data] as T[];
     }
@@ -492,7 +493,7 @@ export async function getCollectionDocs<T = DocumentData>(
     const docs: T[] = [];
     if (!hasConstraints) {
       memCol.clear();
-      collectionCache.delete(collectionName);
+      collectionCache.delete(scopedKey(collectionName));
     }
     snap.forEach((d) => {
       const docData = { id: d.id, ...d.data() } as T;
@@ -501,7 +502,7 @@ export async function getCollectionDocs<T = DocumentData>(
     });
 
     if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
-      collectionCache.set(collectionName, { timestamp: now, data: docs });
+      collectionCache.set(scopedKey(collectionName), { timestamp: now, data: docs });
     }
 
     return docs;
@@ -511,7 +512,7 @@ export async function getCollectionDocs<T = DocumentData>(
     }
 
     // If cached collection data exists in memory, serve it with a warning
-    const cached = collectionCache.get(collectionName);
+    const cached = collectionCache.get(scopedKey(collectionName));
     if (!hasConstraints && cached && cached.data.length > 0) {
       console.warn(`[Firestore] Read error on '${collectionName}', serving ${cached.data.length} cached items:`, err.message);
       return [...cached.data] as T[];
@@ -524,7 +525,7 @@ export async function getCollectionDocs<T = DocumentData>(
     }
 
     // Static taxonomies only have baseline fallbacks
-    if (BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
+    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
       const baselines = BASELINE_COLLECTIONS[collectionName];
       console.warn(`[Firestore] Read error on '${collectionName}', serving taxonomy baseline:`, err.message);
       return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
@@ -543,83 +544,32 @@ export async function getCollectionDocs<T = DocumentData>(
  */
 export async function recordTombstone(collectionName: string, recordId: string): Promise<void> {
   const tombstoneId = `${collectionName}_${recordId}`;
-
-  // Update in-memory tombstones
-  if (!tombstonesCache) {
-    tombstonesCache = { timestamp: Date.now(), data: new Set<string>() };
-  }
-  tombstonesCache.data.add(tombstoneId);
-  tombstonesCache.data.add(recordId);
-
-  if (isBreakerActive()) {
-    return;
-  }
-
-  try {
-    const fdb = getFirestoreDb();
-    await setDoc(doc(fdb, 'deleted_records', tombstoneId), {
-      id: tombstoneId,
-      collectionName,
-      recordId,
-      deletedAt: new Date().toISOString(),
-    });
-  } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      tripCircuitBreaker();
-    }
-  }
+  const dbKey = getActiveFirestoreDatabaseId();
+  let cached = tombstonesCache.get(dbKey);
+  if (!cached) { cached = { timestamp: Date.now(), data: new Set<string>() }; tombstonesCache.set(dbKey, cached); }
+  cached.data.add(tombstoneId); cached.data.add(recordId);
+  if (isBreakerActive()) return;
+  try { await setDoc(doc(getFirestoreDb(), 'deleted_records', tombstoneId), { id: tombstoneId, collectionName, recordId, deletedAt: new Date().toISOString() }); }
+  catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); }
 }
-
-/** Strict point lookup for callers that must fail closed when tombstone reads fail. */
 export async function hasTombstone(collectionName: string, recordId: string): Promise<boolean> {
   const tombstoneId = `${collectionName}_${recordId}`;
-  if (tombstonesCache && (tombstonesCache.data.has(tombstoneId) || tombstonesCache.data.has(recordId))) {
-    return true;
-  }
-  if (isBreakerActive()) {
-    return false;
-  }
-  try {
-    const fdb = getFirestoreDb();
-    const snap = await getDoc(doc(fdb, 'deleted_records', tombstoneId));
-    return snap.exists();
-  } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      tripCircuitBreaker();
-    }
-    return tombstonesCache ? (tombstonesCache.data.has(tombstoneId) || tombstonesCache.data.has(recordId)) : false;
-  }
+  const cached = tombstonesCache.get(getActiveFirestoreDatabaseId());
+  if (cached && (cached.data.has(tombstoneId) || cached.data.has(recordId))) return true;
+  if (isBreakerActive()) return false;
+  try { return (await getDoc(doc(getFirestoreDb(), 'deleted_records', tombstoneId))).exists(); }
+  catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); return cached ? (cached.data.has(tombstoneId) || cached.data.has(recordId)) : false; }
 }
-
 export async function getTombstones(): Promise<Set<string>> {
-  const now = Date.now();
-  if (tombstonesCache && now - tombstonesCache.timestamp < CACHE_TTL_MS) {
-    return new Set(tombstonesCache.data);
-  }
-
-  const set: Set<string> = tombstonesCache ? new Set<string>(tombstonesCache.data) : new Set<string>();
-
-  if (isBreakerActive()) {
-    return set;
-  }
-
+  const now = Date.now(); const dbKey = getActiveFirestoreDatabaseId(); const cached = tombstonesCache.get(dbKey);
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) return new Set(cached.data);
+  const set: Set<string> = cached ? new Set(cached.data) : new Set<string>();
+  if (isBreakerActive()) return set;
   try {
-    const fdb = getFirestoreDb();
-    const snap = await getDocs(collection(fdb, 'deleted_records'));
-    snap.forEach((d) => {
-      set.add(d.id);
-      const data = d.data();
-      if (data.collectionName && data.recordId) {
-        set.add(`${data.collectionName}_${data.recordId}`);
-      }
-    });
-    tombstonesCache = { timestamp: now, data: set };
-  } catch (err: any) {
-    if (isQuotaOrNetworkError(err)) {
-      tripCircuitBreaker();
-    }
-  }
-
+    const snap = await getDocs(collection(getFirestoreDb(), 'deleted_records'));
+    snap.forEach((d) => { set.add(d.id); const value = d.data(); if (value.collectionName && value.recordId) set.add(`${value.collectionName}_${value.recordId}`); });
+    tombstonesCache.set(dbKey, { timestamp: now, data: set });
+  } catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); }
   return set;
 }
 

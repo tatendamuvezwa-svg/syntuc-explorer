@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { getDocById, getCollectionDocs, where } from '../lib/firestore.ts';
+import { getDocById, getCollectionDocs, where, getDefaultFirestoreDatabaseId, runWithFirestoreDatabase } from '../lib/firestore.ts';
 
 export interface AuthenticatedStaffRequest extends Request {
   staffUser?: {
@@ -269,7 +269,7 @@ export async function requireCoordinatorAuth(
     }
 
     // Load authorized staff user from Firestore by the verified userId
-    const staff = await getDocById<any>('users', tokenResult.userId);
+    const staff = await runWithFirestoreDatabase(getDefaultFirestoreDatabaseId(), () => getDocById<any>('users', tokenResult.userId!));
 
     if (!staff || !staff.isActive) {
       res.status(401).json({
