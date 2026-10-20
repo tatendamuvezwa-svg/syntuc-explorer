@@ -138,7 +138,47 @@ router.get('/product/:productId', async (req, res: Response) => {
       .filter((m) => !tombstones.has(`media_assets_${m.id}`))
       .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
 
-    res.json(activeMedia);
+    // Large data-URI images are stored as ordered Firestore media_chunks. Rehydrate
+    // them before returning the gallery; otherwise the UI receives the internal
+    // __CHUNKED__:mediaId marker as an image URL and thumbnails appear broken.
+    const hydratedMedia = await Promise.all(activeMedia.map(async (asset) => {
+      if (!asset.isChunked || typeof asset.url !== 'string' || !asset.url.startsWith('__CHUNKED__:')) {
+        return asset;
+      }
+
+      const mediaId = asset.id;
+      const totalChunks = Number(asset.totalChunks);
+      if (!mediaId || !Number.isInteger(totalChunks) || totalChunks < 1 || totalChunks > 100) {
+        throw new Error(`INVALID_MEDIA_CHUNK_METADATA:${String(mediaId)}`);
+      }
+
+      const fdb = getFirestoreDb();
+      const chunks = await Promise.all(
+        Array.from({ length: totalChunks }, (_, index) =>
+          getDoc(doc(fdb, 'media_chunks', `${mediaId}_chunk_${index}`))
+        )
+      );
+      if (chunks.some((chunk) => !chunk.exists())) {
+        throw new Error(`MEDIA_CHUNK_MISSING:${mediaId}`);
+      }
+
+      const reconstructedUrl = chunks
+        .map((chunk) => String(chunk.data()?.data || ''))
+        .join('');
+      if (!reconstructedUrl.startsWith('data:image/')) {
+        throw new Error(`MEDIA_CHUNK_DATA_INVALID:${mediaId}`);
+      }
+
+      return {
+        ...asset,
+        url: reconstructedUrl,
+        thumbnailUrl: typeof asset.thumbnailUrl === 'string' && !asset.thumbnailUrl.startsWith('__CHUNKED__:')
+          ? asset.thumbnailUrl
+          : reconstructedUrl,
+      };
+    }));
+
+    res.json(hydratedMedia);
   } catch (error) {
     console.error('Error fetching product media from Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_MEDIA' });
