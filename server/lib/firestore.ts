@@ -416,7 +416,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
       console.warn(`[Firestore] Read notice on doc '${collectionName}/${id}', serving cached memory copy:`, err.message);
       return memDoc as T;
     }
-    if (BASELINE_COLLECTIONS[collectionName]) {
+    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName]) {
       const baseline = BASELINE_COLLECTIONS[collectionName].find((d: any) => d.id === id);
       if (baseline) return baseline as T;
     }
@@ -525,7 +525,7 @@ export async function getCollectionDocs<T = DocumentData>(
     }
 
     // Static taxonomies only have baseline fallbacks
-    if (BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
+    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
       const baselines = BASELINE_COLLECTIONS[collectionName];
       console.warn(`[Firestore] Read error on '${collectionName}', serving taxonomy baseline:`, err.message);
       return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
