@@ -193,9 +193,9 @@ router.get('/leads', requireCoordinatorAuth, async (req: AuthenticatedStaffReque
     }));
 
     res.json(enriched);
-  } catch (error) {
-    console.warn('Notice loading leads (returning empty baseline):', error);
-    res.json([]);
+  } catch (error: any) {
+    console.error('[Coordinator API] Lead read failed:', error);
+    res.status(503).json({ error: 'LEADS_UNAVAILABLE', diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED' });
   }
 });
 
@@ -229,9 +229,9 @@ router.get('/reservations', requireCoordinatorAuth, async (req: AuthenticatedSta
     });
 
     res.json(enriched);
-  } catch (error) {
-    console.warn('Notice loading reservations (returning empty baseline):', error);
-    res.json([]);
+  } catch (error: any) {
+    console.error('[Coordinator API] Reservation read failed:', error);
+    res.status(503).json({ error: 'RESERVATIONS_UNAVAILABLE', diagnosticCode: typeof error?.code === 'string' ? error.code : 'FIRESTORE_READ_FAILED' });
   }
 });
 
