@@ -214,10 +214,15 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
   };
 
   useEffect(() => {
+    if (isAuthenticated && staffUser?.role !== 'admin' && selectedDatabaseId !== PRIMARY_DATABASE_ID) {
+      setSelectedDatabaseId(PRIMARY_DATABASE_ID);
+      try { localStorage.removeItem('syntuc_admin_database_id'); } catch (_) {}
+      return;
+    }
     if (isAuthenticated) {
       loadAllData();
     }
-  }, [isAuthenticated, selectedDatabaseId]);
+  }, [isAuthenticated, selectedDatabaseId, staffUser?.role]);
 
   useEffect(() => {
     if (selectedProductForMedia && selectedProductForMedia.trim() !== '') {
