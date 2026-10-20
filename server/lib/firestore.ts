@@ -370,15 +370,26 @@ export function getFirestoreDb(): Firestore {
   if (firestoreInstance) return firestoreInstance;
 
   const cfg = getFirebaseConfig();
-  const app = getApps().length > 0
-    ? getApps()[0]
-    : initializeApp({
-        projectId: cfg.projectId,
-        apiKey: cfg.apiKey,
-        authDomain: cfg.authDomain,
-        appId: cfg.appId,
-        storageBucket: cfg.storageBucket,
-      });
+  const existingApp = getApps().find((candidate) => candidate.name === '[DEFAULT]');
+  let app;
+  if (existingApp) {
+    // Never silently attach this repository's Firestore client to a pre-existing
+    // Firebase app configured for a different project.
+    if (existingApp.options.projectId !== cfg.projectId) {
+      throw new Error(
+        `FIREBASE_PROJECT_MISMATCH: config targets '${cfg.projectId}' but default app targets '${existingApp.options.projectId || 'unknown'}'. Refusing to read or write the wrong project.`
+      );
+    }
+    app = existingApp;
+  } else {
+    app = initializeApp({
+      projectId: cfg.projectId,
+      apiKey: cfg.apiKey,
+      authDomain: cfg.authDomain,
+      appId: cfg.appId,
+      storageBucket: cfg.storageBucket,
+    });
+  }
 
   const dbId = cfg.firestoreDatabaseId || '(default)';
   try {

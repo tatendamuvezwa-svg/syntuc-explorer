@@ -363,16 +363,17 @@ export const api = {
   },
 
   async getReservations(): Promise<ReservationRequest[]> {
-    try {
-      const res = await fetch(`${API_BASE}/coordinator/reservations`, {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error('Failed to load reservations');
-      return await res.json();
-    } catch (err) {
-      console.warn('Notice loading reservations, using fallback:', err);
-      return [];
+    const res = await fetch(`${API_BASE}/coordinator/reservations`, {
+      headers: getStaffHeaders(),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload.message || payload.error || 'Failed to load reservations from the authoritative store');
     }
+    if (!Array.isArray(payload)) {
+      throw new Error('Reservation endpoint returned an invalid response');
+    }
+    return payload;
   },
 
   async getReservationDetail(id: string): Promise<ReservationRequest> {
@@ -640,24 +641,18 @@ export const api = {
 
   async getProductMedia(productId: string): Promise<MediaAsset[]> {
     if (!productId || typeof productId !== 'string' || productId.trim() === '' || productId === 'undefined' || productId === 'null') {
-      return [];
+      throw new Error('A valid product ID is required to load product media');
     }
-    try {
-      const res = await fetch(`${API_BASE}/media/product/${encodeURIComponent(productId.trim())}`);
-      if (!res.ok) {
-        console.warn(`[api] getProductMedia failed with status ${res.status}`);
-        return [];
-      }
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        console.warn(`[api] getProductMedia expected JSON but received ${contentType}`);
-        return [];
-      }
-      return res.json();
-    } catch (err) {
-      console.warn('[api] getProductMedia error:', err);
-      return [];
+    const res = await fetch(`${API_BASE}/media/product/${encodeURIComponent(productId.trim())}`);
+    const contentType = res.headers.get('content-type') || '';
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(payload?.message || payload?.error || `Failed to load product media (HTTP ${res.status})`);
     }
+    if (!contentType.includes('application/json') || !Array.isArray(payload)) {
+      throw new Error('Product media endpoint returned an invalid response');
+    }
+    return payload;
   },
 
   async uploadMedia(formData: FormData): Promise<any> {

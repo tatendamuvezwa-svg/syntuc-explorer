@@ -2,12 +2,39 @@ import { Router, Request, Response } from 'express';
 import {
   getCollectionDocs,
   getDocById,
+  getFirestoreDb,
+  doc,
+  getDoc,
   where,
   getTombstones,
 } from '../lib/firestore.ts';
 import { getAuthoritativeVariantsForProduct } from '../services/variantCatalog.ts';
 
 const router = Router();
+
+// Reconstruct images stored in media_chunks. Chunked URLs are internal storage
+// markers and cannot be rendered by browsers as image sources.
+async function hydrateMediaAsset(asset: any): Promise<any> {
+  if (!asset?.isChunked || typeof asset.url !== 'string' || !asset.url.startsWith('__CHUNKED__:')) return asset;
+  const mediaId = asset.id;
+  const totalChunks = Number(asset.totalChunks);
+  if (!mediaId || !Number.isInteger(totalChunks) || totalChunks < 1 || totalChunks > 100) {
+    throw new Error(`INVALID_MEDIA_CHUNK_METADATA:${String(mediaId)}`);
+  }
+  const fdb = getFirestoreDb();
+  const chunks = await Promise.all(Array.from({ length: totalChunks }, (_, index) =>
+    getDoc(doc(fdb, 'media_chunks', `${mediaId}_chunk_${index}`))
+  ));
+  if (chunks.some((chunk) => !chunk.exists())) throw new Error(`MEDIA_CHUNK_MISSING:${mediaId}`);
+  const url = chunks.map((chunk) => String(chunk.data()?.data || '')).join('');
+  if (!url.startsWith('data:image/')) throw new Error(`MEDIA_CHUNK_DATA_INVALID:${mediaId}`);
+  return {
+    ...asset,
+    url,
+    thumbnailUrl: typeof asset.thumbnailUrl === 'string' && !asset.thumbnailUrl.startsWith('__CHUNKED__:')
+      ? asset.thumbnailUrl : url,
+  };
+}
 
 // GET all published products with primary media and operator info
 router.get('/products', async (req: Request, res: Response) => {
@@ -23,7 +50,9 @@ router.get('/products', async (req: Request, res: Response) => {
     const operatorMap = new Map(operators.map((o) => [o.id, o]));
 
     const allMedia = await getCollectionDocs<any>('media_assets');
-    const mediaList = allMedia.filter((m) => !tombstones.has(`media_assets_${m.id}`));
+    const mediaList = await Promise.all(allMedia
+      .filter((m) => !tombstones.has(`media_assets_${m.id}`))
+      .map(hydrateMediaAsset));
 
     const productsWithDetails = products.map((p) => {
       const op = p.operatorId ? operatorMap.get(p.operatorId) : null;
@@ -86,9 +115,10 @@ router.get('/products/:id', async (req: Request, res: Response) => {
     const variants = await getAuthoritativeVariantsForProduct(product.id);
 
     const allMedia = await getCollectionDocs<any>('media_assets');
-    let media = allMedia
+    let media = await Promise.all(allMedia
       .filter((m) => m.ownerId === product.id && !tombstones.has(`media_assets_${m.id}`))
-      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
+      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0))
+      .map(hydrateMediaAsset));
 
     let primaryMedia = product.primaryMediaId
       ? media.find((m) => m.id === product.primaryMediaId)
