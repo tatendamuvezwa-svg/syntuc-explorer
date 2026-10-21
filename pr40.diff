@@ -1,0 +1,436 @@
+diff --git a/package.json b/package.json
+index 3617134..41bc4b2 100644
+--- a/package.json
++++ b/package.json
+@@ -37,7 +37,7 @@
+     "@types/react": "^19.3.0",
+     "@types/react-dom": "^19.3.0",
+     "autoprefixer": "^10.4.21",
+-    "esbuild": "^0.28.1",
++    "esbuild": "^0.25.0",
+     "tailwindcss": "^4.3.3",
+     "tsx": "^4.21.0",
+     "typescript": "^7.0.2",
+diff --git a/server.ts b/server.ts
+index 862028f..414edc5 100644
+--- a/server.ts
++++ b/server.ts
+@@ -14,6 +14,7 @@ import analyticsRoutes from './server/routes/analytics.ts';
+ import marketingRoutes from './server/routes/marketing.ts';
+ import reviewsRoutes from './server/routes/reviews.ts';
+ import { getFirestoreDb, getFirebaseConfig } from './server/lib/firestore.ts';
++import { selectedDatabaseContext } from './server/middleware/databaseSelection.ts';
+ import { ensureHeritageCruiseProduct } from './server/services/seedHeritageCruise.ts';
+ 
+ dotenv.config();
+@@ -83,8 +84,8 @@ app.use('/api/catalog', catalogRoutes);
+ app.use('/api/session', sessionRoutes);
+ app.use('/api/reservations', reservationRoutes);
+ app.use('/api/reservation', reservationRoutes);
+-app.use('/api/coordinator', coordinatorRoutes);
+-app.use('/api/media', mediaRoutes);
++app.use('/api/coordinator', selectedDatabaseContext, coordinatorRoutes);
++app.use('/api/media', selectedDatabaseContext, mediaRoutes);
+ app.use('/api/school-trips', schoolTripRoutes);
+ app.use('/api/assistant', assistantRoutes);
+ app.use('/api/analytics', analyticsRoutes);
+diff --git a/server/lib/firestore.ts b/server/lib/firestore.ts
+index 775e25e..5a8448f 100644
+--- a/server/lib/firestore.ts
++++ b/server/lib/firestore.ts
+@@ -21,13 +21,25 @@ import {
+ } from 'firebase/firestore';
+ import fs from 'fs';
+ import path from 'path';
++import { AsyncLocalStorage } from 'node:async_hooks';
+ import { getBaselineProducts, getBaselinePackages } from './baselineCatalog.ts';
+ 
+ // Silence internal Firebase WebChannel / gRPC idle stream disconnect warnings
+ setLogLevel('silent');
+ 
+-let firestoreInstance: Firestore | null = null;
++const firestoreInstances = new Map<string, Firestore>();
+ let firebaseConfig: any = null;
++const databaseContext = new AsyncLocalStorage<string>();
++export const SUPPORTED_FIRESTORE_DATABASES = [
++  { id: 'ai-studio-syntucexplorer-60065304-e43e-44fe-88e1-2ee33d74fe10', label: 'Primary · Syntuc Explorer' },
++  { id: 'ai-studio-syntucexplorer-8297878a-a0e6-49a9-aecf-fcb4bb4e0a46', label: 'Alternate · Legacy / Recovery' },
++] as const;
++export function getDefaultFirestoreDatabaseId(): string { const cfg = getFirebaseConfig(); return cfg.firestoreDatabaseId || '(default)'; }
++export function getActiveFirestoreDatabaseId(): string { return databaseContext.getStore() || getDefaultFirestoreDatabaseId(); }
++export function runWithFirestoreDatabase<T>(databaseId: string, callback: () => T): T {
++  if (databaseId !== getDefaultFirestoreDatabaseId() && !SUPPORTED_FIRESTORE_DATABASES.some((database) => database.id === databaseId)) throw new Error('UNSUPPORTED_FIRESTORE_DATABASE');
++  return databaseContext.run(databaseId, callback);
++}
+ 
+ // ==========================================
+ // CIRCUIT BREAKER & IN-MEMORY RESILIENCE LAYER
+@@ -68,14 +80,12 @@ interface CacheEntry<T> {
+ 
+ const collectionCache = new Map<string, CacheEntry<any[]>>();
+ const memoryStore = new Map<string, Map<string, any>>();
+-let tombstonesCache: CacheEntry<Set<string>> | null = null;
+-
++const tombstonesCache = new Map<string, CacheEntry<Set<string>>>();
++function scopedKey(name: string): string { return `${getActiveFirestoreDatabaseId()}::${name}`; }
+ function getMemoryCollection(name: string): Map<string, any> {
+-  let col = memoryStore.get(name);
+-  if (!col) {
+-    col = new Map<string, any>();
+-    memoryStore.set(name, col);
+-  }
++  const key = scopedKey(name);
++  let col = memoryStore.get(key);
++  if (!col) { col = new Map<string, any>(); memoryStore.set(key, col); }
+   return col;
+ }
+ 
+@@ -367,29 +377,20 @@ export function getFirebaseConfig() {
+ }
+ 
+ export function getFirestoreDb(): Firestore {
+-  if (firestoreInstance) return firestoreInstance;
+-
+   const cfg = getFirebaseConfig();
+-  const app = getApps().length > 0
+-    ? getApps()[0]
+-    : initializeApp({
+-        projectId: cfg.projectId,
+-        apiKey: cfg.apiKey,
+-        authDomain: cfg.authDomain,
+-        appId: cfg.appId,
+-        storageBucket: cfg.storageBucket,
+-      });
+-
+-  const dbId = cfg.firestoreDatabaseId || '(default)';
+-  try {
+-    firestoreInstance = initializeFirestore(app, {
+-      experimentalAutoDetectLongPolling: true,
+-    }, dbId);
+-  } catch (_) {
+-    firestoreInstance = getFirestore(app, dbId);
+-  }
+-  console.log('[Firestore] Authoritative database initialized:', cfg.firestoreDatabaseId);
+-  return firestoreInstance;
++  const dbId = getActiveFirestoreDatabaseId();
++  const cached = firestoreInstances.get(dbId);
++  if (cached) return cached;
++  const app = getApps().length > 0 ? getApps()[0] : initializeApp({
++    projectId: cfg.projectId, apiKey: cfg.apiKey, authDomain: cfg.authDomain,
++    appId: cfg.appId, storageBucket: cfg.storageBucket,
++  });
++  let instance: Firestore;
++  try { instance = initializeFirestore(app, { experimentalAutoDetectLongPolling: true }, dbId); }
++  catch (_) { instance = getFirestore(app, dbId); }
++  firestoreInstances.set(dbId, instance);
++  console.log('[Firestore] Database instance ready:', dbId);
++  return instance;
+ }
+ 
+ export async function getDocById<T = DocumentData>(collectionName: string, id: string): Promise<T | null> {
+@@ -415,7 +416,7 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
+       console.warn(`[Firestore] Read notice on doc '${collectionName}/${id}', serving cached memory copy:`, err.message);
+       return memDoc as T;
+     }
+-    if (BASELINE_COLLECTIONS[collectionName]) {
++    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName]) {
+       const baseline = BASELINE_COLLECTIONS[collectionName].find((d: any) => d.id === id);
+       if (baseline) return baseline as T;
+     }
+@@ -438,7 +439,7 @@ export async function setDocById<T extends Record<string, any>>(
+   const memCol = getMemoryCollection(collectionName);
+   const existing = memCol.get(id) || {};
+   memCol.set(id, merge ? { ...existing, id, ...data } : { id, ...data });
+-  collectionCache.delete(collectionName);
++  collectionCache.delete(scopedKey(collectionName));
+ }
+ 
+ export async function updateDocById(
+@@ -454,7 +455,7 @@ export async function updateDocById(
+   const memCol = getMemoryCollection(collectionName);
+   const existing = memCol.get(id) || {};
+   memCol.set(id, { ...existing, id, ...data });
+-  collectionCache.delete(collectionName);
++  collectionCache.delete(scopedKey(collectionName));
+ }
+ 
+ export async function deleteDocById(collectionName: string, id: string): Promise<void> {
+@@ -465,7 +466,7 @@ export async function deleteDocById(collectionName: string, id: string): Promise
+   // Invalidate local memory and collection cache only after successful durable deletion
+   const memCol = getMemoryCollection(collectionName);
+   memCol.delete(id);
+-  collectionCache.delete(collectionName);
++  collectionCache.delete(scopedKey(collectionName));
+ }
+ 
+ export async function getCollectionDocs<T = DocumentData>(
+@@ -478,7 +479,7 @@ export async function getCollectionDocs<T = DocumentData>(
+ 
+   // Serve from memory collection cache if fresh (prevents query storms and preserves free-tier read limits)
+   if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
+-    const cached = collectionCache.get(collectionName);
++    const cached = collectionCache.get(scopedKey(collectionName));
+     if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+       return [...cached.data] as T[];
+     }
+@@ -492,7 +493,7 @@ export async function getCollectionDocs<T = DocumentData>(
+     const docs: T[] = [];
+     if (!hasConstraints) {
+       memCol.clear();
+-      collectionCache.delete(collectionName);
++      collectionCache.delete(scopedKey(collectionName));
+     }
+     snap.forEach((d) => {
+       const docData = { id: d.id, ...d.data() } as T;
+@@ -501,7 +502,7 @@ export async function getCollectionDocs<T = DocumentData>(
+     });
+ 
+     if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
+-      collectionCache.set(collectionName, { timestamp: now, data: docs });
++      collectionCache.set(scopedKey(collectionName), { timestamp: now, data: docs });
+     }
+ 
+     return docs;
+@@ -511,7 +512,7 @@ export async function getCollectionDocs<T = DocumentData>(
+     }
+ 
+     // If cached collection data exists in memory, serve it with a warning
+-    const cached = collectionCache.get(collectionName);
++    const cached = collectionCache.get(scopedKey(collectionName));
+     if (!hasConstraints && cached && cached.data.length > 0) {
+       console.warn(`[Firestore] Read error on '${collectionName}', serving ${cached.data.length} cached items:`, err.message);
+       return [...cached.data] as T[];
+@@ -524,7 +525,7 @@ export async function getCollectionDocs<T = DocumentData>(
+     }
+ 
+     // Static taxonomies only have baseline fallbacks
+-    if (BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
++    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
+       const baselines = BASELINE_COLLECTIONS[collectionName];
+       console.warn(`[Firestore] Read error on '${collectionName}', serving taxonomy baseline:`, err.message);
+       return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
+@@ -543,83 +544,32 @@ export async function getCollectionDocs<T = DocumentData>(
+  */
+ export async function recordTombstone(collectionName: string, recordId: string): Promise<void> {
+   const tombstoneId = `${collectionName}_${recordId}`;
+-
+-  // Update in-memory tombstones
+-  if (!tombstonesCache) {
+-    tombstonesCache = { timestamp: Date.now(), data: new Set<string>() };
+-  }
+-  tombstonesCache.data.add(tombstoneId);
+-  tombstonesCache.data.add(recordId);
+-
+-  if (isBreakerActive()) {
+-    return;
+-  }
+-
+-  try {
+-    const fdb = getFirestoreDb();
+-    await setDoc(doc(fdb, 'deleted_records', tombstoneId), {
+-      id: tombstoneId,
+-      collectionName,
+-      recordId,
+-      deletedAt: new Date().toISOString(),
+-    });
+-  } catch (err: any) {
+-    if (isQuotaOrNetworkError(err)) {
+-      tripCircuitBreaker();
+-    }
+-  }
++  const dbKey = getActiveFirestoreDatabaseId();
++  let cached = tombstonesCache.get(dbKey);
++  if (!cached) { cached = { timestamp: Date.now(), data: new Set<string>() }; tombstonesCache.set(dbKey, cached); }
++  cached.data.add(tombstoneId); cached.data.add(recordId);
++  if (isBreakerActive()) return;
++  try { await setDoc(doc(getFirestoreDb(), 'deleted_records', tombstoneId), { id: tombstoneId, collectionName, recordId, deletedAt: new Date().toISOString() }); }
++  catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); }
+ }
+-
+-/** Strict point lookup for callers that must fail closed when tombstone reads fail. */
+ export async function hasTombstone(collectionName: string, recordId: string): Promise<boolean> {
+   const tombstoneId = `${collectionName}_${recordId}`;
+-  if (tombstonesCache && (tombstonesCache.data.has(tombstoneId) || tombstonesCache.data.has(recordId))) {
+-    return true;
+-  }
+-  if (isBreakerActive()) {
+-    return false;
+-  }
+-  try {
+-    const fdb = getFirestoreDb();
+-    const snap = await getDoc(doc(fdb, 'deleted_records', tombstoneId));
+-    return snap.exists();
+-  } catch (err: any) {
+-    if (isQuotaOrNetworkError(err)) {
+-      tripCircuitBreaker();
+-    }
+-    return tombstonesCache ? (tombstonesCache.data.has(tombstoneId) || tombstonesCache.data.has(recordId)) : false;
+-  }
++  const cached = tombstonesCache.get(getActiveFirestoreDatabaseId());
++  if (cached && (cached.data.has(tombstoneId) || cached.data.has(recordId))) return true;
++  if (isBreakerActive()) return false;
++  try { return (await getDoc(doc(getFirestoreDb(), 'deleted_records', tombstoneId))).exists(); }
++  catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); return cached ? (cached.data.has(tombstoneId) || cached.data.has(recordId)) : false; }
+ }
+-
+ export async function getTombstones(): Promise<Set<string>> {
+-  const now = Date.now();
+-  if (tombstonesCache && now - tombstonesCache.timestamp < CACHE_TTL_MS) {
+-    return new Set(tombstonesCache.data);
+-  }
+-
+-  const set: Set<string> = tombstonesCache ? new Set<string>(tombstonesCache.data) : new Set<string>();
+-
+-  if (isBreakerActive()) {
+-    return set;
+-  }
+-
++  const now = Date.now(); const dbKey = getActiveFirestoreDatabaseId(); const cached = tombstonesCache.get(dbKey);
++  if (cached && now - cached.timestamp < CACHE_TTL_MS) return new Set(cached.data);
++  const set: Set<string> = cached ? new Set(cached.data) : new Set<string>();
++  if (isBreakerActive()) return set;
+   try {
+-    const fdb = getFirestoreDb();
+-    const snap = await getDocs(collection(fdb, 'deleted_records'));
+-    snap.forEach((d) => {
+-      set.add(d.id);
+-      const data = d.data();
+-      if (data.collectionName && data.recordId) {
+-        set.add(`${data.collectionName}_${data.recordId}`);
+-      }
+-    });
+-    tombstonesCache = { timestamp: now, data: set };
+-  } catch (err: any) {
+-    if (isQuotaOrNetworkError(err)) {
+-      tripCircuitBreaker();
+-    }
+-  }
+-
++    const snap = await getDocs(collection(getFirestoreDb(), 'deleted_records'));
++    snap.forEach((d) => { set.add(d.id); const value = d.data(); if (value.collectionName && value.recordId) set.add(`${value.collectionName}_${value.recordId}`); });
++    tombstonesCache.set(dbKey, { timestamp: now, data: set });
++  } catch (err: any) { if (isQuotaOrNetworkError(err)) tripCircuitBreaker(); }
+   return set;
+ }
+ 
+diff --git a/server/middleware/auth.ts b/server/middleware/auth.ts
+index 4e4cf3b..a69194d 100644
+--- a/server/middleware/auth.ts
++++ b/server/middleware/auth.ts
+@@ -1,6 +1,6 @@
+ import { Request, Response, NextFunction } from 'express';
+ import crypto from 'crypto';
+-import { getDocById, getCollectionDocs, where } from '../lib/firestore.ts';
++import { getDocById, getCollectionDocs, where, getDefaultFirestoreDatabaseId, runWithFirestoreDatabase } from '../lib/firestore.ts';
+ 
+ export interface AuthenticatedStaffRequest extends Request {
+   staffUser?: {
+@@ -269,7 +269,7 @@ export async function requireCoordinatorAuth(
+     }
+ 
+     // Load authorized staff user from Firestore by the verified userId
+-    const staff = await getDocById<any>('users', tokenResult.userId);
++    const staff = await runWithFirestoreDatabase(getDefaultFirestoreDatabaseId(), () => getDocById<any>('users', tokenResult.userId!));
+ 
+     if (!staff || !staff.isActive) {
+       res.status(401).json({
+diff --git a/server/middleware/databaseSelection.ts b/server/middleware/databaseSelection.ts
+new file mode 100644
+index 0000000..d5ce7ef
+--- /dev/null
++++ b/server/middleware/databaseSelection.ts
+@@ -0,0 +1,23 @@
++import type { Request, Response, NextFunction } from 'express';
++import { getDocById, getDefaultFirestoreDatabaseId, runWithFirestoreDatabase, SUPPORTED_FIRESTORE_DATABASES } from '../lib/firestore.ts';
++import { verifyStaffAuthToken } from './auth.ts';
++
++export async function selectedDatabaseContext(req: Request, res: Response, next: NextFunction): Promise<void> {
++  const requested = req.header('x-syntuc-database-id');
++  if (!requested) { next(); return; }
++  const supported = requested === getDefaultFirestoreDatabaseId() || SUPPORTED_FIRESTORE_DATABASES.some((db) => db.id === requested);
++  if (!supported) { res.status(400).json({ error: 'UNSUPPORTED_DATABASE_SELECTION' }); return; }
++  if (requested === getDefaultFirestoreDatabaseId()) { runWithFirestoreDatabase(requested, () => next()); return; }
++  const authorization = req.header('authorization') || '';
++  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
++  const tokenResult = verifyStaffAuthToken(token);
++  if (!tokenResult.valid || !tokenResult.userId) { res.status(401).json({ error: 'AUTHENTICATION_REQUIRED' }); return; }
++  try {
++    const staff = await runWithFirestoreDatabase(getDefaultFirestoreDatabaseId(), () => getDocById<any>('users', tokenResult.userId!));
++    if (!staff || !staff.isActive || staff.role !== 'admin') { res.status(403).json({ error: 'ADMIN_REQUIRED_FOR_DATABASE_SWITCH' }); return; }
++    runWithFirestoreDatabase(requested, () => next());
++  } catch (error) {
++    console.error('[Database selector] Authorization failed:', error);
++    res.status(503).json({ error: 'DATABASE_SELECTION_UNAVAILABLE' });
++  }
++}
+diff --git a/src/components/coordinator/CoordinatorPortal.tsx b/src/components/coordinator/CoordinatorPortal.tsx
+index 82159bf..7ba6e78 100644
+--- a/src/components/coordinator/CoordinatorPortal.tsx
++++ b/src/components/coordinator/CoordinatorPortal.tsx
+@@ -58,6 +58,12 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
+   const [emailInput, setEmailInput] = useState<string>('');
+   const [passwordInput, setPasswordInput] = useState<string>('');
+   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
++  const PRIMARY_DATABASE_ID = 'ai-studio-syntucexplorer-60065304-e43e-44fe-88e1-2ee33d74fe10';
++  const ALTERNATE_DATABASE_ID = 'ai-studio-syntucexplorer-8297878a-a0e6-49a9-aecf-fcb4bb4e0a46';
++  const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>(() => {
++    try { return localStorage.getItem('syntuc_admin_database_id') || PRIMARY_DATABASE_ID; }
++    catch { return PRIMARY_DATABASE_ID; }
++  });
+ 
+   // Active workbench tab
+   const [activeTab, setActiveTab] = useState<
+@@ -208,10 +214,15 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
+   };
+ 
+   useEffect(() => {
++    if (isAuthenticated && staffUser?.role !== 'admin' && selectedDatabaseId !== PRIMARY_DATABASE_ID) {
++      setSelectedDatabaseId(PRIMARY_DATABASE_ID);
++      try { localStorage.removeItem('syntuc_admin_database_id'); } catch (_) {}
++      return;
++    }
+     if (isAuthenticated) {
+       loadAllData();
+     }
+-  }, [isAuthenticated]);
++  }, [isAuthenticated, selectedDatabaseId, staffUser?.role]);
+ 
+   useEffect(() => {
+     if (selectedProductForMedia && selectedProductForMedia.trim() !== '') {
+@@ -530,6 +541,19 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
+         </div>
+ 
+         <div className="flex items-center space-x-3">
++          {staffUser?.role === 'admin' && (
++            <label className="flex items-center gap-2 text-xs text-stone-200">
++              <span className="hidden sm:inline">Database</span>
++              <select value={selectedDatabaseId} onChange={(event) => {
++                const id = event.target.value;
++                setSelectedDatabaseId(id);
++                try { localStorage.setItem('syntuc_admin_database_id', id); } catch (_) {}
++              }} className="max-w-[245px] rounded-lg border border-stone-600 bg-stone-800 px-2.5 py-2 text-xs text-white outline-none focus:border-amber-400" aria-label="Administrator database selector">
++                <option value={PRIMARY_DATABASE_ID}>Primary · Syntuc Explorer</option>
++                <option value={ALTERNATE_DATABASE_ID}>Alternate · Legacy / Recovery</option>
++              </select>
++            </label>
++          )}
+           <button
+             onClick={loadAllData}
+             className="p-1.5 text-stone-400 hover:text-white rounded-lg transition"
+diff --git a/src/services/api.ts b/src/services/api.ts
+index 7bc16bb..078470b 100644
+--- a/src/services/api.ts
++++ b/src/services/api.ts
+@@ -29,9 +29,12 @@ function getSessionHeaders(): Record<string, string> {
+ 
+ function getStaffHeaders(): Record<string, string> {
+   const token = localStorage.getItem('syntuc_staff_token') || '';
++  const selectedDatabaseId = localStorage.getItem('syntuc_admin_database_id');
++  const alternateDatabaseId = 'ai-studio-syntucexplorer-8297878a-a0e6-49a9-aecf-fcb4bb4e0a46';
+   return {
+     'Content-Type': 'application/json',
+     Authorization: `Bearer ${token}`,
++    ...(selectedDatabaseId === alternateDatabaseId ? { 'x-syntuc-database-id': selectedDatabaseId } : {}),
+   };
+ }
+ 

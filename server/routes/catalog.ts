@@ -29,16 +29,21 @@ router.get('/products', async (req: Request, res: Response) => {
       const op = p.operatorId ? operatorMap.get(p.operatorId) : null;
       const productMedia = mediaList.filter((m) => m.ownerId === p.id);
       let primaryMedia = p.primaryMediaId
-        ? productMedia.find((m) => m.id === p.primaryMediaId)
+        ? mediaList.find((m) => m.id === p.primaryMediaId)
         : null;
       if (!primaryMedia) {
         primaryMedia = productMedia.find((m) => m.isPrimary) || productMedia[0] || null;
       }
 
+      let resolvedPrimaryUrl = primaryMedia?.url || p.primaryImageUrl || null;
+      if (resolvedPrimaryUrl && resolvedPrimaryUrl.startsWith('__CHUNKED__:')) {
+        resolvedPrimaryUrl = primaryMedia?.id ? `/api/media/render/${primaryMedia.id}` : null;
+      }
+
       return {
         ...p,
         operatorName: op?.name || 'Syntuc Partner',
-        primaryImageUrl: primaryMedia?.url || null,
+        primaryImageUrl: resolvedPrimaryUrl,
         primaryImageAlt: primaryMedia?.altText || p.name,
       };
     });
@@ -86,15 +91,35 @@ router.get('/products/:id', async (req: Request, res: Response) => {
     const variants = await getAuthoritativeVariantsForProduct(product.id);
 
     const allMedia = await getCollectionDocs<any>('media_assets');
-    let media = allMedia
+    const media = allMedia
       .filter((m) => m.ownerId === product.id && !tombstones.has(`media_assets_${m.id}`))
-      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
+      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0))
+      .map((m) => {
+        let url = m.url;
+        if (url && url.startsWith('__CHUNKED__:')) {
+          url = `/api/media/render/${m.id}`;
+        }
+        let thumb = m.thumbnailUrl;
+        if (!thumb || thumb.startsWith('__CHUNKED__:')) {
+          thumb = url;
+        }
+        return {
+          ...m,
+          url,
+          thumbnailUrl: thumb,
+        };
+      });
 
     let primaryMedia = product.primaryMediaId
-      ? media.find((m) => m.id === product.primaryMediaId)
+      ? allMedia.find((m) => m.id === product.primaryMediaId) || media.find((m) => m.id === product.primaryMediaId)
       : null;
     if (!primaryMedia) {
       primaryMedia = media.find((m) => m.isPrimary) || media[0] || null;
+    }
+
+    let resolvedPrimaryUrl = primaryMedia?.url || product.primaryImageUrl || null;
+    if (resolvedPrimaryUrl && resolvedPrimaryUrl.startsWith('__CHUNKED__:')) {
+      resolvedPrimaryUrl = primaryMedia?.id ? `/api/media/render/${primaryMedia.id}` : null;
     }
 
     res.json({
@@ -104,7 +129,7 @@ router.get('/products/:id', async (req: Request, res: Response) => {
       rooms,
       variants,
       media,
-      primaryImageUrl: primaryMedia?.url || null,
+      primaryImageUrl: resolvedPrimaryUrl,
       primaryImageAlt: primaryMedia?.altText || product.name,
     });
   } catch (error: any) {

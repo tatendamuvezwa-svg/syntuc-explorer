@@ -136,12 +136,87 @@ router.get('/product/:productId', async (req, res: Response) => {
     const allMedia = await getCollectionDocs<any>('media_assets', where('ownerId', '==', productId.trim()));
     const activeMedia = allMedia
       .filter((m) => !tombstones.has(`media_assets_${m.id}`))
-      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
+      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0))
+      .map((m) => {
+        let url = m.url;
+        if (url && url.startsWith('__CHUNKED__:')) {
+          url = `/api/media/render/${m.id}`;
+        }
+        let thumb = m.thumbnailUrl;
+        if (!thumb || thumb.startsWith('__CHUNKED__:')) {
+          thumb = url;
+        }
+        return {
+          ...m,
+          url,
+          thumbnailUrl: thumb,
+        };
+      });
 
     res.json(activeMedia);
   } catch (error) {
     console.error('Error fetching product media from Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_MEDIA' });
+  }
+});
+
+// GET /api/media/render/:mediaId - Safely stream media from disk or re-hydrate from chunks
+router.get('/render/:mediaId', async (req, res: Response) => {
+  try {
+    const { mediaId } = req.params;
+    if (!mediaId) {
+      res.status(400).send('Invalid media ID');
+      return;
+    }
+
+    // 1. Check if matching file exists in uploadsDir
+    if (fs.existsSync(uploadsDir)) {
+      const files = fs.readdirSync(uploadsDir);
+      const matchedFile = files.find((f) => f.includes(mediaId));
+      if (matchedFile) {
+        res.sendFile(path.join(uploadsDir, matchedFile));
+        return;
+      }
+    }
+
+    // 2. Fetch media asset metadata
+    const asset = await getDocById<any>('media_assets', mediaId);
+    if (!asset) {
+      res.status(404).send('Media asset not found');
+      return;
+    }
+
+    // If external URL, redirect
+    if (asset.url && !asset.url.startsWith('__CHUNKED__') && !asset.url.startsWith('/uploads')) {
+      res.redirect(asset.url);
+      return;
+    }
+
+    // 3. Re-hydrate from media_chunks if chunked
+    const chunks = await getCollectionDocs<any>(
+      'media_chunks',
+      where('mediaAssetId', '==', mediaId)
+    );
+    if (chunks && chunks.length > 0) {
+      chunks.sort((a, b) => (Number(a.chunkIndex) || 0) - (Number(b.chunkIndex) || 0));
+      const fullData = chunks.map((c) => c.data).join('');
+      if (fullData.startsWith('data:')) {
+        const matches = fullData.match(/^data:([A-Za-z0-9\/+.-]+);base64,(.+)$/);
+        if (matches) {
+          const mime = matches[1];
+          const buf = Buffer.from(matches[2], 'base64');
+          res.setHeader('Content-Type', mime);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.send(buf);
+          return;
+        }
+      }
+    }
+
+    res.status(404).send('Image unavailable');
+  } catch (err: any) {
+    console.error('[Media] Error rendering media:', err);
+    res.status(500).send('Error rendering image');
   }
 });
 
@@ -172,17 +247,7 @@ router.post(
       let assetUrl = externalUrl;
 
       if (req.file) {
-        try {
-          const fileBuffer = fs.readFileSync(req.file.path);
-          // Store durable Data URI directly in Firestore so media survives container recycling
-          assetUrl = `data:${req.file.mimetype};base64,${fileBuffer.toString('base64')}`;
-          try {
-            fs.unlinkSync(req.file.path);
-          } catch (_) {}
-        } catch (readErr) {
-          console.warn('[Media] Data URI generation notice, using fallback path:', readErr);
-          assetUrl = `/uploads/${req.file.filename}`;
-        }
+        assetUrl = `/uploads/${req.file.filename}`;
       }
 
       if (!assetUrl) {
@@ -210,7 +275,7 @@ router.post(
         }
       }
 
-      // Build media record
+      // Build media record with durable public URL
       const mediaRecord = {
         id: mediaId,
         ownerType,
@@ -231,11 +296,12 @@ router.post(
       // Persist directly to Cloud Firestore
       await persistMediaToFirestore(mediaRecord);
 
-      // If primary, update product or package in Firestore
+      // If primary, update product or package in Firestore with both primaryMediaId and primaryImageUrl
       if (shouldBePrimary) {
         if (ownerType === 'product') {
           await updateDocById('products', ownerId, {
             primaryMediaId: mediaId,
+            primaryImageUrl: assetUrl,
             updatedAt: nowIso,
           });
         } else if (ownerType === 'package') {
@@ -285,15 +351,20 @@ router.post('/:id/set-primary', requireCoordinatorAuth, async (req: Authenticate
       }
     }
 
-    // 2. Update product primaryMediaId or package primaryImageUrl in Firestore
+    const resolvedPrimaryUrl = target.url?.startsWith('__CHUNKED__:')
+      ? `/api/media/render/${target.id}`
+      : target.url;
+
+    // 2. Update product primaryMediaId & primaryImageUrl or package primaryImageUrl in Firestore
     if (target.ownerType === 'product') {
       await updateDocById('products', target.ownerId, {
         primaryMediaId: id,
+        primaryImageUrl: resolvedPrimaryUrl,
         updatedAt: nowIso,
       });
     } else if (target.ownerType === 'package') {
       await updateDocById('packages', target.ownerId, {
-        primaryImageUrl: target.url,
+        primaryImageUrl: resolvedPrimaryUrl,
         updatedAt: nowIso,
       });
     }

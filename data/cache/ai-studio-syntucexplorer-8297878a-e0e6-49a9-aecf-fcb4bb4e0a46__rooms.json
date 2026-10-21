@@ -1,0 +1,219 @@
+[
+  {
+    "id": "rm_azambezi_deluxe",
+    "capacityChildren": 1,
+    "capacityAdults": 2,
+    "productId": "prod_azambezi",
+    "pricePerNight": "280.00",
+    "amenities": [
+      "Direct Zambezi River view",
+      "Espresso machine",
+      "Mini bar fridge",
+      "Bathrobes & slippers",
+      "Balcony"
+    ],
+    "isAvailable": true,
+    "currency": "USD",
+    "description": "Prime elevated positioning with direct sweeping views of the flowing Zambezi River, king bed, and private outdoor patio.",
+    "roomType": "Deluxe",
+    "propertyId": "prop_azambezi",
+    "name": "River View Deluxe Room"
+  },
+  {
+    "id": "rm_azambezi_std",
+    "pricePerNight": "220.00",
+    "name": "Standard Riverside Room",
+    "capacityChildren": 1,
+    "description": "Comfortable air-conditioned room with king or twin beds, en-suite bathroom, and balcony overlooking lush indigenous gardens.",
+    "capacityAdults": 2,
+    "amenities": [
+      "Air conditioning",
+      "Satellite TV",
+      "Tea & Coffee facilities",
+      "Private Balcony",
+      "Free Wi-Fi"
+    ],
+    "isAvailable": true,
+    "propertyId": "prop_azambezi",
+    "productId": "prod_azambezi",
+    "currency": "USD",
+    "roomType": "Standard"
+  },
+  {
+    "id": "rm_azambezi_suite",
+    "amenities": [
+      "Separate living room",
+      "Panoramic river terrace",
+      "Deep soaking tub",
+      "VIP guest welcome",
+      "Complimentary minibar"
+    ],
+    "capacityChildren": 2,
+    "roomType": "Suite",
+    "pricePerNight": "360.00",
+    "currency": "USD",
+    "capacityAdults": 2,
+    "description": "Expansive luxury suite featuring an independent lounge salon, panoramic riverfront terrace, and soaking tub.",
+    "propertyId": "prop_azambezi",
+    "isAvailable": true,
+    "name": "Executive River Suite",
+    "productId": "prod_azambezi"
+  },
+  {
+    "id": "rm_elephant_tent",
+    "isAvailable": true,
+    "capacityChildren": 1,
+    "description": "Breathtaking canvas retreat with private viewing deck over the Masuwe Gorge, private plunge pool, and indoor/outdoor showers.",
+    "propertyId": "prop_elephantcamp",
+    "amenities": [
+      "Private infinity plunge pool",
+      "Gorge deck vistas",
+      "Freestanding oval bathtub",
+      "Fully stocked complimentary bar",
+      "Personal butler service"
+    ],
+    "name": "Luxury Tented Suite",
+    "productId": "prod_elephantcamp",
+    "roomType": "Suite",
+    "capacityAdults": 2,
+    "currency": "USD",
+    "pricePerNight": "750.00"
+  },
+  {
+    "id": "rm_explorers_chalet",
+    "description": "Private free-standing chalet surrounded by indigenous trees, walk-in shower, air conditioning, and personal patio.",
+    "productId": "prod_explorers",
+    "name": "Standard Garden Chalet",
+    "isAvailable": true,
+    "pricePerNight": "110.00",
+    "capacityChildren": 0,
+    "capacityAdults": 2,
+    "roomType": "Chalet",
+    "propertyId": "prop_explorers",
+    "amenities": [
+      "Air conditioning",
+      "Walk-in rain shower",
+      "Private terrace",
+      "Room safe",
+      "Garden views"
+    ],
+    "currency": "USD"
+  },
+  {
+    "id": "rm_explorers_deluxe",
+    "pricePerNight": "155.00",
+    "isAvailable": true,
+    "amenities": [
+      "Poolside location",
+      "Lounge seating",
+      "Tea and coffee bar",
+      "High ceiling architecture"
+    ],
+    "description": "Spacious modern village room situated right alongside the main swimming pool with custom hardwood furnishings.",
+    "propertyId": "prop_explorers",
+    "capacityChildren": 1,
+    "currency": "USD",
+    "productId": "prod_explorers",
+    "name": "Deluxe Village Suite",
+    "capacityAdults": 2,
+    "roomType": "Deluxe"
+  },
+  {
+    "id": "rm_olddrift_family",
+    "capacityChildren": 2,
+    "capacityAdults": 2,
+    "productId": "prod_olddrift",
+    "pricePerNight": "980.00",
+    "amenities": [
+      "Two en-suite bedrooms",
+      "Private central plunge pool",
+      "Panoramic river deck",
+      "Private family guide on request"
+    ],
+    "isAvailable": true,
+    "currency": "USD",
+    "description": "Two full en-suite tented bedrooms connected by an expansive private deck with central plunge pool overlooking the Zambezi.",
+    "roomType": "Family",
+    "propertyId": "prop_olddrift",
+    "name": "Family Tented Suite"
+  },
+  {
+    "id": "rm_olddrift_tent",
+    "description": "Expansive riverfront canvas villa featuring private plunge pool, outdoor ball-and-claw Victorian bathtub, and king canopy bed.",
+    "productId": "prod_olddrift",
+    "name": "Luxury Tented Suite",
+    "isAvailable": true,
+    "roomType": "Suite",
+    "pricePerNight": "680.00",
+    "capacityAdults": 2,
+    "capacityChildren": 0,
+    "propertyId": "prop_olddrift",
+    "amenities": [
+      "Private plunge pool",
+      "Outdoor Victorian roll-top bath",
+      "Indoor & outdoor showers",
+      "Air conditioned bed canopy",
+      "Full minibar"
+    ],
+    "currency": "USD"
+  },
+  {
+    "id": "rm_rainbow_deluxe",
+    "name": "Deluxe Spray View Suite",
+    "isAvailable": true,
+    "description": "Top-tier floor suite overlooking the gardens with direct views toward the rising spray plumes of Victoria Falls.",
+    "pricePerNight": "240.00",
+    "amenities": [
+      "View of Falls spray plume",
+      "Lounge sitting area",
+      "Mini fridge",
+      "Bathrobes",
+      "Daily fruit basket"
+    ],
+    "roomType": "Deluxe",
+    "productId": "prod_rainbow",
+    "capacityChildren": 1,
+    "capacityAdults": 2,
+    "propertyId": "prop_rainbow",
+    "currency": "USD"
+  },
+  {
+    "id": "rm_rainbow_family",
+    "propertyId": "prop_rainbow",
+    "capacityAdults": 2,
+    "description": "Two interconnected bedrooms designed for traveling families or groups, sharing two private bathrooms.",
+    "currency": "USD",
+    "productId": "prod_rainbow",
+    "pricePerNight": "290.00",
+    "roomType": "Family",
+    "isAvailable": true,
+    "name": "Family Interconnecting Room",
+    "amenities": [
+      "Interconnecting bedrooms",
+      "2 full en-suite bathrooms",
+      "2 TVs",
+      "Generous wardrobe space"
+    ],
+    "capacityChildren": 3
+  },
+  {
+    "id": "rm_rainbow_std",
+    "name": "Standard Twin / Double Room",
+    "amenities": [
+      "Air conditioning",
+      "En-suite shower/tub",
+      "Private balcony",
+      "Satellite TV",
+      "Safe"
+    ],
+    "pricePerNight": "165.00",
+    "isAvailable": true,
+    "roomType": "Standard",
+    "capacityAdults": 2,
+    "capacityChildren": 1,
+    "propertyId": "prop_rainbow",
+    "description": "Airy guestroom with private enclosed balcony, cooling tiled floors, air conditioning, and satellite television.",
+    "productId": "prod_rainbow",
+    "currency": "USD"
+  }
+]

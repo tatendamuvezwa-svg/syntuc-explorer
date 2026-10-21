@@ -424,7 +424,7 @@ router.post('/calculate', async (req, res: Response) => {
 });
 
 // GET /api/reservations/guest/:token - Secure Guest Reservation Dashboard
-router.get('/guest/:token', async (req, res: Response) => {
+const handleGuestDashboard = async (req: any, res: Response) => {
   try {
     const token = req.params.token;
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -523,7 +523,10 @@ router.get('/guest/:token', async (req, res: Response) => {
     console.error('Guest dashboard load error in Firestore:', error);
     res.status(500).json({ error: 'FAILED_TO_LOAD_DASHBOARD' });
   }
-});
+};
+
+router.get('/guest/:token', handleGuestDashboard);
+router.get('/guest/:token/dashboard', handleGuestDashboard);
 
 // POST /api/reservations/guest/:token/messages - Guest sends message to coordinator
 router.post('/guest/:token/messages', async (req, res: Response) => {

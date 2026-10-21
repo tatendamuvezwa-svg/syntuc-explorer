@@ -350,29 +350,25 @@ export const api = {
   },
 
   async getLeads(): Promise<Lead[]> {
-    try {
-      const res = await fetch(`${API_BASE}/coordinator/leads`, {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error('Failed to load leads');
-      return await res.json();
-    } catch (err) {
-      console.warn('Notice loading leads, using fallback:', err);
-      return [];
+    const res = await fetch(`${API_BASE}/coordinator/leads`, {
+      headers: getStaffHeaders(),
+    });
+    const payload = await res.json().catch(() => []);
+    if (!res.ok) {
+      throw new Error(payload.message || payload.error || 'Failed to load leads');
     }
+    return Array.isArray(payload) ? payload : [];
   },
 
   async getReservations(): Promise<ReservationRequest[]> {
-    try {
-      const res = await fetch(`${API_BASE}/coordinator/reservations`, {
-        headers: getStaffHeaders(),
-      });
-      if (!res.ok) throw new Error('Failed to load reservations');
-      return await res.json();
-    } catch (err) {
-      console.warn('Notice loading reservations, using fallback:', err);
-      return [];
+    const res = await fetch(`${API_BASE}/coordinator/reservations`, {
+      headers: getStaffHeaders(),
+    });
+    const payload = await res.json().catch(() => []);
+    if (!res.ok) {
+      throw new Error(payload.message || payload.error || 'Failed to load reservations');
     }
+    return Array.isArray(payload) ? payload : [];
   },
 
   async getReservationDetail(id: string): Promise<ReservationRequest> {

@@ -1,0 +1,34 @@
+[
+  {
+    "id": "ses_108ab716371d40e7cd6361d3822fbd7d",
+    "sessionSecret": "f50f2571df47533228d6b225187af800b61b7e4d0146712d5568e987b7d6e085",
+    "ipHash": "12ca17b49af2289436f303e0166030a21e525d266e209267433801a8fd4071a0",
+    "userAgent": "node",
+    "createdAt": "2026-10-20T17:59:33.610Z",
+    "lastActiveAt": "2026-10-20T17:59:33.610Z"
+  },
+  {
+    "id": "ses_fdcf1751bc92b05ab24e4801f4b0cbc1",
+    "sessionSecret": "7e0967b7940764a155e493052387c38bb1f8cbec602cfc30aa950d2b3dc270f0",
+    "ipHash": "12ca17b49af2289436f303e0166030a21e525d266e209267433801a8fd4071a0",
+    "userAgent": "browser",
+    "createdAt": "2026-10-20T18:07:06.901Z",
+    "lastActiveAt": "2026-10-20T18:07:06.901Z"
+  },
+  {
+    "id": "ses_632dee0edececdf638a2c7804fa8bbed",
+    "ipHash": "12ca17b49af2289436f303e0166030a21e525d266e209267433801a8fd4071a0",
+    "lastActiveAt": "2026-10-21T07:16:25.102Z",
+    "sessionSecret": "d9ddba553a1936cfa3a9f1dbe0b2c5eb7d1dba89f3f8439f21e674b131e5ad62",
+    "createdAt": "2026-10-21T07:16:25.102Z",
+    "userAgent": "node"
+  },
+  {
+    "id": "ses_9f84e8f12c001cf8f2bb3095b09b75e1",
+    "sessionSecret": "23406d89bd5379eb3b02cfe48d6aae59925341d3e83b2742e69e8b8e914450c3",
+    "ipHash": "12ca17b49af2289436f303e0166030a21e525d266e209267433801a8fd4071a0",
+    "userAgent": "browser",
+    "createdAt": "2026-10-21T07:20:15.395Z",
+    "lastActiveAt": "2026-10-21T07:20:15.395Z"
+  }
+]

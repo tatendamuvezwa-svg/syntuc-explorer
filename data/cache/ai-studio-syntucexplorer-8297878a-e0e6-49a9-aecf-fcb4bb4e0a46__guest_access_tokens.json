@@ -1,0 +1,57 @@
+[
+  {
+    "id": "gstok_0aa5557a240ab9c242029c7ed5892b9b7dc75d55cfba28e5",
+    "tokenHash": "cec896a992f1362b309a56eafd04476d7d5b44fceb8c9c7949575ed7ac5cd725",
+    "expiresAt": "2026-11-16T03:10:15.040Z",
+    "isRevoked": false,
+    "reservationRequestId": "res_d85118dbf31d1be0494af025",
+    "createdAt": "2026-10-17T03:10:14.988Z",
+    "guestId": "gst_24eac765789c5d2ec9ac364b"
+  },
+  {
+    "id": "gstok_102f804fbad1a38f8688e54d541e01ef41b9bc6bd4140ab2",
+    "createdAt": "2026-10-17T05:02:15.419Z",
+    "guestId": "gst_ba90cc6e6578d3c839a2ab93",
+    "expiresAt": "2026-11-16T05:02:15.420Z",
+    "tokenHash": "d3774d0f849451d39c4554de90e76becaf85b13cf10f410ac6f4e7acd6d4e8c1",
+    "isRevoked": false,
+    "reservationRequestId": "res_93149983c19aa54ea13bffa4"
+  },
+  {
+    "id": "gstok_176500f0102eea27b96122b91a8ff914a49af33e9b8ea07d",
+    "createdAt": "2026-10-15T16:33:59.038Z",
+    "tokenHash": "f28628c689ab0cb862c8a21e1e62d629efd289a294ab151c4e1caab2205a65ea",
+    "expiresAt": "2026-11-14T16:33:59.039Z",
+    "reservationRequestId": "res_1085e54b0df0c63275088a16",
+    "isRevoked": false,
+    "guestId": "gst_3593dc5ea6985adecd1daeac"
+  },
+  {
+    "id": "gstok_20a830f5bb84cf8a764b22efe8ac700cb79a7fcc8c5d118f",
+    "guestId": "gst_ea0a04d48752c5bb71808325",
+    "createdAt": "2026-10-17T05:11:10.563Z",
+    "reservationRequestId": "res_9944d03ef9e3b5078d2802fd",
+    "expiresAt": "2026-11-16T05:11:10.564Z",
+    "tokenHash": "d3843ed127648a3c47b56d0a7e2288a78fc7e93227ceef4e85789e313e8c35b6",
+    "isRevoked": false
+  },
+  {
+    "id": "gstok_5f3f4d7dcadaac08c93130c89e45d2957867d3bea64c51cc",
+    "createdAt": "2026-10-17T04:59:45.464Z",
+    "guestId": "gst_4c6a21b83dfb52e9e627832d",
+    "isRevoked": false,
+    "tokenHash": "54bc906e1b742d253f5d7e5ba0de461f8b6b280e06b087c5f6ce34a29cc6cd63",
+    "expiresAt": "2026-11-16T04:59:45.464Z",
+    "reservationRequestId": "res_978a25f60d488b20d10e5cf2"
+  },
+  {
+    "id": "gstok_f98f1213b7e2e5e59e4f6268b949ec6d76fcdc82221aee3e",
+    "guestId": "gst_3c764f5a64cdb5ef3c08bb7a",
+    "isRevoked": false,
+    "tokenHash": "3e4f13bd38f0f19ba2ca39ffa5623273e6e9ecca4ef70c7c2b2e50d521ac312c",
+    "expiresAt": "2026-11-16T16:02:48.097Z",
+    "reservationRequestId": "res_534658e965536314e6c3c853",
+    "createdAt": "2026-10-17T16:02:48.054Z",
+    "lastAccessedAt": "2026-10-17T16:02:50.245Z"
+  }
+]

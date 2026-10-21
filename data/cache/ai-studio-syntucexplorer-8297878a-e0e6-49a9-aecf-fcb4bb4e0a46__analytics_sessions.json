@@ -1,0 +1,85 @@
+[
+  {
+    "id": "ses_20261020_9747c57c816a1263",
+    "lastActivityAt": "2026-10-20T17:52:12.352Z",
+    "updatedAt": "2026-10-20T17:52:12.352Z"
+  },
+  {
+    "id": "ses_108ab716371d40e7cd6361d3822fbd7d",
+    "sessionId": "ses_108ab716371d40e7cd6361d3822fbd7d",
+    "visitorId": "vis_test_1792519173752",
+    "startedAt": "2026-10-20T17:59:33.757Z",
+    "lastActivityAt": "2026-10-20T17:59:34.044Z",
+    "landingPage": "/",
+    "source": "direct",
+    "medium": "none",
+    "campaign": null,
+    "content": null,
+    "term": null,
+    "referrerUrl": null,
+    "referrerDomain": null,
+    "attributionConfidence": "DIRECT",
+    "deviceCategory": "desktop",
+    "browser": null,
+    "os": null,
+    "country": null,
+    "updatedAt": "2026-10-20T17:59:34.044Z"
+  },
+  {
+    "id": "ses_test_tiktok_1792519626214",
+    "sessionId": "ses_test_tiktok_1792519626214",
+    "visitorId": "vis_test_tiktok_1792519626214",
+    "startedAt": "2026-10-20T18:07:06.218Z",
+    "lastActivityAt": "2026-10-20T18:07:06.783Z",
+    "landingPage": "/catalog",
+    "source": "tiktok",
+    "medium": "paid_social",
+    "campaign": "persistence_test",
+    "content": "persistence_test_ad",
+    "term": null,
+    "referrerUrl": "https://www.tiktok.com/",
+    "referrerDomain": "tiktok.com",
+    "attributionConfidence": "UTM_EXACT",
+    "deviceCategory": "desktop",
+    "browser": null,
+    "os": null,
+    "country": null,
+    "updatedAt": "2026-10-20T18:07:06.783Z"
+  },
+  {
+    "id": "ses_632dee0edececdf638a2c7804fa8bbed",
+    "lastActivityAt": "2026-10-21T07:16:26.357Z",
+    "updatedAt": "2026-10-21T07:16:26.357Z"
+  },
+  {
+    "id": "ses_test_tiktok_1792567214934",
+    "sessionId": "ses_test_tiktok_1792567214934",
+    "visitorId": "vis_test_tiktok_1792567214934",
+    "startedAt": "2026-10-21T07:20:14.936Z",
+    "lastActivityAt": "2026-10-21T07:20:15.297Z",
+    "landingPage": "/catalog",
+    "source": "tiktok",
+    "medium": "paid_social",
+    "campaign": "persistence_test",
+    "content": "persistence_test_ad",
+    "term": null,
+    "referrerUrl": "https://www.tiktok.com/",
+    "referrerDomain": "tiktok.com",
+    "attributionConfidence": "UTM_EXACT",
+    "deviceCategory": "desktop",
+    "browser": null,
+    "os": null,
+    "country": null,
+    "updatedAt": "2026-10-21T07:20:15.297Z"
+  },
+  {
+    "id": "ses_9f84e8f12c001cf8f2bb3095b09b75e1",
+    "lastActivityAt": "2026-10-21T07:20:15.765Z",
+    "updatedAt": "2026-10-21T07:20:15.765Z"
+  },
+  {
+    "id": "ses_coordinator",
+    "lastActivityAt": "2026-10-21T07:20:16.248Z",
+    "updatedAt": "2026-10-21T07:20:16.248Z"
+  }
+]

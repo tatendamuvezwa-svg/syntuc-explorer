@@ -1,0 +1,939 @@
+[
+  {
+    "id": "imp_pkg_1854a3fea998a9d8f783",
+    "tagline": "Operator package from Shearwater",
+    "name": "Tick It to Adventure — Any 3 Activities",
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "currency": "USD",
+    "categorySlug": "packages",
+    "pricePerPerson": "478",
+    "description": "Tick It to Adventure — Any 3 Activities, supplied by Shearwater in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "catalogImportKey": "operator-pricelist-v1:shearwater:tick-it-to-adventure-any-3-activities",
+    "slug": "tick-it-to-adventure-any-3-activities-d8f783",
+    "mandatoryFees": [],
+    "highlights": [],
+    "primaryImageUrl": null,
+    "operatorName": "Shearwater",
+    "importedByStaffId": "usr_user_email",
+    "verificationNotes": [
+      "Source describes selection of any three activities. Verify the eligible activity list and exclusions."
+    ],
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "durationNights": 0,
+    "durationDays": 1,
+    "priceBasis": "per_person",
+    "catalogItemType": "package",
+    "videoUrl": null,
+    "inclusions": [],
+    "operatorId": "op_shearwater"
+  },
+  {
+    "id": "imp_pkg_1e73db33ee6755674cca",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:silver-package",
+    "name": "Silver Package",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "pricePerPerson": "150",
+    "categorySlug": "packages",
+    "description": "Silver Package, supplied by Shearwater in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "highlights": [
+      "Sunset cruise",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)",
+      "Bridge tour"
+    ],
+    "slug": "silver-package-674cca",
+    "currency": "USD",
+    "mandatoryFees": [],
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "catalogItemType": "package",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "operatorName": "Shearwater",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "videoUrl": null,
+    "tagline": "Operator package from Shearwater",
+    "priceBasis": "per_person",
+    "durationNights": 0,
+    "durationDays": 1,
+    "inclusions": [
+      "Sunset cruise",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)",
+      "Bridge tour"
+    ],
+    "operatorId": "op_shearwater",
+    "importedByStaffId": "usr_user_email",
+    "verificationNotes": [
+      "Source notes rainforest lunch may be optional. Confirm exact inclusions before publishing."
+    ],
+    "primaryImageUrl": null
+  },
+  {
+    "id": "imp_pkg_3865fcf46bef01d65a02",
+    "isPublished": false,
+    "mandatoryFees": [],
+    "catalogImportKey": "operator-pricelist-v1:shearwater:gruesome-twosome-rafting-and-bungee",
+    "primaryImageUrl": null,
+    "description": "Gruesome Twosome — Rafting and Bungee, supplied by Shearwater in the Victoria Falls tourism region.",
+    "highlights": [],
+    "durationDays": 1,
+    "videoUrl": null,
+    "catalogItemType": "package",
+    "operatorName": "Shearwater",
+    "durationNights": 0,
+    "pricePerPerson": "347",
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "inclusions": [],
+    "name": "Gruesome Twosome — Rafting and Bungee",
+    "operatorId": "op_shearwater",
+    "currency": "USD",
+    "priceBasis": "per_person",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "importedByStaffId": "usr_user_email",
+    "verificationNotes": [
+      "Source describes a $10 saving; confirm eligible season and fees."
+    ],
+    "categorySlug": "packages",
+    "tagline": "Operator package from Shearwater",
+    "slug": "gruesome-twosome-rafting-and-bungee-d65a02",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ]
+  },
+  {
+    "id": "imp_pkg_45a8762384bf1c386957",
+    "priceBasis": "per_person",
+    "inclusions": [
+      "Sunset cruise",
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)",
+      "Bridge tour"
+    ],
+    "operatorName": "Shearwater",
+    "operatorId": "op_shearwater",
+    "durationNights": 0,
+    "description": "Platinum Package, supplied by Shearwater in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "durationDays": 1,
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "videoUrl": null,
+    "importedByStaffId": "usr_user_email",
+    "verificationNotes": [
+      "Source notes rainforest lunch may be optional. Confirm exact inclusions before publishing."
+    ],
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "highlights": [
+      "Sunset cruise",
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)",
+      "Bridge tour"
+    ],
+    "catalogItemType": "package",
+    "mandatoryFees": [],
+    "currency": "USD",
+    "categorySlug": "packages",
+    "name": "Platinum Package",
+    "slug": "platinum-package-386957",
+    "pricePerPerson": "326",
+    "primaryImageUrl": null,
+    "tagline": "Operator package from Shearwater",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:platinum-package"
+  },
+  {
+    "id": "imp_pkg_60e5b3898ca6c6796a96",
+    "operatorName": "Wild Horizons",
+    "highlights": [
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Sundowner cruise",
+      "Lookout Cafe lunch"
+    ],
+    "slug": "wild-horizons-classic-with-lookout-lunch-796a96",
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:wild-horizons-classic-with-lookout-lunch",
+    "currency": "USD",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required",
+    "mandatoryFees": [],
+    "durationDays": 1,
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "name": "Wild Horizons Classic with Lookout Lunch",
+    "verificationNotes": [],
+    "importedByStaffId": "usr_user_email",
+    "durationNights": 0,
+    "priceBasis": "per_person",
+    "pricePerPerson": "289",
+    "inclusions": [
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Sundowner cruise",
+      "Lookout Cafe lunch"
+    ],
+    "operatorId": "op_wildhorizons",
+    "categorySlug": "packages",
+    "description": "Wild Horizons Classic with Lookout Lunch, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "catalogItemType": "package",
+    "primaryImageUrl": null,
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "tagline": "Operator package from Wild Horizons",
+    "videoUrl": null
+  },
+  {
+    "id": "imp_pkg_690dc0b55a2face630b3",
+    "highlights": [
+      "Sundowner cruise",
+      "Any two eligible activities: Elephant Encounter, solo Zip Line or Gorge Swing, White Water Rafting"
+    ],
+    "importedByStaffId": "usr_user_email",
+    "name": "Adventure Pass 2",
+    "verificationNotes": [
+      "Verify exact eligible activity combinations and all exclusions."
+    ],
+    "categorySlug": "packages",
+    "currency": "USD",
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:adventure-pass-2",
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required",
+    "tagline": "Operator package from Wild Horizons",
+    "durationNights": 0,
+    "isPublished": false,
+    "slug": "adventure-pass-2-e630b3",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "description": "Adventure Pass 2, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "operatorName": "Wild Horizons",
+    "inclusions": [
+      "Sundowner cruise",
+      "Any two eligible activities: Elephant Encounter, solo Zip Line or Gorge Swing, White Water Rafting"
+    ],
+    "operatorId": "op_wildhorizons",
+    "priceBasis": "per_person",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "pricePerPerson": "347",
+    "primaryImageUrl": null,
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "durationDays": 1,
+    "catalogItemType": "package",
+    "mandatoryFees": [],
+    "exclusions": [
+      "National Parks fees excluded according to supplied summary."
+    ],
+    "videoUrl": null
+  },
+  {
+    "id": "imp_pkg_6e74b8a65ee08e738460",
+    "inclusions": [
+      "Sunset cruise",
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)"
+    ],
+    "operatorId": "op_shearwater",
+    "priceBasis": "per_person",
+    "primaryImageUrl": null,
+    "mandatoryFees": [],
+    "verificationNotes": [
+      "Source notes rainforest lunch may be optional. Confirm exact inclusions before publishing."
+    ],
+    "importedByStaffId": "usr_user_email",
+    "name": "Gold Package",
+    "slug": "gold-package-738460",
+    "tagline": "Operator package from Shearwater",
+    "catalogItemType": "package",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "pricePerPerson": "247",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "categorySlug": "packages",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "currency": "USD",
+    "highlights": [
+      "Sunset cruise",
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)"
+    ],
+    "durationDays": 1,
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "durationNights": 0,
+    "videoUrl": null,
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:gold-package",
+    "isPublished": false,
+    "description": "Gold Package, supplied by Shearwater in the Victoria Falls tourism region.",
+    "operatorName": "Shearwater"
+  },
+  {
+    "id": "imp_pkg_771e1d85e18ef584895a",
+    "catalogItemType": "package",
+    "mandatoryFees": [],
+    "categorySlug": "packages",
+    "priceBasis": "per_person",
+    "inclusions": [
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Sundowner cruise"
+    ],
+    "currency": "USD",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "operatorId": "op_wildhorizons",
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:wild-horizons-classic",
+    "durationNights": 0,
+    "primaryImageUrl": null,
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "verificationNotes": [],
+    "importedByStaffId": "usr_user_email",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "pricePerPerson": "255",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "description": "Wild Horizons Classic, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "name": "Wild Horizons Classic",
+    "operatorName": "Wild Horizons",
+    "highlights": [
+      "Helicopter flight",
+      "Victoria Falls tour",
+      "Sundowner cruise"
+    ],
+    "tagline": "Operator package from Wild Horizons",
+    "slug": "wild-horizons-classic-84895a",
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required",
+    "videoUrl": null,
+    "durationDays": 1
+  },
+  {
+    "id": "imp_pkg_8db7742bd305c572bb92",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "operatorName": "Wild Horizons",
+    "catalogItemType": "package",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "tagline": "Operator package from Wild Horizons",
+    "highlights": [
+      "Victoria Falls tour",
+      "Lookout Cafe lunch"
+    ],
+    "durationDays": 1,
+    "primaryImageUrl": null,
+    "videoUrl": null,
+    "pricePerPerson": "69",
+    "durationNights": 0,
+    "priceBasis": "per_person",
+    "categorySlug": "packages",
+    "mandatoryFees": [],
+    "description": "Victoria Falls Classic, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "currency": "USD",
+    "slug": "victoria-falls-classic-72bb92",
+    "inclusions": [
+      "Victoria Falls tour",
+      "Lookout Cafe lunch"
+    ],
+    "operatorId": "op_wildhorizons",
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:victoria-falls-classic",
+    "name": "Victoria Falls Classic",
+    "importedByStaffId": "usr_user_email",
+    "verificationNotes": [],
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required"
+  },
+  {
+    "id": "imp_pkg_8eac4a286398679792e8",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "categorySlug": "packages",
+    "verificationNotes": [
+      "Source describes selection of any two activities. Verify the eligible activity list and exclusions."
+    ],
+    "importedByStaffId": "usr_user_email",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "name": "Tick It to Adventure — Any 2 Activities",
+    "priceBasis": "per_person",
+    "videoUrl": null,
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "inclusions": [],
+    "slug": "tick-it-to-adventure-any-2-activities-9792e8",
+    "operatorId": "op_shearwater",
+    "durationNights": 0,
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "tagline": "Operator package from Shearwater",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:tick-it-to-adventure-any-2-activities",
+    "pricePerPerson": "370",
+    "currency": "USD",
+    "mandatoryFees": [],
+    "operatorName": "Shearwater",
+    "catalogItemType": "package",
+    "primaryImageUrl": null,
+    "highlights": [],
+    "isPublished": false,
+    "durationDays": 1,
+    "description": "Tick It to Adventure — Any 2 Activities, supplied by Shearwater in the Victoria Falls tourism region."
+  },
+  {
+    "id": "imp_pkg_a1cbc4ec95f016409556",
+    "categorySlug": "packages",
+    "importedByStaffId": "usr_user_email",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "verificationNotes": [],
+    "primaryImageUrl": null,
+    "name": "Big Air — Bridge Swing, Slide and Bungee",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:big-air-bridge-swing-slide-and-bungee",
+    "videoUrl": null,
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "pricePerPerson": "280",
+    "slug": "big-air-bridge-swing-slide-and-bungee-409556",
+    "catalogItemType": "package",
+    "tagline": "Operator package from Shearwater",
+    "priceBasis": "per_person",
+    "operatorId": "op_shearwater",
+    "inclusions": [],
+    "mandatoryFees": [],
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "durationNights": 0,
+    "operatorName": "Shearwater",
+    "description": "Big Air — Bridge Swing, Slide and Bungee, supplied by Shearwater in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "currency": "USD",
+    "durationDays": 1,
+    "highlights": []
+  },
+  {
+    "id": "imp_pkg_af93d7c57b4f3b494a11",
+    "videoUrl": null,
+    "verificationNotes": [
+      "Summary says $10, source PDF transcription says $12; confirm before publishing."
+    ],
+    "importedByStaffId": "usr_user_email",
+    "highlights": [],
+    "tagline": "Operator package from Shearwater",
+    "pricePerPerson": "268",
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "categorySlug": "packages",
+    "description": "Jetboat and Rafting Combo, supplied by Shearwater in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "slug": "jetboat-and-rafting-combo-494a11",
+    "priceBasis": "per_person",
+    "durationDays": 1,
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "operatorId": "op_shearwater",
+    "catalogItemType": "package",
+    "durationNights": 0,
+    "inclusions": [],
+    "currency": "USD",
+    "primaryImageUrl": null,
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "mandatoryFees": [
+      {
+        "mandatory": true,
+        "currency": "USD",
+        "amount": 12,
+        "name": "National Parks fees",
+        "verificationStatus": "CONFLICT_REQUIRES_CONFIRMATION"
+      }
+    ],
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "name": "Jetboat and Rafting Combo",
+    "operatorName": "Shearwater",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:jetboat-and-rafting-combo"
+  },
+  {
+    "id": "imp_pkg_b209409270d8e1b301d3",
+    "mandatoryFees": [],
+    "isPublished": false,
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:zambezi-classic",
+    "primaryImageUrl": null,
+    "description": "Zambezi Classic, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "highlights": [
+      "Victoria Falls tour",
+      "Sundowner cruise"
+    ],
+    "durationDays": 1,
+    "videoUrl": null,
+    "catalogItemType": "package",
+    "durationNights": 0,
+    "operatorName": "Wild Horizons",
+    "pricePerPerson": "94",
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required",
+    "name": "Zambezi Classic",
+    "inclusions": [
+      "Victoria Falls tour",
+      "Sundowner cruise"
+    ],
+    "operatorId": "op_wildhorizons",
+    "currency": "USD",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "priceBasis": "per_person",
+    "importedByStaffId": "usr_user_email",
+    "verificationNotes": [],
+    "categorySlug": "packages",
+    "tagline": "Operator package from Wild Horizons",
+    "slug": "zambezi-classic-b301d3",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ]
+  },
+  {
+    "id": "imp_pkg_b30f86deb23ef2767a7c",
+    "primaryImageUrl": null,
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "videoUrl": null,
+    "durationNights": 0,
+    "highlights": [],
+    "mandatoryFees": [],
+    "categorySlug": "packages",
+    "catalogItemType": "package",
+    "catalogImportKey": "operator-pricelist-v1:pure-africa:pure-africa-cruise-and-dinner-combination-signature",
+    "sourceReference": "Latest Pure Africa catalog supplied by the user on 14 October 2026; authoritative over all earlier Pure Africa catalog prices.",
+    "name": "Pure Africa Cruise and Dinner Combination — Signature",
+    "tagline": "Operator package from Pure Africa",
+    "description": "Pure Africa Cruise and Dinner Combination — Signature, supplied by Pure Africa in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "priceBasis": "per_person",
+    "inclusions": [],
+    "durationDays": 1,
+    "operatorId": "op_pure_africa",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "pricePerPerson": "156",
+    "slug": "pure-africa-cruise-and-dinner-combination-signature-767a7c",
+    "verificationNotes": [
+      "The supplied catalog summary contains a $156 cruise-and-dinner combination; confirm exact cruise, meal, inclusions and rate basis before publication."
+    ],
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "importedByStaffId": "usr_user_email",
+    "currency": "USD",
+    "operatorName": "Pure Africa"
+  },
+  {
+    "id": "imp_pkg_b53e16afd83a73ab4174",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "verificationNotes": [
+      "Verify river/season conditions and exact inclusions."
+    ],
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "importedByStaffId": "usr_user_email",
+    "operatorName": "Shearwater",
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "name": "Rampage — Jetboat and Rafting Rapids 1–5",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:rampage-jetboat-and-rafting-rapids-1-5",
+    "isPublished": false,
+    "slug": "rampage-jetboat-and-rafting-rapids-1-5-ab4174",
+    "durationDays": 1,
+    "description": "Rampage — Jetboat and Rafting Rapids 1–5, supplied by Shearwater in the Victoria Falls tourism region.",
+    "videoUrl": null,
+    "durationNights": 0,
+    "highlights": [],
+    "mandatoryFees": [],
+    "pricePerPerson": "204",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "primaryImageUrl": null,
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "categorySlug": "packages",
+    "currency": "USD",
+    "tagline": "Operator package from Shearwater",
+    "catalogItemType": "package",
+    "inclusions": [],
+    "operatorId": "op_shearwater",
+    "priceBasis": "per_person"
+  },
+  {
+    "id": "imp_pkg_b8d4053fdaf1898fd5b4",
+    "operatorName": "Shearwater",
+    "catalogItemType": "package",
+    "highlights": [
+      "Sunset cruise",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)"
+    ],
+    "primaryImageUrl": null,
+    "catalogImportKey": "operator-pricelist-v1:shearwater:bronze-package",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "currency": "USD",
+    "durationDays": 1,
+    "durationNights": 0,
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "tagline": "Operator package from Shearwater",
+    "slug": "bronze-package-8fd5b4",
+    "categorySlug": "packages",
+    "pricePerPerson": "75",
+    "description": "Bronze Package, supplied by Shearwater in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "priceBasis": "per_person",
+    "videoUrl": null,
+    "inclusions": [
+      "Sunset cruise",
+      "Victoria Falls tour",
+      "Rainforest lunch (unconfirmed)"
+    ],
+    "operatorId": "op_shearwater",
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "mandatoryFees": [],
+    "verificationNotes": [
+      "Source notes rainforest lunch may be optional. Confirm exact inclusions before publishing."
+    ],
+    "importedByStaffId": "usr_user_email",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "name": "Bronze Package"
+  },
+  {
+    "id": "imp_pkg_c6a3168ee913dd71d32e",
+    "priceBasis": "per_person",
+    "operatorId": "op_shearwater",
+    "slug": "gruesome-twosome-bungee-and-jetboat-71d32e",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "inclusions": [],
+    "primaryImageUrl": null,
+    "durationDays": 1,
+    "description": "Gruesome Twosome — Bungee and Jetboat, supplied by Shearwater in the Victoria Falls tourism region.",
+    "mandatoryFees": [],
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "catalogItemType": "package",
+    "isPublished": false,
+    "videoUrl": null,
+    "pricePerPerson": "312",
+    "name": "Gruesome Twosome — Bungee and Jetboat",
+    "operatorName": "Shearwater",
+    "currency": "USD",
+    "catalogImportKey": "operator-pricelist-v1:shearwater:gruesome-twosome-bungee-and-jetboat",
+    "highlights": [],
+    "durationNights": 0,
+    "tagline": "Operator package from Shearwater",
+    "sourceReference": "2026 - Shearwater Pricelist (lnternational).pdf; verify conflicting fee/inclusion details before publication",
+    "categorySlug": "packages",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "importedByStaffId": "usr_user_email",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "verificationNotes": [
+      "Source describes a $34 saving; confirm eligible season and fees."
+    ]
+  },
+  {
+    "id": "imp_pkg_d51d33d9ec7e44091e88",
+    "importedByStaffId": "usr_user_email",
+    "catalogItemType": "package",
+    "verificationNotes": [
+      "Supplied summary states $18 in fees; confirm applicability and fee basis."
+    ],
+    "description": "Rafting and Gorge Swing Combo, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:rafting-and-gorge-swing-combo",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "tagline": "Operator package from Wild Horizons",
+    "pricePerPerson": "274",
+    "operatorName": "Wild Horizons",
+    "priceBasis": "per_person",
+    "mandatoryFees": [
+      {
+        "mandatory": true,
+        "amount": 18,
+        "currency": "USD",
+        "name": "National Parks fees",
+        "verificationStatus": "SOURCE_STATED"
+      }
+    ],
+    "primaryImageUrl": null,
+    "inclusions": [],
+    "videoUrl": null,
+    "durationDays": 1,
+    "operatorId": "op_wildhorizons",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "name": "Rafting and Gorge Swing Combo",
+    "categorySlug": "packages",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "currency": "USD",
+    "durationNights": 0,
+    "slug": "rafting-and-gorge-swing-combo-091e88",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required",
+    "highlights": []
+  },
+  {
+    "id": "imp_pkg_d84be34b64570a29c354",
+    "verificationNotes": [],
+    "primaryImageUrl": null,
+    "importedByStaffId": "usr_user_email",
+    "mandatoryFees": [],
+    "durationNights": 0,
+    "categorySlug": "packages",
+    "description": "Zambezi Classic with Lookout Lunch, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "highlights": [
+      "Victoria Falls tour",
+      "Sundowner cruise",
+      "Lookout Cafe lunch"
+    ],
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "catalogItemType": "package",
+    "currency": "USD",
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "tagline": "Operator package from Wild Horizons",
+    "operatorName": "Wild Horizons",
+    "name": "Zambezi Classic with Lookout Lunch",
+    "videoUrl": null,
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "priceBasis": "per_person",
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:zambezi-classic-with-lookout-lunch",
+    "pricePerPerson": "122",
+    "inclusions": [
+      "Victoria Falls tour",
+      "Sundowner cruise",
+      "Lookout Cafe lunch"
+    ],
+    "durationDays": 1,
+    "operatorId": "op_wildhorizons",
+    "slug": "zambezi-classic-with-lookout-lunch-29c354"
+  },
+  {
+    "id": "imp_pkg_e0b85d5593cb0bfe4926",
+    "currency": "USD",
+    "operatorId": "op_pure_africa",
+    "inclusions": [],
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "priceBasis": "per_person",
+    "sourceReference": "Latest Pure Africa catalog supplied by the user on 14 October 2026; authoritative over all earlier Pure Africa catalog prices.",
+    "isPublished": false,
+    "description": "Pure Africa Cruise and Dinner Combination — Standard, supplied by Pure Africa in the Victoria Falls tourism region.",
+    "pricePerPerson": "110",
+    "exclusions": [
+      "Draft import: verify current rate, fees, inclusions, availability and operator source before publishing."
+    ],
+    "categorySlug": "packages",
+    "catalogImportKey": "operator-pricelist-v1:pure-africa:pure-africa-cruise-and-dinner-combination-standard",
+    "mandatoryFees": [],
+    "tagline": "Operator package from Pure Africa",
+    "highlights": [],
+    "durationDays": 1,
+    "verificationNotes": [
+      "The supplied catalog summary contains a $110 cruise-and-dinner combination; confirm exact cruise, meal, inclusions and rate basis before publication."
+    ],
+    "importedByStaffId": "usr_user_email",
+    "primaryImageUrl": null,
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "slug": "pure-africa-cruise-and-dinner-combination-standard-fe4926",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "durationNights": 0,
+    "operatorName": "Pure Africa",
+    "name": "Pure Africa Cruise and Dinner Combination — Standard",
+    "videoUrl": null,
+    "catalogItemType": "package"
+  },
+  {
+    "id": "imp_pkg_ec44ae1c52c6d04434c0",
+    "createdAt": "2026-10-17T03:08:39.635Z",
+    "exclusions": [
+      "National Parks fees excluded according to supplied summary."
+    ],
+    "categorySlug": "packages",
+    "updatedAt": "2026-10-17T03:08:39.635Z",
+    "catalogImportStatus": "DRAFT_NEEDS_VERIFICATION",
+    "catalogItemType": "package",
+    "slug": "adventure-pass-1-4434c0",
+    "name": "Adventure Pass 1",
+    "priceBasis": "per_person",
+    "durationNights": 0,
+    "primaryImageUrl": null,
+    "currency": "USD",
+    "operatorId": "op_wildhorizons",
+    "inclusions": [
+      "Sundowner cruise",
+      "Any two of: High Wire Pass, 12/13-minute helicopter flight, Night Drive"
+    ],
+    "description": "Adventure Pass 1, supplied by Wild Horizons in the Victoria Falls tourism region.",
+    "isPublished": false,
+    "videoUrl": null,
+    "mandatoryFees": [],
+    "pricePerPerson": "416",
+    "catalogImportKey": "operator-pricelist-v1:wild-horizons:adventure-pass-1",
+    "operatorName": "Wild Horizons",
+    "sourceReference": "Wild Horizons brochure summary supplied by the user; original brochure verification required",
+    "highlights": [
+      "Sundowner cruise",
+      "Any two of: High Wire Pass, 12/13-minute helicopter flight, Night Drive"
+    ],
+    "tagline": "Operator package from Wild Horizons",
+    "importedByStaffId": "usr_user_email",
+    "verificationNotes": [
+      "Verify exact eligible activity combinations and all exclusions."
+    ],
+    "durationDays": 1
+  },
+  {
+    "id": "pkg_batoka_adventure",
+    "inclusions": [
+      "2 nights accommodation with breakfast",
+      "Full day white-water rafting with gear and guide",
+      "Full day Chobe safari trip with border transfers and lunch",
+      "Simunye theatre admission"
+    ],
+    "durationDays": 3,
+    "highlights": [
+      "2 nights at Victoria Falls Rainbow Hotel with breakfast",
+      "Full-day Grade 5 Batoka Gorge White Water Rafting with gorge buffet lunch",
+      "Full-day Chobe National Park Safari in Botswana (boat safari + 4x4 game drive + lodge buffet)",
+      "Simunye African theatrical evening performance ticket"
+    ],
+    "name": "Batoka Adventure & Wilderness Duo",
+    "durationNights": 2,
+    "tagline": "High-adrenaline white-water rafting, Chobe Botswana safari, and panoramic hotel stay.",
+    "currency": "USD",
+    "primaryImageUrl": "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80",
+    "cloudPersistedAt": "2026-10-11T05:34:22.257Z",
+    "exclusions": [
+      "Parks river levy ($10)",
+      "Botswana park fee ($15)"
+    ],
+    "updatedAt": "2026-10-18T14:00:31.044Z",
+    "isPublished": false,
+    "pricePerPerson": "590",
+    "description": "The definitive adventure package for active travelers. Base yourself for 2 nights at the Victoria Falls Rainbow Hotel overlooking the Falls spray. Conquer the world's greatest Grade 5 rapids on the Zambezi River with full-day rafting, and embark on a full-day cross-border safari to Botswana's Chobe National Park to witness hundreds of elephants along the Chobe River.",
+    "slug": "batoka-adventure-and-wilderness-duo",
+    "videoUrl": null,
+    "createdAt": "2026-10-11T05:34:22.257Z"
+  },
+  {
+    "id": "pkg_essential_vf",
+    "durationNights": 3,
+    "highlights": [
+      "3 nights at Shearwater Explorers Village with breakfast",
+      "12-minute Flight of Angels scenic helicopter flight",
+      "Zambezi Explorer luxury sunset cruise with canapés & open bar",
+      "Victoria Falls Rainforest guided walking tour with poncho",
+      "All airport and scheduled activity transfers included"
+    ],
+    "inclusions": [
+      "3 nights accommodation with daily breakfast",
+      "All 3 signature activities as listed",
+      "Return Victoria Falls International Airport transfers",
+      "Dedicated Syntuc Explorer trip coordination"
+    ],
+    "videoUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "name": "Victoria Falls Essential Journey",
+    "durationDays": 4,
+    "tagline": "The iconic 4-day introduction to Victoria Falls: rainforest, flight of angels & sunset cruise.",
+    "cloudPersistedAt": "2026-10-11T05:34:22.051Z",
+    "primaryImageUrl": "https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=1200&q=80",
+    "exclusions": [
+      "Rainforest National Park entry fee ($50)",
+      "Helicopter aviation levy ($15)",
+      "River usage fee ($12)"
+    ],
+    "currency": "USD",
+    "createdAt": "2026-10-11T05:34:22.051Z",
+    "updatedAt": "2026-10-18T14:00:18.358Z",
+    "slug": "victoria-falls-essential-journey",
+    "description": "A seamlessly coordinated 4-day, 3-night holiday combining town accommodation at Shearwater Explorers Village with the three must-do experiences: a guided rainforest walking tour of the Falls, the world-famous 12-minute Flight of Angels helicopter flight, and a pure luxury sunset catamaran cruise on the Zambezi.",
+    "isPublished": false,
+    "pricePerPerson": "680"
+  },
+  {
+    "id": "pkg_luxury_zambezi",
+    "name": "Zambezi Luxury Safari & River Retreat",
+    "tagline": "All-inclusive 5-star riverfront canvas sanctuary, wildlife safaris & extended gorge helicopter flight.",
+    "videoUrl": null,
+    "exclusions": [
+      "Park conservation fees ($15/day)",
+      "Helicopter park levy ($15)"
+    ],
+    "cloudPersistedAt": "2026-10-11T05:34:22.217Z",
+    "durationNights": 3,
+    "pricePerPerson": "2450",
+    "primaryImageUrl": "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1200&q=80",
+    "updatedAt": "2026-10-18T14:00:27.595Z",
+    "inclusions": [
+      "All luxury accommodations, all meals and premium open bar",
+      "All guided safari drives and river cruises inside Zambezi National Park",
+      "25-minute extended helicopter tour",
+      "Executive VIP airport transfers"
+    ],
+    "description": "Designed for the discerning traveler seeking complete wilderness immersion with unmatched luxury. Stay 3 nights at Old Drift Lodge in Zambezi National Park with private plunge pool, indulge in daily river boat safaris and game drives, fly on the 25-minute extended helicopter flight over Batoka Gorge, and dine suspended over the gorge at The Lookout Café.",
+    "createdAt": "2026-10-11T05:34:22.217Z",
+    "slug": "zambezi-luxury-safari-retreat",
+    "isPublished": false,
+    "durationDays": 4,
+    "currency": "USD",
+    "highlights": [
+      "3 nights all-inclusive luxury at Old Drift Lodge in Zambezi National Park",
+      "25-minute Zambezi Gorge & Falls extended helicopter flight",
+      "Private Zambezi Explorer sunset cruise with gourmet dinner",
+      "The Lookout Café cliffside dining voucher",
+      "Unlimited morning and evening wildlife game drives and river boat safaris"
+    ]
+  },
+  {
+    "id": "pkg_sunset_gamedrive_combo",
+    "description": "Historical packaged combination of Zambezi sunset cruise and Zambezi National Park safari drive. Deactivated in favor of standalone activities.",
+    "isPublished": false,
+    "name": "Sunset Cruise + Game Drive Package",
+    "primaryImageUrl": "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1200&q=80",
+    "inclusions": [
+      "Historical inclusion package"
+    ],
+    "currency": "USD",
+    "durationNights": 0,
+    "highlights": [
+      "Zambezi Sunset Cruise",
+      "National Park Safari Game Drive"
+    ],
+    "cloudPersistedAt": "2026-10-11T05:34:22.308Z",
+    "pricePerPerson": "180.00",
+    "updatedAt": "2026-10-11T05:34:22.308Z",
+    "createdAt": "2026-10-11T05:34:22.308Z",
+    "durationDays": 1,
+    "tagline": "Legacy combination package (Deactivated).",
+    "slug": "sunset-cruise-game-drive-package",
+    "videoUrl": null,
+    "exclusions": [
+      "Parks fee"
+    ]
+  }
+]

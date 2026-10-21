@@ -1,0 +1,200 @@
+[
+  {
+    "id": "evt_0540df2c2940477d793a8468",
+    "eventId": "evt_0540df2c2940477d793a8468",
+    "visitorId": "vis_3621005be819b08a",
+    "sessionId": "ses_20261020_9747c57c816a1263",
+    "eventType": "PAGE_VIEWED",
+    "route": "/",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {},
+    "occurredAt": "2026-10-20T17:51:03.180Z"
+  },
+  {
+    "id": "evt_7bedab99a05ea7c7430997bf",
+    "eventId": "evt_7bedab99a05ea7c7430997bf",
+    "visitorId": "vis_3621005be819b08a",
+    "sessionId": "ses_20261020_9747c57c816a1263",
+    "eventType": "PAGE_VIEWED",
+    "route": "/",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {},
+    "occurredAt": "2026-10-20T17:52:12.352Z"
+  },
+  {
+    "id": "evt_b50d2cb5f4dca7baf2f32f80",
+    "eventId": "evt_b50d2cb5f4dca7baf2f32f80",
+    "visitorId": "vis_test_1792519173752",
+    "sessionId": "ses_108ab716371d40e7cd6361d3822fbd7d",
+    "eventType": "SESSION_STARTED",
+    "route": "/",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {
+      "isReturning": false,
+      "source": "direct",
+      "campaign": null,
+      "content": null,
+      "confidence": "DIRECT"
+    },
+    "occurredAt": "2026-10-20T17:59:33.921Z"
+  },
+  {
+    "id": "evt_9073a639394dc36a9b34ae34",
+    "eventId": "evt_9073a639394dc36a9b34ae34",
+    "visitorId": "vis_test_1792519173752",
+    "sessionId": "ses_108ab716371d40e7cd6361d3822fbd7d",
+    "eventType": "LANDING_PAGE_VIEWED",
+    "route": "/",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {
+      "landingPage": "/"
+    },
+    "occurredAt": "2026-10-20T17:59:34.044Z"
+  },
+  {
+    "id": "evt_2cd3b3b8e4525f8a03dcacf6",
+    "eventId": "evt_2cd3b3b8e4525f8a03dcacf6",
+    "visitorId": "vis_test_tiktok_1792519626214",
+    "sessionId": "ses_test_tiktok_1792519626214",
+    "eventType": "SESSION_STARTED",
+    "route": "/catalog",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {
+      "isReturning": false,
+      "source": "tiktok",
+      "campaign": "persistence_test",
+      "content": "persistence_test_ad",
+      "confidence": "UTM_EXACT"
+    },
+    "occurredAt": "2026-10-20T18:07:06.678Z"
+  },
+  {
+    "id": "evt_b56eb398110383452027c6ee",
+    "eventId": "evt_b56eb398110383452027c6ee",
+    "visitorId": "vis_test_tiktok_1792519626214",
+    "sessionId": "ses_test_tiktok_1792519626214",
+    "eventType": "LANDING_PAGE_VIEWED",
+    "route": "/catalog",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {
+      "landingPage": "/catalog"
+    },
+    "occurredAt": "2026-10-20T18:07:06.783Z"
+  },
+  {
+    "id": "evt_474942b8cc22879c3c60ccbe",
+    "eventId": "evt_474942b8cc22879c3c60ccbe",
+    "visitorId": "vis_guest",
+    "sessionId": "ses_632dee0edececdf638a2c7804fa8bbed",
+    "eventType": "RESERVATION_REQUEST_SUBMITTED",
+    "route": null,
+    "productId": null,
+    "packageId": null,
+    "reservationId": "res_b232385bfc15860538fac945",
+    "reservationReference": "SYN-VF-19356",
+    "metadata": {
+      "total": 104,
+      "firstTouchSource": "direct",
+      "firstTouchCampaign": null,
+      "firstTouchContent": null,
+      "lastTouchSource": "direct",
+      "lastTouchCampaign": null,
+      "lastTouchContent": null
+    },
+    "occurredAt": "2026-10-21T07:16:26.357Z"
+  },
+  {
+    "id": "evt_e4c63079e4cb68775aa6b50b",
+    "eventId": "evt_e4c63079e4cb68775aa6b50b",
+    "visitorId": "vis_test_tiktok_1792567214934",
+    "sessionId": "ses_test_tiktok_1792567214934",
+    "eventType": "SESSION_STARTED",
+    "route": "/catalog",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {
+      "isReturning": false,
+      "source": "tiktok",
+      "campaign": "persistence_test",
+      "content": "persistence_test_ad",
+      "confidence": "UTM_EXACT"
+    },
+    "occurredAt": "2026-10-21T07:20:15.216Z"
+  },
+  {
+    "id": "evt_20cbba4696297ae783b36bbf",
+    "eventId": "evt_20cbba4696297ae783b36bbf",
+    "visitorId": "vis_test_tiktok_1792567214934",
+    "sessionId": "ses_test_tiktok_1792567214934",
+    "eventType": "LANDING_PAGE_VIEWED",
+    "route": "/catalog",
+    "productId": null,
+    "packageId": null,
+    "reservationId": null,
+    "reservationReference": null,
+    "metadata": {
+      "landingPage": "/catalog"
+    },
+    "occurredAt": "2026-10-21T07:20:15.297Z"
+  },
+  {
+    "id": "evt_77627fc7aedb9844c16c18e5",
+    "eventId": "evt_77627fc7aedb9844c16c18e5",
+    "visitorId": "vis_test_tiktok_1792567214934",
+    "sessionId": "ses_9f84e8f12c001cf8f2bb3095b09b75e1",
+    "eventType": "RESERVATION_REQUEST_SUBMITTED",
+    "route": null,
+    "productId": null,
+    "packageId": null,
+    "reservationId": "res_cc8e65207b53faa61dfdfd16",
+    "reservationReference": "SYN-VF-96603",
+    "metadata": {
+      "total": 508,
+      "firstTouchSource": "tiktok",
+      "firstTouchCampaign": "persistence_test",
+      "firstTouchContent": "persistence_test_ad",
+      "lastTouchSource": "direct",
+      "lastTouchCampaign": null,
+      "lastTouchContent": null
+    },
+    "occurredAt": "2026-10-21T07:20:15.765Z"
+  },
+  {
+    "id": "evt_551eab759fce4f10791287a1",
+    "eventId": "evt_551eab759fce4f10791287a1",
+    "visitorId": "vis_test_tiktok_1792567214934",
+    "sessionId": "ses_coordinator",
+    "eventType": "RESERVATION_CONFIRMED",
+    "route": null,
+    "productId": null,
+    "packageId": null,
+    "reservationId": "res_cc8e65207b53faa61dfdfd16",
+    "reservationReference": "SYN-VF-96603",
+    "metadata": {
+      "previousStatus": "NEW",
+      "newStatus": "CONFIRMED",
+      "staffId": "usr_coord_1"
+    },
+    "occurredAt": "2026-10-21T07:20:16.248Z"
+  }
+]

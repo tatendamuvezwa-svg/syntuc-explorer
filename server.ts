@@ -14,7 +14,8 @@ import analyticsRoutes from './server/routes/analytics.ts';
 import marketingRoutes from './server/routes/marketing.ts';
 import reviewsRoutes from './server/routes/reviews.ts';
 import { getFirestoreDb, getFirebaseConfig } from './server/lib/firestore.ts';
-import { ensureHeritageCruiseProduct } from './server/services/seedHeritageCruise.ts';
+import { selectedDatabaseContext } from './server/middleware/databaseSelection.ts';
+import { ensureHeritageCruiseProduct, ensureBaselineAccommodations } from './server/services/seedHeritageCruise.ts';
 
 dotenv.config();
 
@@ -83,8 +84,8 @@ app.use('/api/catalog', catalogRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/reservation', reservationRoutes);
-app.use('/api/coordinator', coordinatorRoutes);
-app.use('/api/media', mediaRoutes);
+app.use('/api/coordinator', selectedDatabaseContext, coordinatorRoutes);
+app.use('/api/media', selectedDatabaseContext, mediaRoutes);
 app.use('/api/school-trips', schoolTripRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -109,8 +110,9 @@ async function startServer() {
     }
     console.log('[Syntuc Server] Authoritative Cloud Firestore database active.');
 
-    // Ensure Heritage Standard Sunset Cruise product exists in live catalogue
+    // Ensure Heritage Standard Sunset Cruise and baseline accommodations exist in live catalogue
     await ensureHeritageCruiseProduct();
+    await ensureBaselineAccommodations();
 
     // Setup Vite in development or static dist in production
     if (!isProduction) {

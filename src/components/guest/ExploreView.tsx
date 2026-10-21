@@ -21,9 +21,10 @@ import syntucAvatarImg from '../../assets/images/syntuc_guide_avatar_17923150990
 
 interface ExploreViewProps {
   onOpenFeedback?: (productId?: string) => void;
+  onOpenOnboardCheckin?: (productId?: string) => void;
 }
 
-export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenFeedback }) => {
+export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenFeedback, onOpenOnboardCheckin }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -92,6 +93,16 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenFeedback }) => {
       onOpenFeedback(productId);
     } else {
       window.history.pushState({}, '', `/feedback?product=${encodeURIComponent(productId)}`);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleOpenCheckin = (productId: string) => {
+    if (onOpenOnboardCheckin) {
+      onOpenOnboardCheckin(productId);
+    } else {
+      window.history.pushState({}, '', `/onboard?product=${encodeURIComponent(productId)}`);
       window.dispatchEvent(new PopStateEvent('popstate'));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -508,6 +519,19 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenFeedback }) => {
                       </button>
 
                       <div className="flex items-center space-x-1.5 flex-wrap">
+                        {/* Visible "Check-in" Action for Heritage Cruise / River Cruises */}
+                        {(isHeritageCruise || product.categorySlug === 'river-cruises') && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCheckin(product.id)}
+                            className="px-2.5 py-1.5 text-xs font-semibold bg-[#20372B] hover:bg-[#2F4D3C] text-[#E2BE8C] border border-[#E2BE8C]/40 rounded-lg transition flex items-center cursor-pointer shadow-2xs"
+                            title="Open onboard guest check-in experience"
+                          >
+                            <Compass className="w-3 h-3 mr-1 text-[#E2BE8C]" />
+                            <span>Check-in</span>
+                          </button>
+                        )}
+
                         {/* Visible "Review This Cruise" Action */}
                         {(isHeritageCruise || product.categorySlug === 'river-cruises') && (
                           <button
@@ -533,8 +557,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenFeedback }) => {
 
                         <button
                           type="button"
-                          onClick={() => {
-                            addToTrip({ productId: product.id });
+                          onClick={async () => {
+                            await addToTrip({ productId: product.id });
                             openReservationModal();
                           }}
                           className="px-3 py-1.5 text-xs font-semibold bg-[#263B30] hover:bg-[#34513F] text-white rounded-lg shadow-xs transition cursor-pointer"

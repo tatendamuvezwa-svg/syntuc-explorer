@@ -1,0 +1,26 @@
+[
+  {
+    "id": "usr_admin_1",
+    "passwordHash": "saintech2026!admin",
+    "role": "admin",
+    "isActive": true,
+    "name": "SAINTECH System Admin",
+    "email": "admin@saintech.io"
+  },
+  {
+    "id": "usr_coord_1",
+    "passwordHash": "syntuc2026!secure",
+    "role": "reservations_coordinator",
+    "isActive": true,
+    "name": "Victoria Falls Reservations Desk",
+    "email": "reservations@syntuc.com"
+  },
+  {
+    "id": "usr_user_email",
+    "isActive": true,
+    "role": "admin",
+    "email": "tatenda.muvezwa@gmail.com",
+    "name": "Tatenda Muvezwa",
+    "passwordHash": "admin2026!"
+  }
+]

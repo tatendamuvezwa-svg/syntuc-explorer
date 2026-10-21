@@ -41,8 +41,54 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Products
+    // Products & Packages
     match /products/{productId} {
+      allow read, write: if true;
+    }
+
+    match /packages/{packageId} {
+      allow read, write: if true;
+    }
+
+    // Taxonomy & Metadata
+    match /categories/{categoryId} {
+      allow read, write: if true;
+    }
+
+    match /operators/{operatorId} {
+      allow read, write: if true;
+    }
+
+    match /properties/{propertyId} {
+      allow read, write: if true;
+    }
+
+    match /rooms/{roomId} {
+      allow read, write: if true;
+    }
+
+    match /knowledge_sources/{sourceId} {
+      allow read, write: if true;
+    }
+
+    // Reviews & Notes
+    match /boat_cruise_reviews/{reviewId} {
+      allow read, write: if true;
+    }
+
+    match /coordinator_notes/{noteId} {
+      allow read, write: if true;
+    }
+
+    match /leads/{leadId} {
+      allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /product_revisions/{revId} {
       allow read, write: if true;
     }
 

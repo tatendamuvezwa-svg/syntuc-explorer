@@ -1,13 +1,13 @@
 import crypto from 'crypto';
 import { operatorCatalogImport } from '../data/operatorCatalogImport.ts';
 import { accommodationCatalogImport } from '../data/accommodationCatalogImport.ts';
-import { HERITAGE_CRUISE_PRODUCT_ID } from '../services/seedHeritageCruise.ts';
+export const HERITAGE_CRUISE_PRODUCT_ID = 'heritage-standard-sunset-cruise';
 
 const normalize = (value: unknown) =>
   String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 // 1. The 5 canonical published baseline accommodations
-const BASELINE_ACCOMMODATIONS = [
+export const BASELINE_ACCOMMODATIONS = [
   {
     id: 'prod_azambezi',
     slug: 'azambezi-river-lodge',

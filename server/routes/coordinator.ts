@@ -786,10 +786,15 @@ router.get('/products', requireCoordinatorAuth, async (req: AuthenticatedStaffRe
         productMedia.find((m) => m.isPrimary) ||
         productMedia[0];
 
+      let resolvedPrimaryUrl = primaryMedia?.url || p.primaryImageUrl || null;
+      if (resolvedPrimaryUrl && resolvedPrimaryUrl.startsWith('__CHUNKED__:')) {
+        resolvedPrimaryUrl = primaryMedia?.id ? `/api/media/render/${primaryMedia.id}` : null;
+      }
+
       return {
         ...p,
         operatorName: p.operatorName || op?.name || 'Unassigned — review required',
-        primaryImageUrl: primaryMedia?.url || null,
+        primaryImageUrl: resolvedPrimaryUrl,
         mediaCount: productMedia.length,
       };
     });

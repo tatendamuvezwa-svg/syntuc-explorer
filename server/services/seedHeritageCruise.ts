@@ -86,3 +86,43 @@ export async function ensureHeritageCruiseProduct(): Promise<void> {
     console.warn('[Catalog] Notice ensuring Heritage Standard Sunset Cruise product:', error);
   }
 }
+
+export async function ensureBaselineAccommodations(): Promise<void> {
+  try {
+    const { BASELINE_ACCOMMODATIONS } = await import('../lib/baselineCatalog.ts');
+    for (const acc of BASELINE_ACCOMMODATIONS) {
+      const existing = await getDocById<any>('products', acc.id);
+      if (!existing) {
+        await setDocById('products', acc.id, {
+          ...acc,
+          isPublished: true,
+          updatedAt: new Date().toISOString(),
+        }, true);
+      }
+      if (acc.primaryMediaId) {
+        const existingMedia = await getDocById<any>('media_assets', acc.primaryMediaId);
+        if (!existingMedia) {
+          await setDocById('media_assets', acc.primaryMediaId, {
+            id: acc.primaryMediaId,
+            ownerType: 'product',
+            ownerId: acc.id,
+            mediaType: 'IMAGE',
+            url: acc.primaryImageUrl,
+            thumbnailUrl: acc.primaryImageUrl,
+            isPrimary: true,
+            displayOrder: 0,
+            caption: acc.name,
+            altText: acc.primaryImageAlt || acc.name,
+            sourceName: acc.operatorName,
+            sourceType: 'SUPPLIER_OFFICIAL',
+            verificationState: 'ESTABLISHED',
+            createdAt: acc.createdAt,
+          }, true);
+        }
+      }
+    }
+    console.log('[Catalog] Canonical baseline accommodations verified and persisted in Firestore.');
+  } catch (error) {
+    console.warn('[Catalog] Notice ensuring baseline accommodations:', error);
+  }
+}

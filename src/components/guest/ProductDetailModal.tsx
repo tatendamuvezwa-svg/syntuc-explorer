@@ -17,6 +17,7 @@ import {
   Play,
   Layers,
   Ship,
+  Compass,
 } from 'lucide-react';
 import { Room, MediaAsset } from '../../types/index.ts';
 
@@ -594,20 +595,37 @@ export const ProductDetailModal: React.FC = () => {
 
               <div className="flex items-center space-x-2.5 flex-wrap">
                 {(product.id === 'heritage-standard-sunset-cruise' || product.categorySlug === 'river-cruises') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeProductDetail();
-                      window.history.pushState({}, '', `/feedback?product=${encodeURIComponent(product.id)}`);
-                      window.dispatchEvent(new PopStateEvent('popstate'));
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold text-xs transition flex items-center cursor-pointer shadow-2xs"
-                    title="Review this boat cruise"
-                  >
-                    <Ship className="w-3.5 h-3.5 mr-1.5 text-amber-700" />
-                    <span>Review This Cruise</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeProductDetail();
+                        window.history.pushState({}, '', `/onboard?product=${encodeURIComponent(product.id)}`);
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="px-3.5 py-2.5 rounded-xl bg-[#20372B] hover:bg-[#2F4D3C] text-[#E2BE8C] border border-[#E2BE8C]/40 font-semibold text-xs transition flex items-center cursor-pointer shadow-2xs"
+                      title="Open Heritage Cruise onboard guest check-in"
+                    >
+                      <Compass className="w-3.5 h-3.5 mr-1.5 text-[#E2BE8C]" />
+                      <span>Cruise Check-in</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeProductDetail();
+                        window.history.pushState({}, '', `/feedback?product=${encodeURIComponent(product.id)}`);
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-semibold text-xs transition flex items-center cursor-pointer shadow-2xs"
+                      title="Review this boat cruise"
+                    >
+                      <Ship className="w-3.5 h-3.5 mr-1.5 text-amber-700" />
+                      <span>Review This Cruise</span>
+                    </button>
+                  </>
                 )}
 
                 <button

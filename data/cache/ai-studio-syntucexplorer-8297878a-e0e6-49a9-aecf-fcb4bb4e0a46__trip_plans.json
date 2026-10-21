@@ -1,0 +1,38 @@
+[
+  {
+    "id": "trip_28267c2b7f7fab1b71fa0c85",
+    "guestSessionId": "ses_108ab716371d40e7cd6361d3822fbd7d",
+    "title": "My Victoria Falls Journey",
+    "adultsCount": 2,
+    "childrenCount": 0,
+    "createdAt": "2026-10-20T17:59:33.610Z",
+    "updatedAt": "2026-10-20T17:59:33.610Z"
+  },
+  {
+    "id": "trip_09768c5ea71cb8b8db31b0ad",
+    "guestSessionId": "ses_fdcf1751bc92b05ab24e4801f4b0cbc1",
+    "title": "My Victoria Falls Journey",
+    "adultsCount": 2,
+    "childrenCount": 0,
+    "createdAt": "2026-10-20T18:07:06.901Z",
+    "updatedAt": "2026-10-20T18:07:06.901Z"
+  },
+  {
+    "id": "trip_feb83a1216891050d993778b",
+    "title": "My Victoria Falls Journey",
+    "adultsCount": 2,
+    "updatedAt": "2026-10-21T07:16:25.102Z",
+    "guestSessionId": "ses_632dee0edececdf638a2c7804fa8bbed",
+    "childrenCount": 0,
+    "createdAt": "2026-10-21T07:16:25.102Z"
+  },
+  {
+    "id": "trip_97075c73e89e2376c20eaaf4",
+    "guestSessionId": "ses_9f84e8f12c001cf8f2bb3095b09b75e1",
+    "title": "My Victoria Falls Journey",
+    "adultsCount": 2,
+    "childrenCount": 0,
+    "createdAt": "2026-10-21T07:20:15.395Z",
+    "updatedAt": "2026-10-21T07:20:15.395Z"
+  }
+]

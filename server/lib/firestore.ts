@@ -21,13 +21,38 @@ import {
 } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
-import { getBaselineProducts, getBaselinePackages } from './baselineCatalog.ts';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 // Silence internal Firebase WebChannel / gRPC idle stream disconnect warnings
 setLogLevel('silent');
 
-let firestoreInstance: Firestore | null = null;
+const firestoreInstances = new Map<string, Firestore>();
 let firebaseConfig: any = null;
+const databaseContext = new AsyncLocalStorage<string>();
+
+export const SUPPORTED_FIRESTORE_DATABASES = [
+  { id: 'ai-studio-syntucexplorer-8297878a-e0e6-49a9-aecf-fcb4bb4e0a46', label: 'Primary · Syntuc Explorer (Authoritative)' },
+  { id: 'ai-studio-syntucexplorer-60065304-e43e-44fe-88e1-2ee33d74fe10', label: 'Secondary · Sandbox / Backup' },
+] as const;
+
+export function getDefaultFirestoreDatabaseId(): string {
+  const cfg = getFirebaseConfig();
+  return cfg.firestoreDatabaseId || 'ai-studio-syntucexplorer-8297878a-e0e6-49a9-aecf-fcb4bb4e0a46';
+}
+
+export function getActiveFirestoreDatabaseId(): string {
+  return databaseContext.getStore() || getDefaultFirestoreDatabaseId();
+}
+
+export function runWithFirestoreDatabase<T>(databaseId: string, callback: () => T): T {
+  if (
+    databaseId !== getDefaultFirestoreDatabaseId() &&
+    !SUPPORTED_FIRESTORE_DATABASES.some((database) => database.id === databaseId)
+  ) {
+    throw new Error('UNSUPPORTED_FIRESTORE_DATABASE');
+  }
+  return databaseContext.run(databaseId, callback);
+}
 
 // ==========================================
 // CIRCUIT BREAKER & IN-MEMORY RESILIENCE LAYER
@@ -36,8 +61,8 @@ let firebaseConfig: any = null;
 // ==========================================
 
 // Circuit breaker tracking (logging/observability only; never suppresses durable writes or returns false empty arrays)
-const CACHE_TTL_MS = 60_000; // 60 seconds collection TTL
-const QUOTA_COOLDOWN_MS = 15_000; // 15 seconds probe cooldown
+const CACHE_TTL_MS = 300_000; // 5 minutes collection TTL to preserve free-tier daily read limits
+const QUOTA_COOLDOWN_MS = 60_000; // 60 seconds probe cooldown during quota outage
 
 let isFirestoreQuotaExceeded = false;
 let quotaExceededTrippedAt = 0;
@@ -68,13 +93,64 @@ interface CacheEntry<T> {
 
 const collectionCache = new Map<string, CacheEntry<any[]>>();
 const memoryStore = new Map<string, Map<string, any>>();
-let tombstonesCache: CacheEntry<Set<string>> | null = null;
+const tombstonesCache = new Map<string, CacheEntry<Set<string>>>();
+
+const cacheDir = path.resolve(process.cwd(), 'data/cache');
+if (!fs.existsSync(cacheDir)) {
+  fs.mkdirSync(cacheDir, { recursive: true });
+}
+
+export function getDiskCachePath(dbId: string, colName: string): string {
+  const safeDb = dbId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeCol = colName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(cacheDir, `${safeDb}__${safeCol}.json`);
+}
+
+export function saveCollectionToDiskCache(dbId: string, colName: string, items: any[]): void {
+  try {
+    const filePath = getDiskCachePath(dbId, colName);
+    fs.writeFileSync(filePath, JSON.stringify(items, null, 2), 'utf8');
+  } catch (e: any) {
+    console.warn(`[DiskCache] Failed to save snapshot for ${colName}:`, e.message);
+  }
+}
+
+export function loadCollectionFromDiskCache(dbId: string, colName: string): any[] | null {
+  try {
+    const filePath = getDiskCachePath(dbId, colName);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const items = JSON.parse(content);
+      if (Array.isArray(items)) {
+        return items;
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[DiskCache] Failed to load snapshot for ${colName}:`, e.message);
+  }
+  return null;
+}
+
+function scopedKey(name: string): string {
+  return `${getActiveFirestoreDatabaseId()}::${name}`;
+}
 
 function getMemoryCollection(name: string): Map<string, any> {
-  let col = memoryStore.get(name);
+  const key = scopedKey(name);
+  let col = memoryStore.get(key);
   if (!col) {
     col = new Map<string, any>();
-    memoryStore.set(name, col);
+    memoryStore.set(key, col);
+    // Hydrate from disk cache snapshot if available
+    const dbId = getActiveFirestoreDatabaseId();
+    const diskItems = loadCollectionFromDiskCache(dbId, name);
+    if (diskItems && diskItems.length > 0) {
+      for (const item of diskItems) {
+        if (item && item.id) {
+          col.set(item.id, item);
+        }
+      }
+    }
   }
   return col;
 }
@@ -326,8 +402,6 @@ const BASELINE_COLLECTIONS: Record<string, any[]> = {
       lastVerified: '2026-10-14T10:00:00.000Z',
     },
   ],
-  products: getBaselineProducts(),
-  packages: getBaselinePackages(),
 };
 
 // Seed baseline entries into memory store
@@ -367,9 +441,11 @@ export function getFirebaseConfig() {
 }
 
 export function getFirestoreDb(): Firestore {
-  if (firestoreInstance) return firestoreInstance;
-
   const cfg = getFirebaseConfig();
+  const dbId = getActiveFirestoreDatabaseId();
+  const cached = firestoreInstances.get(dbId);
+  if (cached) return cached;
+
   const app = getApps().length > 0
     ? getApps()[0]
     : initializeApp({
@@ -380,21 +456,42 @@ export function getFirestoreDb(): Firestore {
         storageBucket: cfg.storageBucket,
       });
 
-  const dbId = cfg.firestoreDatabaseId || '(default)';
+  let instance: Firestore;
   try {
-    firestoreInstance = initializeFirestore(app, {
+    instance = initializeFirestore(app, {
       experimentalAutoDetectLongPolling: true,
     }, dbId);
   } catch (_) {
-    firestoreInstance = getFirestore(app, dbId);
+    instance = getFirestore(app, dbId);
   }
-  console.log('[Firestore] Authoritative database initialized:', cfg.firestoreDatabaseId);
-  return firestoreInstance;
+  firestoreInstances.set(dbId, instance);
+  console.log('[Firestore] Database instance ready:', dbId);
+  return instance;
 }
 
 export async function getDocById<T = DocumentData>(collectionName: string, id: string): Promise<T | null> {
   const memCol = getMemoryCollection(collectionName);
   const memDoc = memCol.get(id);
+
+  if (isBreakerActive()) {
+    if (memDoc) return memDoc as T;
+    const dbId = getActiveFirestoreDatabaseId();
+    const diskItems = loadCollectionFromDiskCache(dbId, collectionName);
+    if (diskItems) {
+      const match = diskItems.find((d: any) => d.id === id);
+      if (match) {
+        memCol.set(id, match);
+        return match as T;
+      }
+    }
+    if (BASELINE_COLLECTIONS[collectionName]) {
+      const baseline = BASELINE_COLLECTIONS[collectionName].find((d: any) => d.id === id);
+      if (baseline) return baseline as T;
+    }
+    if (['guest_sessions', 'analytics_visitors', 'analytics_sessions', 'healthcheck'].includes(collectionName)) {
+      return null;
+    }
+  }
 
   try {
     const fdb = getFirestoreDb();
@@ -415,9 +512,26 @@ export async function getDocById<T = DocumentData>(collectionName: string, id: s
       console.warn(`[Firestore] Read notice on doc '${collectionName}/${id}', serving cached memory copy:`, err.message);
       return memDoc as T;
     }
+    const dbId = getActiveFirestoreDatabaseId();
+    const diskItems = loadCollectionFromDiskCache(dbId, collectionName);
+    if (diskItems) {
+      const match = diskItems.find((d: any) => d.id === id);
+      if (match) {
+        memCol.set(id, match);
+        return match as T;
+      }
+    }
     if (BASELINE_COLLECTIONS[collectionName]) {
       const baseline = BASELINE_COLLECTIONS[collectionName].find((d: any) => d.id === id);
       if (baseline) return baseline as T;
+    }
+    // For ephemeral session and analytics tracking docs, do not throw fatal crash on quota exhaustion
+    if (['guest_sessions', 'analytics_visitors', 'analytics_sessions', 'healthcheck'].includes(collectionName)) {
+      return null;
+    }
+    if (isQuotaOrNetworkError(err)) {
+      console.warn(`[Firestore] Read notice on doc '${collectionName}/${id}' (quota limit reached, returning null):`, err.message);
+      return null;
     }
     console.error(`[Firestore] Failed to read doc '${collectionName}/${id}':`, err.message);
     throw err;
@@ -434,11 +548,12 @@ export async function setDocById<T extends Record<string, any>>(
   // Durable write to Cloud Firestore must succeed before reporting success
   await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge });
 
-  // Update in-memory cache and invalidate collection cache only after successful durable write
+  // Update in-memory cache, disk cache, and invalidate collection cache only after successful durable write
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   memCol.set(id, merge ? { ...existing, id, ...data } : { id, ...data });
-  collectionCache.delete(collectionName);
+  collectionCache.delete(scopedKey(collectionName));
+  saveCollectionToDiskCache(getActiveFirestoreDatabaseId(), collectionName, Array.from(memCol.values()));
 }
 
 export async function updateDocById(
@@ -450,11 +565,12 @@ export async function updateDocById(
   // Durable write to Cloud Firestore must succeed before reporting success
   await setDoc(doc(fdb, collectionName, id), { id, ...data }, { merge: true });
 
-  // Update in-memory cache and invalidate collection cache only after successful durable write
+  // Update in-memory cache, disk cache, and invalidate collection cache only after successful durable write
   const memCol = getMemoryCollection(collectionName);
   const existing = memCol.get(id) || {};
   memCol.set(id, { ...existing, id, ...data });
-  collectionCache.delete(collectionName);
+  collectionCache.delete(scopedKey(collectionName));
+  saveCollectionToDiskCache(getActiveFirestoreDatabaseId(), collectionName, Array.from(memCol.values()));
 }
 
 export async function deleteDocById(collectionName: string, id: string): Promise<void> {
@@ -462,10 +578,11 @@ export async function deleteDocById(collectionName: string, id: string): Promise
   // Durable deletion from Cloud Firestore must succeed before updating local state
   await deleteDoc(doc(fdb, collectionName, id));
 
-  // Invalidate local memory and collection cache only after successful durable deletion
+  // Invalidate local memory, disk cache, and collection cache only after successful durable deletion
   const memCol = getMemoryCollection(collectionName);
   memCol.delete(id);
-  collectionCache.delete(collectionName);
+  collectionCache.delete(scopedKey(collectionName));
+  saveCollectionToDiskCache(getActiveFirestoreDatabaseId(), collectionName, Array.from(memCol.values()));
 }
 
 export async function getCollectionDocs<T = DocumentData>(
@@ -477,11 +594,37 @@ export async function getCollectionDocs<T = DocumentData>(
   const memCol = getMemoryCollection(collectionName);
 
   // Serve from memory collection cache if fresh (prevents query storms and preserves free-tier read limits)
-  if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
-    const cached = collectionCache.get(collectionName);
+  if (!hasConstraints) {
+    const cached = collectionCache.get(scopedKey(collectionName));
     if (cached && now - cached.timestamp < CACHE_TTL_MS) {
       return [...cached.data] as T[];
     }
+  }
+
+  // If breaker is currently active, serve cached or baseline data directly without redundant network roundtrips
+  if (isBreakerActive()) {
+    const cached = collectionCache.get(scopedKey(collectionName));
+    if (!hasConstraints && cached && Array.isArray(cached.data)) {
+      return [...cached.data] as T[];
+    }
+    const allDocs = Array.from(memCol.values());
+    if (allDocs.length > 0) {
+      return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
+    }
+    const dbId = getActiveFirestoreDatabaseId();
+    const diskItems = loadCollectionFromDiskCache(dbId, collectionName);
+    if (Array.isArray(diskItems)) {
+      for (const item of diskItems) {
+        if (item && item.id) memCol.set(item.id, item);
+      }
+      return (hasConstraints ? diskItems.filter((d) => matchesConstraints(d, constraints)) : [...diskItems]) as T[];
+    }
+    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
+      const baselines = BASELINE_COLLECTIONS[collectionName];
+      return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
+    }
+    // If breaker is active and no cached data exists, return empty array to prevent hammering exhausted quota
+    return [] as T[];
   }
 
   try {
@@ -492,7 +635,7 @@ export async function getCollectionDocs<T = DocumentData>(
     const docs: T[] = [];
     if (!hasConstraints) {
       memCol.clear();
-      collectionCache.delete(collectionName);
+      collectionCache.delete(scopedKey(collectionName));
     }
     snap.forEach((d) => {
       const docData = { id: d.id, ...d.data() } as T;
@@ -500,8 +643,9 @@ export async function getCollectionDocs<T = DocumentData>(
       memCol.set(d.id, docData);
     });
 
-    if (!hasConstraints && !isAuthoritativeCatalogCollection(collectionName)) {
-      collectionCache.set(collectionName, { timestamp: now, data: docs });
+    if (!hasConstraints) {
+      collectionCache.set(scopedKey(collectionName), { timestamp: now, data: docs });
+      saveCollectionToDiskCache(getActiveFirestoreDatabaseId(), collectionName, docs);
     }
 
     return docs;
@@ -510,28 +654,44 @@ export async function getCollectionDocs<T = DocumentData>(
       tripCircuitBreaker();
     }
 
-    // If cached collection data exists in memory, serve it with a warning
-    const cached = collectionCache.get(collectionName);
-    if (!hasConstraints && cached && cached.data.length > 0) {
-      console.warn(`[Firestore] Read error on '${collectionName}', serving ${cached.data.length} cached items:`, err.message);
+    // If cached collection data exists in memory, serve it with a notice
+    const cached = collectionCache.get(scopedKey(collectionName));
+    if (!hasConstraints && cached && Array.isArray(cached.data)) {
+      console.warn(`[Firestore] Read notice on '${collectionName}', serving ${cached.data.length} cached items:`, err.message);
       return [...cached.data] as T[];
     }
 
     const allDocs = Array.from(memCol.values());
     if (allDocs.length > 0) {
-      console.warn(`[Firestore] Read error on '${collectionName}', serving ${allDocs.length} memory items:`, err.message);
+      console.warn(`[Firestore] Read notice on '${collectionName}', serving ${allDocs.length} memory items:`, err.message);
       return (hasConstraints ? allDocs.filter((d) => matchesConstraints(d, constraints)) : [...allDocs]) as T[];
     }
 
-    // Static taxonomies only have baseline fallbacks
-    if (BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
+    // Try disk cache snapshot
+    const dbId = getActiveFirestoreDatabaseId();
+    const diskItems = loadCollectionFromDiskCache(dbId, collectionName);
+    if (Array.isArray(diskItems)) {
+      for (const item of diskItems) {
+        if (item && item.id) memCol.set(item.id, item);
+      }
+      console.warn(`[Firestore] Read notice on '${collectionName}', serving ${diskItems.length} disk cached items:`, err.message);
+      return (hasConstraints ? diskItems.filter((d) => matchesConstraints(d, constraints)) : [...diskItems]) as T[];
+    }
+
+    // Static taxonomies baseline fallback
+    if (getActiveFirestoreDatabaseId() === getDefaultFirestoreDatabaseId() && BASELINE_COLLECTIONS[collectionName] && BASELINE_COLLECTIONS[collectionName].length > 0) {
       const baselines = BASELINE_COLLECTIONS[collectionName];
-      console.warn(`[Firestore] Read error on '${collectionName}', serving taxonomy baseline:`, err.message);
+      console.warn(`[Firestore] Read notice on '${collectionName}', serving taxonomy baseline:`, err.message);
       return (hasConstraints ? baselines.filter((d) => matchesConstraints(d, constraints)) : [...baselines]) as T[];
     }
 
-    // For operational collections (reservations, reviews, guests, messages, notes, media, products, packages),
-    // NEVER mask database errors as valid empty arrays! Throw the error so the caller can report it.
+    // If quota is exhausted or circuit breaker active, log notice and return empty array to prevent 503 cascades
+    if (isQuotaOrNetworkError(err)) {
+      console.warn(`[Firestore] Authoritative collection read notice for '${collectionName}' (quota limit reached, serving empty fallback):`, err.message);
+      return [] as T[];
+    }
+
+    // For other fatal failures, log error and re-throw
     console.error(`[Firestore] Authoritative collection read failed for '${collectionName}':`, err.message);
     throw err;
   }
@@ -543,13 +703,14 @@ export async function getCollectionDocs<T = DocumentData>(
  */
 export async function recordTombstone(collectionName: string, recordId: string): Promise<void> {
   const tombstoneId = `${collectionName}_${recordId}`;
-
-  // Update in-memory tombstones
-  if (!tombstonesCache) {
-    tombstonesCache = { timestamp: Date.now(), data: new Set<string>() };
+  const dbKey = getActiveFirestoreDatabaseId();
+  let cached = tombstonesCache.get(dbKey);
+  if (!cached) {
+    cached = { timestamp: Date.now(), data: new Set<string>() };
+    tombstonesCache.set(dbKey, cached);
   }
-  tombstonesCache.data.add(tombstoneId);
-  tombstonesCache.data.add(recordId);
+  cached.data.add(tombstoneId);
+  cached.data.add(recordId);
 
   if (isBreakerActive()) {
     return;
@@ -573,7 +734,8 @@ export async function recordTombstone(collectionName: string, recordId: string):
 /** Strict point lookup for callers that must fail closed when tombstone reads fail. */
 export async function hasTombstone(collectionName: string, recordId: string): Promise<boolean> {
   const tombstoneId = `${collectionName}_${recordId}`;
-  if (tombstonesCache && (tombstonesCache.data.has(tombstoneId) || tombstonesCache.data.has(recordId))) {
+  const cached = tombstonesCache.get(getActiveFirestoreDatabaseId());
+  if (cached && (cached.data.has(tombstoneId) || cached.data.has(recordId))) {
     return true;
   }
   if (isBreakerActive()) {
@@ -587,17 +749,19 @@ export async function hasTombstone(collectionName: string, recordId: string): Pr
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();
     }
-    return tombstonesCache ? (tombstonesCache.data.has(tombstoneId) || tombstonesCache.data.has(recordId)) : false;
+    return cached ? (cached.data.has(tombstoneId) || cached.data.has(recordId)) : false;
   }
 }
 
 export async function getTombstones(): Promise<Set<string>> {
   const now = Date.now();
-  if (tombstonesCache && now - tombstonesCache.timestamp < CACHE_TTL_MS) {
-    return new Set(tombstonesCache.data);
+  const dbKey = getActiveFirestoreDatabaseId();
+  const cached = tombstonesCache.get(dbKey);
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    return new Set(cached.data);
   }
 
-  const set: Set<string> = tombstonesCache ? new Set<string>(tombstonesCache.data) : new Set<string>();
+  const set: Set<string> = cached ? new Set<string>(cached.data) : new Set<string>();
 
   if (isBreakerActive()) {
     return set;
@@ -613,7 +777,7 @@ export async function getTombstones(): Promise<Set<string>> {
         set.add(`${data.collectionName}_${data.recordId}`);
       }
     });
-    tombstonesCache = { timestamp: now, data: set };
+    tombstonesCache.set(dbKey, { timestamp: now, data: set });
   } catch (err: any) {
     if (isQuotaOrNetworkError(err)) {
       tripCircuitBreaker();

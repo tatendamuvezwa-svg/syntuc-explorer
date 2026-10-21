@@ -14,6 +14,7 @@ import { SyntucAssistantWidget } from './components/guest/SyntucAssistantWidget.
 import { CoordinatorPortal } from './components/coordinator/CoordinatorPortal.tsx';
 import { FeedbackView } from './components/guest/FeedbackView.tsx';
 import { TalkView } from './components/guest/TalkView.tsx';
+import { HeritageOnboardView } from './components/guest/HeritageOnboardView.tsx';
 import { CheckCircle2 } from 'lucide-react';
 import { initAnalyticsSession, trackEvent } from './services/analytics.ts';
 
@@ -45,6 +46,9 @@ function MainAppContent() {
     if (path === '/talk' || path === '/talk-to-syntuc' || path === '/chat') {
       return { path: '/talk' };
     }
+    if (path.startsWith('/onboard') || path === '/check-in' || path.startsWith('/check-in/')) {
+      return { path: '/onboard' };
+    }
     return { path: '/' };
   });
 
@@ -61,6 +65,8 @@ function MainAppContent() {
         setCurrentRoute({ path: '/feedback' });
       } else if (path === '/talk' || path === '/talk-to-syntuc' || path === '/chat') {
         setCurrentRoute({ path: '/talk' });
+      } else if (path.startsWith('/onboard') || path === '/check-in' || path.startsWith('/check-in/')) {
+        setCurrentRoute({ path: '/onboard' });
       } else {
         setCurrentRoute({ path: '/' });
       }
@@ -82,6 +88,9 @@ function MainAppContent() {
     } else if (path === '/talk' || path === '/talk-to-syntuc' || path === '/chat') {
       window.history.pushState({}, '', path);
       setCurrentRoute({ path: '/talk' });
+    } else if (path.startsWith('/onboard') || path === '/check-in' || path.startsWith('/check-in/')) {
+      window.history.pushState({}, '', path);
+      setCurrentRoute({ path: '/onboard' });
     } else {
       window.history.pushState({}, '', '/');
       setCurrentRoute({ path: '/' });
@@ -122,6 +131,13 @@ function MainAppContent() {
           <FeedbackView onBackToExplore={() => navigateTo('/')} />
         ) : currentRoute.path === '/talk' ? (
           <TalkView onBackToExplore={() => navigateTo('/')} />
+        ) : currentRoute.path === '/onboard' ? (
+          <HeritageOnboardView
+            onBackToExplore={() => navigateTo('/')}
+            onOpenFeedback={(productId) =>
+              navigateTo(productId ? `/feedback?product=${encodeURIComponent(productId)}` : '/feedback')
+            }
+          />
         ) : (
           <>
             {activeTab === 'packages' ? (
@@ -130,6 +146,9 @@ function MainAppContent() {
               <ExploreView
                 onOpenFeedback={(productId) =>
                   navigateTo(productId ? `/feedback?product=${encodeURIComponent(productId)}` : '/feedback')
+                }
+                onOpenOnboardCheckin={(productId) =>
+                  navigateTo(productId ? `/onboard?product=${encodeURIComponent(productId)}` : '/onboard')
                 }
               />
             )}

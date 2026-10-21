@@ -1281,7 +1281,11 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
                             }`}
                           >
                             <div className="relative h-28 bg-stone-200">
-                              <img src={med.url} alt="" className="w-full h-full object-cover" />
+                              <img
+                                src={med.url?.startsWith('__CHUNKED__:') ? `/api/media/render/${med.id}` : med.url}
+                                alt={med.altText || med.caption || ''}
+                                className="w-full h-full object-cover"
+                              />
                               {med.isPrimary && (
                                 <span className="absolute top-1.5 left-1.5 text-[9px] font-extrabold uppercase bg-amber-600 text-white px-2 py-0.5 rounded shadow-xs flex items-center">
                                   <Star className="w-2.5 h-2.5 mr-1 fill-white" /> PRIMARY

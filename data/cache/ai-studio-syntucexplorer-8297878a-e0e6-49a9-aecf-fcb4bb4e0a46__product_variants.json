@@ -1,0 +1,143 @@
+[
+  {
+    "id": "var_1792048173510_a9zyll",
+    "productId": "prod_zambezi_explorer_cruise",
+    "priceBasis": "per_person",
+    "priceDelta": "0",
+    "name": "Luxury Deck (Lower & Mid Decks)",
+    "isActive": true,
+    "updatedAt": "2026-10-15T07:09:33.510Z",
+    "compulsoryFees": [],
+    "currency": "USD",
+    "duration": null,
+    "description": null,
+    "evidenceStatus": "SUPPORTED",
+    "createdAt": "2026-10-15T07:09:33.510Z",
+    "price": 69
+  },
+  {
+    "id": "var_test_1791976394367",
+    "category": "Private Bow",
+    "priceDelta": "0",
+    "priceBasis": "per_person",
+    "price": 160,
+    "createdAt": "2026-10-14T11:13:14.387Z",
+    "supplierNote": "Updated tariff: US$160 + US$12 National Parks fee.",
+    "evidenceStatus": "SUPPORTED",
+    "duration": null,
+    "currency": "USD",
+    "productId": "prod_zambezi_explorer_cruise",
+    "compulsoryFees": [
+      {
+        "name": "National Parks River Conservation Fee",
+        "currency": "USD",
+        "amount": 12,
+        "basis": "per_person"
+      }
+    ],
+    "updatedAt": "2026-10-14T11:13:14.971Z",
+    "name": "Sunset Private Bow Lounge",
+    "description": "Exclusive front bow lounge for couples or small private parties.",
+    "isActive": false
+  },
+  {
+    "id": "var_test_1792048612644",
+    "priceBasis": "per_person",
+    "duration": null,
+    "priceDelta": "0",
+    "supplierNote": "Updated tariff: US$160 + US$12 National Parks fee.",
+    "evidenceStatus": "SUPPORTED",
+    "category": "Private Bow",
+    "createdAt": "2026-10-15T07:16:52.644Z",
+    "compulsoryFees": [
+      {
+        "basis": "per_person",
+        "currency": "USD",
+        "amount": 12,
+        "name": "National Parks River Conservation Fee"
+      }
+    ],
+    "description": "Exclusive front bow lounge for couples or small private parties.",
+    "updatedAt": "2026-10-15T07:16:53.269Z",
+    "productId": "prod_zambezi_explorer_cruise",
+    "isActive": false,
+    "price": 160,
+    "name": "Sunset Private Bow Lounge (612644)",
+    "currency": "USD"
+  },
+  {
+    "id": "var_test_1792048632362",
+    "name": "Sunset Private Bow Lounge (632362)",
+    "currency": "USD",
+    "description": "Exclusive front bow lounge for couples or small private parties.",
+    "updatedAt": "2026-10-15T07:17:13.073Z",
+    "evidenceStatus": "SUPPORTED",
+    "isActive": false,
+    "priceDelta": "0",
+    "productId": "prod_zambezi_explorer_cruise",
+    "priceBasis": "per_person",
+    "compulsoryFees": [
+      {
+        "currency": "USD",
+        "basis": "per_person",
+        "name": "National Parks River Conservation Fee",
+        "amount": 12
+      }
+    ],
+    "createdAt": "2026-10-15T07:17:12.362Z",
+    "category": "Private Bow",
+    "price": 160,
+    "duration": null,
+    "supplierNote": "Updated tariff: US$160 + US$12 National Parks fee."
+  },
+  {
+    "id": "var_test_1792048776762",
+    "isActive": false,
+    "priceDelta": "0",
+    "priceBasis": "per_person",
+    "currency": "USD",
+    "createdAt": "2026-10-15T07:19:36.762Z",
+    "name": "Sunset Private Bow Lounge (776762)",
+    "evidenceStatus": "SUPPORTED",
+    "price": 160,
+    "productId": "prod_zambezi_explorer_cruise",
+    "updatedAt": "2026-10-15T07:19:37.536Z",
+    "compulsoryFees": [
+      {
+        "currency": "USD",
+        "name": "National Parks River Conservation Fee",
+        "basis": "per_person",
+        "amount": 12
+      }
+    ],
+    "duration": null,
+    "description": "Exclusive front bow lounge for couples or small private parties.",
+    "category": "Private Bow",
+    "supplierNote": "Updated tariff: US$160 + US$12 National Parks fee."
+  },
+  {
+    "id": "var_test_1792567195099",
+    "currency": "USD",
+    "compulsoryFees": [
+      {
+        "name": "National Parks River Conservation Fee",
+        "currency": "USD",
+        "basis": "per_person",
+        "amount": 12
+      }
+    ],
+    "updatedAt": "2026-10-21T07:19:55.856Z",
+    "isActive": false,
+    "productId": "prod_zambezi_explorer_cruise",
+    "description": "Exclusive front bow lounge for couples or small private parties.",
+    "createdAt": "2026-10-21T07:19:55.099Z",
+    "supplierNote": "Updated tariff: US$160 + US$12 National Parks fee.",
+    "category": "Private Bow",
+    "name": "Sunset Private Bow Lounge (195099)",
+    "duration": null,
+    "price": 160,
+    "evidenceStatus": "SUPPORTED",
+    "priceDelta": "0",
+    "priceBasis": "per_person"
+  }
+]

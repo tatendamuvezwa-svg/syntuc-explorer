@@ -66,7 +66,9 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
 
   // Operational data
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [leadsError, setLeadsError] = useState<string | null>(null);
   const [reservations, setReservations] = useState<ReservationRequest[]>([]);
+  const [reservationsError, setReservationsError] = useState<string | null>(null);
   const [boatCruiseReviews, setBoatCruiseReviews] = useState<BoatCruiseReview[]>([]);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -157,8 +159,26 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
     setLoadingData(true);
     try {
       const [leadsRes, resRes, prodRes, pkgRes, opsRes, propsRes, catsRes, srcRes, reviewsRes] = await Promise.all([
-        api.getLeads().catch((err) => { console.warn('Notice loading leads:', err); return []; }),
-        api.getReservations().catch((err) => { console.warn('Notice loading reservations:', err); return []; }),
+        api.getLeads()
+          .then((data) => {
+            setLeadsError(null);
+            return data;
+          })
+          .catch((err) => {
+            console.warn('Notice loading leads:', err);
+            setLeadsError(err?.message || 'Failed to load leads');
+            return [];
+          }),
+        api.getReservations()
+          .then((data) => {
+            setReservationsError(null);
+            return data;
+          })
+          .catch((err) => {
+            console.warn('Notice loading reservations:', err);
+            setReservationsError(err?.message || 'Failed to load reservations');
+            return [];
+          }),
         api.getCoordinatorProducts().catch((err) => { console.warn('Notice loading products:', err); return []; }),
         api.getCoordinatorPackages().catch((err) => { console.warn('Notice loading packages:', err); return []; }),
         api.getOperators().catch((err) => { console.warn('Notice loading operators:', err); return []; }),
@@ -171,15 +191,15 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
           return [];
         }),
       ]);
-      setLeads(leadsRes);
-      setReservations(resRes);
-      setProducts(prodRes);
-      setPackages(pkgRes);
-      setOperators(opsRes);
-      setProperties(propsRes);
-      setCategories(catsRes);
-      setSources(srcRes);
-      setBoatCruiseReviews(reviewsRes);
+      setLeads(Array.isArray(leadsRes) ? leadsRes : []);
+      setReservations(Array.isArray(resRes) ? resRes : []);
+      setProducts(Array.isArray(prodRes) ? prodRes : []);
+      setPackages(Array.isArray(pkgRes) ? pkgRes : []);
+      setOperators(Array.isArray(opsRes) ? opsRes : []);
+      setProperties(Array.isArray(propsRes) ? propsRes : []);
+      setCategories(Array.isArray(catsRes) ? catsRes : []);
+      setSources(Array.isArray(srcRes) ? srcRes : []);
+      setBoatCruiseReviews(Array.isArray(reviewsRes) ? reviewsRes : []);
       if (staffUser?.role === 'admin') {
         try {
           const usersRes = await api.getStaffUsers();
@@ -557,7 +577,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
           >
-            Reservation Requests ({reservations.length})
+            Reservation Requests ({reservationsError ? 'Unavailable' : reservations.length})
           </button>
           <button
             onClick={() => setActiveTab('reviews')}
@@ -568,7 +588,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
             }`}
           >
             <Ship className="w-3.5 h-3.5" />
-            <span>Boat Cruise Reviews ({boatCruiseReviews.length})</span>
+            <span>Boat Cruise Reviews ({reviewsError ? 'Unavailable' : boatCruiseReviews.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -589,7 +609,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
           >
-            Leads & Touch History ({leads.length})
+            Leads & Touch History ({leadsError ? 'Unavailable' : leads.length})
           </button>
           <button
             onClick={() => setActiveTab('products')}
@@ -664,9 +684,30 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
               Active Reservation Requests
             </h3>
 
+            {reservationsError && (
+              <div
+                role="alert"
+                className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{reservationsError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAllData}
+                  className="font-bold underline text-rose-900 ml-4 hover:opacity-80"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden shadow-xs divide-y divide-stone-100">
-              {reservations.length === 0 ? (
-                <div className="p-12 text-center text-xs text-stone-400">No reservations submitted yet.</div>
+              {!Array.isArray(reservations) || reservations.length === 0 ? (
+                <div className="p-12 text-center text-xs text-stone-400">
+                  {reservationsError ? 'Unable to load reservations from database.' : 'No reservations submitted yet.'}
+                </div>
               ) : (
                 reservations.map(res => (
                   <div
@@ -817,6 +858,25 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
               Commercial Leads & First Touch / Last Touch Tracking
             </h3>
 
+            {leadsError && (
+              <div
+                role="alert"
+                className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{leadsError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAllData}
+                  className="font-bold underline text-rose-900 ml-4 hover:opacity-80"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-3xl border border-stone-200 overflow-hidden shadow-xs">
               <table className="w-full text-left text-xs">
                 <thead className="bg-stone-50 border-b border-stone-200 text-stone-500 uppercase tracking-wider text-[10px]">
@@ -830,7 +890,14 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
-                  {leads.map(lead => (
+                  {!Array.isArray(leads) || leads.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-xs text-stone-400">
+                        {leadsError ? 'Unable to load leads from database.' : 'No leads captured yet.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    leads.map(lead => (
                     <tr key={lead.id} className="hover:bg-stone-50/50">
                       <td className="p-4 font-bold text-stone-900">{lead.guest?.fullName || 'Anonymous Guest'}</td>
                       <td className="p-4 text-stone-600">{lead.guest?.email}</td>
@@ -847,7 +914,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
                         </span>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -2041,7 +2108,7 @@ export const CoordinatorPortal: React.FC<CoordinatorPortalProps> = ({
         }}
         onStatusUpdated={(updatedRes) => {
           setReservations(prev =>
-            prev.map(r => (r.id === updatedRes.id ? { ...r, ...updatedRes } : r))
+            Array.isArray(prev) ? prev.map(r => (r.id === updatedRes.id ? { ...r, ...updatedRes } : r)) : []
           );
           setSelectedRes(updatedRes);
           notify(`Reservation #${updatedRes.referenceNumber} status updated to ${updatedRes.status}`);

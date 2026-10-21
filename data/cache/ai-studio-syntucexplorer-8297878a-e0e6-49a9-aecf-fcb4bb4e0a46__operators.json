@@ -1,0 +1,56 @@
+[
+  {
+    "id": "op_cresta",
+    "location": "Victoria Falls, Zimbabwe",
+    "contactPhone": "+263 83 284 4561",
+    "name": "Cresta Hotels Zimbabwe",
+    "contactEmail": "azambezi@cresta.co.zw",
+    "description": "Operators of A'Zambezi River Lodge on the banks of the Zambezi.",
+    "verified": true
+  },
+  {
+    "id": "op_machaba",
+    "location": "Zambezi National Park, Zimbabwe",
+    "description": "Luxury classic safari camps including Old Drift Lodge.",
+    "contactEmail": "enquiries@machabasafaris.com",
+    "name": "Machaba Safaris",
+    "contactPhone": "+27 82 579 5249",
+    "verified": true
+  },
+  {
+    "id": "op_pure_africa",
+    "verified": true,
+    "contactEmail": "experience@pure.africa",
+    "description": "Operators of the Zambezi Explorer and The Eatery Waterfront dining.",
+    "contactPhone": "+263 83 284 1005",
+    "name": "Pure Africa Experiences",
+    "location": "Victoria Falls, Zimbabwe"
+  },
+  {
+    "id": "op_rtg",
+    "verified": true,
+    "contactPhone": "+263 83 284 4583",
+    "description": "Leading hospitality group operating the Victoria Falls Rainbow Hotel.",
+    "location": "Victoria Falls, Zimbabwe",
+    "contactEmail": "reservations@rtg.co.zw",
+    "name": "Rainbow Tourism Group (RTG)"
+  },
+  {
+    "id": "op_shearwater",
+    "name": "Shearwater Victoria Falls",
+    "contactEmail": "adventures@shearwatervf.com",
+    "location": "Victoria Falls, Zimbabwe",
+    "description": "Premier adventure and touring operator in Victoria Falls since 1982.",
+    "contactPhone": "+263 83 284 4471",
+    "verified": true
+  },
+  {
+    "id": "op_wildhorizons",
+    "contactEmail": "info@wildhorizons.co.zw",
+    "name": "Wild Horizons",
+    "location": "Victoria Falls, Zimbabwe",
+    "description": "Pioneers in high-end eco-tourism, wildlife sanctuaries, and scenic flights.",
+    "contactPhone": "+263 83 284 4219",
+    "verified": true
+  }
+]
